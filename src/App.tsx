@@ -55,7 +55,7 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/sejaatendido-pwa">
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<LoginScreen />} />
