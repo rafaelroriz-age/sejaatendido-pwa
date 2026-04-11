@@ -19,6 +19,7 @@ import BankDetails from './pages/BankDetails';
 import NotificationPreferences from './pages/NotificationPreferences';
 import Earnings from './pages/Earnings';
 import RepasseDetail from './pages/RepasseDetail';
+import LandingPage from './pages/LandingPage';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -57,6 +58,9 @@ export default function App() {
   return (
     <BrowserRouter basename="/sejaatendido-pwa">
       <Routes>
+        {/* Landing page */}
+        <Route path="/" element={<LandingPage />} />
+
         {/* Public routes */}
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/signup" element={<Signup />} />
