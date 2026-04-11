@@ -1,0 +1,117 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { registerRequest } from '../services/api';
+import { showErrorAlert } from '../utils/errorHandler';
+import Colors, { Font, Space, Radius } from '../theme/colors';
+
+export default function SignupScreen() {
+  const navigate = useNavigate();
+  const [nome, setNome] = useState('');
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [confirmaSenha, setConfirmaSenha] = useState('');
+  const [tipo, setTipo] = useState<'PACIENTE' | 'MEDICO'>('PACIENTE');
+  const [crm, setCrm] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSignup() {
+    if (!nome || !email || !senha || !confirmaSenha) { window.alert('Preencha todos os campos'); return; }
+    if (senha !== confirmaSenha) { window.alert('As senhas não coincidem'); return; }
+    if (senha.length < 6) { window.alert('A senha deve ter no mínimo 6 caracteres'); return; }
+    if (tipo === 'MEDICO' && !crm.trim()) { window.alert('Informe o número do CRM'); return; }
+
+    setLoading(true);
+    try {
+      await registerRequest({ nome, email, senha, tipo });
+      const msg = tipo === 'MEDICO'
+        ? 'Conta criada com sucesso. Seu cadastro será analisado pela equipe antes da aprovação.'
+        : 'Conta criada com sucesso. Faça login para continuar.';
+      window.alert(msg);
+      navigate('/login');
+    } catch (error) {
+      showErrorAlert(error, 'Erro ao criar conta');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: Space.lg, fontSize: Font.md,
+    color: Colors.textPrimary, backgroundColor: 'transparent',
+    border: 'none', outline: 'none',
+  };
+  const wrapperStyle: React.CSSProperties = {
+    backgroundColor: Colors.inputBg, borderRadius: Radius.md,
+    marginBottom: Space.md + 2, border: `1px solid ${Colors.border}`,
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primary,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+          }}>
+            <span style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>SA</span>
+          </div>
+          <h1 style={{ fontSize: Font.xl - 4, fontWeight: 800, color: Colors.textPrimary }}>Criar Conta</h1>
+          <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: Space.xl }}>Preencha seus dados para começar</p>
+        </div>
+
+        <div style={{
+          backgroundColor: Colors.card, borderRadius: Radius.xl, padding: Space.xl,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
+        }}>
+          <div style={wrapperStyle}><input placeholder="Nome completo" value={nome} onChange={e => setNome(e.target.value)} disabled={loading} style={inputStyle} /></div>
+          <div style={wrapperStyle}><input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} style={inputStyle} /></div>
+          <div style={wrapperStyle}><input type="password" placeholder="Senha (mínimo 6 caracteres)" value={senha} onChange={e => setSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
+          <div style={wrapperStyle}><input type="password" placeholder="Confirmar senha" value={confirmaSenha} onChange={e => setConfirmaSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
+
+          <div style={{ marginBottom: Space.lg }}>
+            <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Tipo de conta</label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {(['PACIENTE', 'MEDICO'] as const).map(t => (
+                <button key={t} onClick={() => setTipo(t)} disabled={loading}
+                  style={{
+                    flex: 1, padding: '12px 16px', borderRadius: Radius.md, border: `2px solid ${tipo === t ? Colors.primary : Colors.border}`,
+                    backgroundColor: tipo === t ? Colors.accent : Colors.inputBg, color: tipo === t ? Colors.primary : Colors.textSecondary,
+                    fontWeight: 700, fontSize: Font.sm, cursor: 'pointer',
+                  }}
+                >
+                  {t === 'PACIENTE' ? 'Paciente' : 'Médico'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {tipo === 'MEDICO' && (
+            <div>
+              <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Dados Profissionais</label>
+              <div style={wrapperStyle}><input placeholder="Número do CRM" value={crm} onChange={e => setCrm(e.target.value)} disabled={loading} style={{ ...inputStyle, textTransform: 'uppercase' }} /></div>
+            </div>
+          )}
+
+          <button onClick={handleSignup} disabled={loading}
+            style={{
+              width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md,
+              padding: Space.lg, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginTop: Space.sm, opacity: loading ? 0.6 : 1,
+              boxShadow: `0 6px 12px ${Colors.primary}59`,
+            }}
+          >
+            {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: Font.md + 1, fontWeight: 700 }}>Cadastrar</span>}
+          </button>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: Space.xl }}>
+          <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>
+            Já tem conta?{' '}
+            <span onClick={() => navigate('/login')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>Fazer login</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
