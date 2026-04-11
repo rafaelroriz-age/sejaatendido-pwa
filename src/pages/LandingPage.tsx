@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Colors from '../theme/colors';
 
 const ANDROID_APK_URL = 'https://expo.dev/accounts/rafaelroriz_dev/projects/sejaatendido-rn/builds/d5be9460-48c7-4829-be64-b386d0bf62c1';
+const OFFICIAL_LOGO = '/sejaatendido-pwa/logo-oficial.png';
 
 /* ─── Inline SVG logo matching the provided brand image ─── */
 function Logo({ size = 48 }: { size?: number }) {
@@ -159,7 +160,7 @@ export default function LandingPage() {
       <nav style={s.nav}>
         <div style={s.navInner}>
           <a href="#" style={s.navBrand}>
-            <SmallLogo />
+            <img src={OFFICIAL_LOGO} alt="Logo Seja Atendido" style={{ width: 36, height: 36, objectFit: 'contain' }} />
             <span style={s.navBrandText}>Seja Atendido</span>
           </a>
           {!isMobile && (
@@ -212,7 +213,7 @@ export default function LandingPage() {
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <div style={s.phoneMockup}>
                 <div style={s.phoneScreen}>
-                  <Logo size={80} />
+                  <img src={OFFICIAL_LOGO} alt="Logo oficial Seja Atendido" style={{ width: 96, height: 96, objectFit: 'contain' }} />
                   <div style={s.phoneAppName}>Seja Atendido</div>
                   <div style={s.phoneTag}>Sua saúde em boas mãos</div>
                   <div style={{ marginTop: 16, padding: '8px 20px', background: Colors.primary, color: '#fff', borderRadius: 999, fontWeight: 700, fontSize: 13 }}>
