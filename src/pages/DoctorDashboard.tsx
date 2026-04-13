@@ -1,37 +1,67 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearAuthSession, User } from '../storage/localStorage';
+import { Consulta, fetchConsultasMedico } from '../services/api';
+import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import Card from '../components/Card';
 
-interface DemoConsulta { id: string; paciente: string; data: string; hora: string; status: string; motivo: string; }
-
-const DEMO: DemoConsulta[] = [
-  { id: '1', paciente: 'Maria Santos', data: '2025-01-20', hora: '09:00', status: 'CONFIRMADA', motivo: 'Check-up anual' },
-  { id: '2', paciente: 'João Oliveira', data: '2025-01-20', hora: '10:30', status: 'PENDENTE', motivo: 'Dor de cabeça recorrente' },
-  { id: '3', paciente: 'Ana Costa', data: '2025-01-21', hora: '14:00', status: 'CONFIRMADA', motivo: 'Retorno' },
-  { id: '4', paciente: 'Carlos Pereira', data: '2025-01-22', hora: '08:30', status: 'PENDENTE', motivo: 'Consulta inicial' },
-];
-
 export default function DoctorDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const consultas = DEMO;
+  const [consultas, setConsultas] = useState<Consulta[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => { getUser().then(setUser); }, []);
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      try {
+        const [userData, consultasData] = await Promise.all([getUser(), fetchConsultasMedico()]);
+        setUser(userData);
+        setConsultas(consultasData);
+      } catch (error) {
+        showErrorAlert(error, 'Erro ao carregar consultas do médico');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   async function handleLogout() {
     await clearAuthSession();
     navigate('/login', { replace: true });
   }
 
+  function toYmd(dateIso: string) {
+    const d = new Date(dateIso);
+    return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
+  }
+
+  function formatDate(dateIso: string) {
+    return new Date(dateIso).toLocaleDateString('pt-BR');
+  }
+
+  function formatHour(dateIso: string) {
+    return new Date(dateIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function getPatientName(c: Consulta) {
+    const anyConsulta = c as any;
+    return anyConsulta.paciente?.nome || anyConsulta.pacienteNome || anyConsulta.nomePaciente || 'Paciente';
+  }
+
   const stats = {
-    hoje: consultas.filter(c => c.data === '2025-01-20').length,
-    pendentes: consultas.filter(c => c.status === 'PENDENTE').length,
-    confirmadas: consultas.filter(c => c.status === 'CONFIRMADA').length,
+    hoje: consultas.filter(c => toYmd(c.data) === toYmd(new Date().toISOString())).length,
+    pendentes: consultas.filter(c => c.status.toUpperCase().includes('PEND')).length,
+    confirmadas: consultas.filter(c => c.status.toUpperCase().includes('CONFIRM')).length,
   };
+
+  if (loading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: Colors.bg }}><div className="spinner--primary spinner" /></div>;
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg }}>
@@ -72,21 +102,21 @@ export default function DoctorDashboard() {
           <Card key={c.id} style={{ marginBottom: Space.md }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Space.md }}>
               <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                <Avatar name={c.paciente} size={42} color={Colors.doctor} />
+                <Avatar name={getPatientName(c)} size={42} color={Colors.doctor} />
                 <div style={{ marginLeft: Space.md }}>
-                  <div style={{ fontSize: Font.sm + 1, fontWeight: 700, color: Colors.textPrimary }}>{c.paciente}</div>
+                  <div style={{ fontSize: Font.sm + 1, fontWeight: 700, color: Colors.textPrimary }}>{getPatientName(c)}</div>
                   <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>{c.motivo}</div>
                 </div>
               </div>
               <Badge status={c.status} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: Space.md }}>
-              <span style={{ backgroundColor: Colors.inputBg, borderRadius: Radius.sm, padding: '6px 10px', fontSize: Font.xs + 1, fontWeight: 700, color: Colors.textPrimary, marginRight: Space.md }}>{c.hora}</span>
-              <span style={{ fontSize: Font.xs + 1, color: Colors.textSecondary }}>{c.data}</span>
+              <span style={{ backgroundColor: Colors.inputBg, borderRadius: Radius.sm, padding: '6px 10px', fontSize: Font.xs + 1, fontWeight: 700, color: Colors.textPrimary, marginRight: Space.md }}>{formatHour(c.data)}</span>
+              <span style={{ fontSize: Font.xs + 1, color: Colors.textSecondary }}>{formatDate(c.data)}</span>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ flex: 1, backgroundColor: Colors.doctor, borderRadius: Radius.md, padding: 12, border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Iniciar Consulta</button>
-              {c.status === 'PENDENTE' && (
+              {c.status.toUpperCase().includes('PEND') && (
                 <button style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.success, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Confirmar</button>
               )}
             </div>

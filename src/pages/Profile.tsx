@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUser, clearAuthSession, User } from '../storage/localStorage';
+import { getUser, clearAuthSession, saveUser, User } from '../storage/localStorage';
+import { savePerfil } from '../services/api';
+import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Card from '../components/Card';
@@ -11,6 +13,7 @@ export default function Profile() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -22,7 +25,32 @@ export default function Profile() {
     }).finally(() => setLoading(false));
   }, []);
 
-  function handleSave() { window.alert('Perfil atualizado com sucesso!'); setEditing(false); }
+  async function handleSave() {
+    if (!nome.trim()) {
+      window.alert('Informe seu nome.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await savePerfil({ nome: nome.trim(), telefone: telefone.trim() || undefined });
+      const updatedUser: User = {
+        id: updated.id,
+        nome: updated.nome,
+        email: updated.email,
+        tipo: updated.tipo,
+      };
+      await saveUser(updatedUser);
+      setUser(updatedUser);
+      setNome(updated.nome);
+      setEmail(updated.email);
+      setEditing(false);
+      window.alert('Perfil atualizado com sucesso!');
+    } catch (error) {
+      showErrorAlert(error, 'Erro ao salvar perfil');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleLogout() {
     if (!window.confirm('Tem certeza que deseja sair?')) return;
@@ -72,7 +100,7 @@ export default function Profile() {
             <input value={telefone} onChange={e => setTelefone(e.target.value)} disabled={!editing} placeholder="(00) 00000-0000" style={{ ...inputStyle, color: editing ? Colors.textPrimary : Colors.textSecondary }} />
           </div>
           {editing && (
-            <button onClick={handleSave} style={{ width: '100%', backgroundColor: Colors.success, borderRadius: Radius.md, padding: Space.lg, border: 'none', color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', boxShadow: `0 6px 12px ${Colors.success}59` }}>Salvar Alterações</button>
+            <button onClick={handleSave} disabled={saving} style={{ width: '100%', backgroundColor: Colors.success, borderRadius: Radius.md, padding: Space.lg, border: 'none', color: '#fff', fontSize: 16, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, boxShadow: `0 6px 12px ${Colors.success}59` }}>{saving ? 'Salvando...' : 'Salvar Alterações'}</button>
           )}
         </Card>
 

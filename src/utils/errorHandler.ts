@@ -28,6 +28,10 @@ export const handleApiError = (error: unknown): string => {
 };
 
 export const showErrorAlert = (error: unknown, title = 'Erro') => {
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.error('[API_ERROR]', error);
+  }
   const message = handleApiError(error);
   window.alert(`${title}\n${message}`);
 };

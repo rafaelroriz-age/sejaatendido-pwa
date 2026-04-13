@@ -4,6 +4,19 @@ import { registerRequest } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Falha ao ler arquivo de diploma'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function SignupScreen() {
   const navigate = useNavigate();
   const [nome, setNome] = useState('');
@@ -12,6 +25,7 @@ export default function SignupScreen() {
   const [confirmaSenha, setConfirmaSenha] = useState('');
   const [tipo, setTipo] = useState<'PACIENTE' | 'MEDICO'>('PACIENTE');
   const [crm, setCrm] = useState('');
+  const [diplomaFile, setDiplomaFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSignup() {
@@ -19,10 +33,24 @@ export default function SignupScreen() {
     if (senha !== confirmaSenha) { window.alert('As senhas não coincidem'); return; }
     if (senha.length < 6) { window.alert('A senha deve ter no mínimo 6 caracteres'); return; }
     if (tipo === 'MEDICO' && !crm.trim()) { window.alert('Informe o número do CRM'); return; }
+    if (tipo === 'MEDICO' && !diplomaFile) { window.alert('Envie o diploma para cadastro de médico'); return; }
 
     setLoading(true);
     try {
-      await registerRequest({ nome, email, senha, tipo });
+      const payload: Parameters<typeof registerRequest>[0] = {
+        nome,
+        email,
+        senha,
+        tipo,
+      };
+      if (tipo === 'MEDICO') {
+        payload.crm = crm.trim().toUpperCase();
+        if (diplomaFile) {
+          payload.diplomaFileName = diplomaFile.name;
+          payload.diplomaFileBase64 = await fileToBase64(diplomaFile);
+        }
+      }
+      await registerRequest(payload);
       const msg = tipo === 'MEDICO'
         ? 'Conta criada com sucesso. Seu cadastro será analisado pela equipe antes da aprovação.'
         : 'Conta criada com sucesso. Faça login para continuar.';
@@ -88,7 +116,19 @@ export default function SignupScreen() {
           {tipo === 'MEDICO' && (
             <div>
               <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Dados Profissionais</label>
-              <div style={wrapperStyle}><input placeholder="Número do CRM" value={crm} onChange={e => setCrm(e.target.value)} disabled={loading} style={{ ...inputStyle, textTransform: 'uppercase' }} /></div>
+              <div style={wrapperStyle}><input placeholder="Número do CRM" value={crm} onChange={e => setCrm(e.target.value.toUpperCase())} disabled={loading} style={{ ...inputStyle, textTransform: 'uppercase' }} /></div>
+              <div style={wrapperStyle}>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={e => setDiplomaFile(e.target.files?.[0] || null)}
+                  disabled={loading}
+                  style={{ ...inputStyle, paddingTop: 12, paddingBottom: 12 }}
+                />
+              </div>
+              <span style={{ fontSize: 12, color: Colors.textMuted, display: 'block', marginTop: -8, marginBottom: 12 }}>
+                Envie diploma ou comprovante profissional (PDF ou imagem)
+              </span>
             </div>
           )}
 

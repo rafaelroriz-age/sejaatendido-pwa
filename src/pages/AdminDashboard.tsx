@@ -22,7 +22,9 @@ export default function AdminDashboard() {
       const [userData, medicosData] = await Promise.all([getUser(), fetchMedicosPendentes()]);
       setUser(userData);
       setPendentes(medicosData);
-    } catch {} finally { setLoading(false); }
+    } catch (error) {
+      showErrorAlert(error, 'Erro ao carregar painel admin');
+    } finally { setLoading(false); }
   }
 
   async function handleAprovar(id: string) {
@@ -35,7 +37,11 @@ export default function AdminDashboard() {
   async function handleRecusar(id: string) {
     if (!window.confirm('Tem certeza que deseja recusar este médico?')) return;
     setActionLoading(id);
-    try { await recusarMedico(id); setPendentes(p => p.filter(m => m.id !== id)); }
+    try {
+      await recusarMedico(id);
+      setPendentes(p => p.filter(m => m.id !== id));
+      window.alert('Médico recusado com sucesso.');
+    }
     catch (error) { showErrorAlert(error, 'Erro ao recusar médico'); }
     finally { setActionLoading(null); }
   }
@@ -73,6 +79,12 @@ export default function AdminDashboard() {
       </div>
 
       <div style={{ padding: 20 }}>
+        <button onClick={loadData} style={{
+          width: '100%', backgroundColor: Colors.card, borderRadius: Radius.md, padding: 12,
+          border: `1px solid ${Colors.border}`, color: Colors.textPrimary, fontWeight: 700,
+          cursor: 'pointer', marginBottom: 12,
+        }}>Atualizar dados</button>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: Space.xl }}>
           {stats.map(s => (
             <Card key={s.label} style={{ textAlign: 'center' }}>

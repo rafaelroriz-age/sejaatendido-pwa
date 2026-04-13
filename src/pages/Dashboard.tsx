@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchMinhasConsultas, Consulta } from '../services/api';
+import { cancelConsulta, fetchMinhasConsultas, Consulta } from '../services/api';
 import { clearAuthSession, getUser } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
@@ -14,6 +14,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
 
   useEffect(() => { loadData(); loadUserName(); }, []);
@@ -32,6 +33,27 @@ export default function Dashboard() {
   function isPendingPayment(status: string) {
     const n = (status ?? '').toLowerCase();
     return n.includes('pend') || n.includes('aguard') || n.includes('waiting') || n.includes('unpaid');
+  }
+
+  function canCancel(status: string) {
+    const n = (status ?? '').toLowerCase();
+    if (n.includes('cancel')) return false;
+    if (n.includes('conclu') || n.includes('finaliz')) return false;
+    return true;
+  }
+
+  async function handleCancelConsulta(id: string) {
+    if (!window.confirm('Deseja realmente cancelar esta consulta?')) return;
+    setCancelingId(id);
+    try {
+      await cancelConsulta(id);
+      setConsultas(prev => prev.filter(c => c.id !== id));
+      window.alert('Consulta cancelada com sucesso.');
+    } catch (error) {
+      showErrorAlert(error, 'Erro ao cancelar consulta');
+    } finally {
+      setCancelingId(null);
+    }
   }
 
   async function handleLogout() {
@@ -142,6 +164,19 @@ export default function Dashboard() {
                 width: '100%', backgroundColor: Colors.accent, padding: 14, borderRadius: Radius.md,
                 marginTop: Space.md, border: 'none', color: Colors.primary, fontWeight: 700, cursor: 'pointer',
               }}>Entrar na consulta</button>
+            )}
+            {canCancel(c.status) && (
+              <button
+                onClick={() => handleCancelConsulta(c.id)}
+                disabled={cancelingId === c.id}
+                style={{
+                  width: '100%', backgroundColor: Colors.errorLight, padding: 14, borderRadius: Radius.md,
+                  marginTop: Space.md, border: `1px solid ${Colors.error}`, color: Colors.error,
+                  fontWeight: 700, cursor: cancelingId === c.id ? 'not-allowed' : 'pointer', opacity: cancelingId === c.id ? 0.6 : 1,
+                }}
+              >
+                {cancelingId === c.id ? 'Cancelando...' : 'Cancelar consulta'}
+              </button>
             )}
           </Card>
         ))}
