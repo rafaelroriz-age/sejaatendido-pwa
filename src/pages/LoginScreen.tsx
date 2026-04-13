@@ -1,15 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loginRequest } from '../services/api';
+import { loginRequest, loginGoogleRequest } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: Record<string, unknown>) => void;
+          renderButton: (el: HTMLElement, config: Record<string, unknown>) => void;
+        };
+      };
+    };
+  }
+}
+
+const LOGO_URL = `${import.meta.env.BASE_URL}logo-oficial.png`;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
 export default function LoginScreen() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  const navigateByRole = useCallback((tipo: string) => {
+    switch (tipo) {
+      case 'ADMIN': navigate('/admin', { replace: true }); break;
+      case 'MEDICO': navigate('/doctor', { replace: true }); break;
+      default: navigate('/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   async function handleLogin() {
     if (!email || !senha) { window.alert('Preencha email e senha'); return; }
@@ -17,11 +42,7 @@ export default function LoginScreen() {
     try {
       const { token, usuario, refreshToken } = await loginRequest({ email, senha });
       await saveAuthSession(token, usuario, refreshToken);
-      switch (usuario.tipo) {
-        case 'ADMIN': navigate('/admin', { replace: true }); break;
-        case 'MEDICO': navigate('/doctor', { replace: true }); break;
-        default: navigate('/dashboard', { replace: true });
-      }
+      navigateByRole(usuario.tipo);
     } catch (error) {
       showErrorAlert(error, 'Erro ao fazer login');
     } finally {
@@ -29,16 +50,57 @@ export default function LoginScreen() {
     }
   }
 
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !googleBtnRef.current) return;
+
+    function tryRender() {
+      if (!window.google?.accounts?.id || !googleBtnRef.current) return false;
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response: { credential: string }) => {
+          setLoading(true);
+          try {
+            const { token, usuario, refreshToken } = await loginGoogleRequest(response.credential);
+            await saveAuthSession(token, usuario, refreshToken);
+            navigateByRole(usuario.tipo);
+          } catch (error) {
+            showErrorAlert(error, 'Erro ao fazer login com Google');
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        type: 'standard',
+        shape: 'rectangular',
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        width: googleBtnRef.current.offsetWidth,
+        locale: 'pt-BR',
+      });
+      return true;
+    }
+
+    if (!tryRender()) {
+      const interval = setInterval(() => {
+        if (tryRender()) clearInterval(interval);
+      }, 200);
+      return () => clearInterval(interval);
+    }
+  }, [navigateByRole]);
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
-          }}>
-            <span style={{ color: '#fff', fontSize: 28, fontWeight: 800 }}>SA</span>
-          </div>
+          <img
+            src={LOGO_URL}
+            alt="Seja Atendido"
+            style={{ width: 120, height: 120, objectFit: 'contain', marginBottom: 8 }}
+          />
           <h1 style={{ fontSize: Font.xl, fontWeight: 800, color: Colors.textPrimary, marginBottom: 4 }}>Seja Atendido</h1>
           <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: Space.xxl, letterSpacing: 0.3 }}>Acesse sua conta</p>
         </div>
@@ -100,6 +162,20 @@ export default function LoginScreen() {
               : <span style={{ color: '#fff', fontSize: Font.md + 1, fontWeight: 700, letterSpacing: 0.5 }}>Entrar</span>
             }
           </button>
+
+          {GOOGLE_CLIENT_ID && (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'center', margin: `${Space.lg}px 0`,
+                gap: 12,
+              }}>
+                <div style={{ flex: 1, height: 1, backgroundColor: Colors.border }} />
+                <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>ou</span>
+                <div style={{ flex: 1, height: 1, backgroundColor: Colors.border }} />
+              </div>
+              <div ref={googleBtnRef} style={{ width: '100%' }} />
+            </>
+          )}
         </div>
 
         <div style={{ textAlign: 'center', marginTop: Space.xl }}>
