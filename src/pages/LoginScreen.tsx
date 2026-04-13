@@ -32,7 +32,8 @@ export default function LoginScreen() {
     switch (tipo) {
       case 'ADMIN': navigate('/admin', { replace: true }); break;
       case 'MEDICO': navigate('/doctor', { replace: true }); break;
-      default: navigate('/dashboard', { replace: true });
+      case 'PACIENTE': navigate('/dashboard', { replace: true }); break;
+      default: navigate('/home', { replace: true });
     }
   }, [navigate]);
 
@@ -99,9 +100,8 @@ export default function LoginScreen() {
           <img
             src={LOGO_URL}
             alt="Seja Atendido"
-            style={{ width: 120, height: 120, objectFit: 'contain', marginBottom: 8 }}
+            style={{ width: '100%', maxHeight: 160, objectFit: 'contain', marginBottom: 8 }}
           />
-          <h1 style={{ fontSize: Font.xl, fontWeight: 800, color: Colors.textPrimary, marginBottom: 4 }}>Seja Atendido</h1>
           <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: Space.xxl, letterSpacing: 0.3 }}>Acesse sua conta</p>
         </div>
 
@@ -119,6 +119,8 @@ export default function LoginScreen() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               disabled={loading}
+              autoComplete="email"
+              aria-label="Email"
               style={{
                 width: '100%', padding: Space.lg, fontSize: Font.md,
                 color: Colors.textPrimary, backgroundColor: 'transparent',
@@ -137,6 +139,8 @@ export default function LoginScreen() {
               value={senha}
               onChange={e => setSenha(e.target.value)}
               disabled={loading}
+              autoComplete="current-password"
+              aria-label="Senha"
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
               style={{
                 width: '100%', padding: Space.lg, fontSize: Font.md,
@@ -154,7 +158,7 @@ export default function LoginScreen() {
               padding: Space.lg, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               marginTop: Space.sm, opacity: loading ? 0.6 : 1,
-              boxShadow: `0 6px 12px ${Colors.primary}59`,
+              boxShadow: '0 6px 12px rgba(255, 51, 102, 0.35)',
             }}
           >
             {loading
