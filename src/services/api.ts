@@ -81,7 +81,15 @@ api.interceptors.response.use(
 
 // ============ AUTH ============
 export interface LoginRequest { email: string; senha: string; }
-export interface RegisterRequest { nome: string; email: string; senha: string; tipo: 'PACIENTE' | 'MEDICO'; }
+export interface RegisterRequest {
+  nome: string;
+  email: string;
+  senha: string;
+  tipo: 'PACIENTE' | 'MEDICO';
+  crm?: string;
+  diplomaFileName?: string;
+  diplomaFileBase64?: string;
+}
 export interface AuthResponse {
   token: string;
   refreshToken?: string;
@@ -90,6 +98,10 @@ export interface AuthResponse {
 
 export async function loginRequest(data: LoginRequest): Promise<AuthResponse> {
   const r = await api.post('/auth/login', data); return r.data;
+}
+export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
+  const r = await api.post('/auth/google', { idToken });
+  return r.data;
 }
 export async function registerRequest(data: RegisterRequest): Promise<{ id: string }> {
   const r = await api.post('/auth/registro', data); return r.data;
@@ -117,6 +129,12 @@ export interface Medico {
 }
 export async function fetchMedicos(): Promise<Medico[]> { return (await api.get('/medicos')).data; }
 export async function fetchMedicoById(id: string): Promise<Medico> { return (await api.get(`/medicos/${id}`)).data; }
+export async function fetchDisponibilidadeMedico(medicoId: string, data: string): Promise<string[]> {
+  const response = await api.get(`/medicos/${medicoId}/disponibilidade`, { params: { data } });
+  const payload = response.data;
+  if (Array.isArray(payload)) return payload;
+  return payload?.slots ?? payload?.horarios ?? payload?.disponibilidade ?? [];
+}
 
 // ============ CONSULTAS ============
 export interface Consulta {
@@ -125,6 +143,7 @@ export interface Consulta {
 }
 export interface CreateConsultaRequest { medicoId: string; data: string; motivo: string; }
 export async function fetchMinhasConsultas(): Promise<Consulta[]> { return (await api.get('/paciente/consultas')).data; }
+export async function fetchConsultasMedico(): Promise<Consulta[]> { return (await api.get('/medico/consultas')).data; }
 export async function createConsulta(data: CreateConsultaRequest): Promise<Consulta> { return (await api.post('/paciente/consultas', data)).data; }
 export async function cancelConsulta(id: string): Promise<void> { await api.delete(`/paciente/consultas/${id}`); }
 
@@ -156,6 +175,34 @@ export interface PreferenciasNotificacao {
 }
 export async function fetchPreferenciasNotificacao(): Promise<PreferenciasNotificacao | null> { return (await api.get('/usuario/preferencias-notificacao')).data; }
 export async function savePreferenciasNotificacao(data: PreferenciasNotificacao): Promise<void> { await api.put('/usuario/preferencias-notificacao', data); }
+export interface PushTokenPayload {
+  endpoint: string;
+  keys?: { p256dh?: string; auth?: string };
+  expirationTime?: number | null;
+  userAgent?: string;
+  platform?: string;
+}
+export async function registerPushToken(data: PushTokenPayload): Promise<void> {
+  await api.post('/usuario/push-token', data);
+}
+
+// ============ PERFIL ============
+export interface SavePerfilRequest {
+  nome?: string;
+  telefone?: string;
+  senhaAtual?: string;
+  novaSenha?: string;
+}
+export interface PerfilResponse {
+  id: string;
+  nome: string;
+  email: string;
+  tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN';
+  telefone?: string;
+}
+export async function savePerfil(data: SavePerfilRequest): Promise<PerfilResponse> {
+  return (await api.put('/usuario/perfil', data)).data;
+}
 
 // ============ SALDO / GANHOS ============
 export interface SaldoMedico {

@@ -21,8 +21,34 @@ import Earnings from './pages/Earnings';
 import RepasseDetail from './pages/RepasseDetail';
 import LandingPage from './pages/LandingPage';
 
+type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
+
+function roleHome(tipo?: Role) {
+  if (tipo === 'ADMIN') return '/admin';
+  if (tipo === 'MEDICO') return '/doctor';
+  return '/dashboard';
+}
+
+function ProtectedRoute({
+  token,
+  userRole,
+  allow,
+  children,
+}: {
+  token: string | null;
+  userRole?: Role;
+  allow?: Role[];
+  children: React.ReactElement;
+}) {
+  if (!token || !userRole) return <Navigate to="/login" replace />;
+  if (allow && !allow.includes(userRole)) return <Navigate to={roleHome(userRole)} replace />;
+  return children;
+}
+
 export default function App() {
   const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<Role | undefined>(undefined);
   const [initialRoute, setInitialRoute] = useState('/login');
 
   useEffect(() => {
@@ -33,12 +59,18 @@ export default function App() {
     try {
       const { token, user } = await getAuthSession();
       if (token && user) {
+        setToken(token);
+        setUserRole(user.tipo);
         switch (user.tipo) {
           case 'ADMIN': setInitialRoute('/admin'); break;
           case 'MEDICO': setInitialRoute('/doctor'); break;
           case 'PACIENTE': setInitialRoute('/dashboard'); break;
           default: setInitialRoute('/login');
         }
+      } else {
+        setToken(null);
+        setUserRole(undefined);
+        setInitialRoute('/login');
       }
     } catch (error) {
       console.error('Error checking auth:', error);
@@ -62,24 +94,24 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
 
         {/* Public routes */}
-        <Route path="/login" element={<LoginScreen />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={token ? <Navigate to={roleHome(userRole)} replace /> : <LoginScreen />} />
+        <Route path="/signup" element={token ? <Navigate to={roleHome(userRole)} replace /> : <Signup />} />
         <Route path="/confirmar-email" element={<ConfirmEmail />} />
         <Route path="/resetar-senha" element={<ResetPassword />} />
 
         {/* Authenticated routes */}
-        <Route path="/home" element={<HomeScreen />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/doctor" element={<DoctorDashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/book" element={<BookAppointment />} />
-        <Route path="/payment" element={<Payment />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/bank-details" element={<BankDetails />} />
-        <Route path="/notifications" element={<NotificationPreferences />} />
-        <Route path="/earnings" element={<Earnings />} />
-        <Route path="/repasse/:id" element={<RepasseDetail />} />
+        <Route path="/home" element={<ProtectedRoute token={token} userRole={userRole}><HomeScreen /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute token={token} userRole={userRole} allow={['PACIENTE']}><Dashboard /></ProtectedRoute>} />
+        <Route path="/doctor" element={<ProtectedRoute token={token} userRole={userRole} allow={['MEDICO']}><DoctorDashboard /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute token={token} userRole={userRole} allow={['ADMIN']}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/book" element={<ProtectedRoute token={token} userRole={userRole} allow={['PACIENTE']}><BookAppointment /></ProtectedRoute>} />
+        <Route path="/payment" element={<ProtectedRoute token={token} userRole={userRole} allow={['PACIENTE']}><Payment /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute token={token} userRole={userRole}><Profile /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute token={token} userRole={userRole}><Chat /></ProtectedRoute>} />
+        <Route path="/bank-details" element={<ProtectedRoute token={token} userRole={userRole} allow={['MEDICO']}><BankDetails /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute token={token} userRole={userRole}><NotificationPreferences /></ProtectedRoute>} />
+        <Route path="/earnings" element={<ProtectedRoute token={token} userRole={userRole} allow={['MEDICO']}><Earnings /></ProtectedRoute>} />
+        <Route path="/repasse/:id" element={<ProtectedRoute token={token} userRole={userRole} allow={['MEDICO']}><RepasseDetail /></ProtectedRoute>} />
 
         {/* Default redirect */}
         <Route path="*" element={<Navigate to={initialRoute} replace />} />

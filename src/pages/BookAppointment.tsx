@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchMedicos, createConsulta, Medico } from '../services/api';
+import axios from 'axios';
+import { fetchMedicos, createConsulta, fetchDisponibilidadeMedico, Medico } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
@@ -17,9 +18,11 @@ export default function BookAppointment() {
   const [selectedMedico, setSelectedMedico] = useState<Medico | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [motivo, setMotivo] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   const dates = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i + 1); return d; });
 
@@ -27,8 +30,31 @@ export default function BookAppointment() {
     fetchMedicos().then(setMedicos).catch(e => showErrorAlert(e, 'Erro ao carregar médicos')).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    async function loadDisponibilidade() {
+      if (!selectedMedico || !selectedDate) {
+        setAvailableSlots([]);
+        return;
+      }
+      setAvailabilityLoading(true);
+      try {
+        const slots = await fetchDisponibilidadeMedico(selectedMedico.id, selectedDate);
+        setAvailableSlots(slots);
+        if (selectedTime && !slots.includes(selectedTime)) setSelectedTime(null);
+      } catch (error) {
+        setAvailableSlots([]);
+        showErrorAlert(error, 'Erro ao consultar disponibilidade');
+      } finally {
+        setAvailabilityLoading(false);
+      }
+    }
+
+    loadDisponibilidade();
+  }, [selectedMedico, selectedDate]);
+
   async function handleConfirm() {
     if (!selectedMedico || !selectedDate || !selectedTime) { window.alert('Selecione médico, data e horário'); return; }
+    if (!availableSlots.includes(selectedTime)) { window.alert('Este horário não está mais disponível. Escolha outro.'); return; }
     const dateObj = new Date(selectedDate);
     const [h, m] = selectedTime.split(':');
     dateObj.setHours(parseInt(h), parseInt(m), 0, 0);
@@ -37,7 +63,18 @@ export default function BookAppointment() {
       await createConsulta({ medicoId: selectedMedico.id, data: dateObj.toISOString(), motivo: motivo || 'Consulta geral' });
       window.alert('Consulta agendada com sucesso!');
       navigate(-1);
-    } catch (error) { showErrorAlert(error, 'Erro ao agendar consulta'); }
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        window.alert('Conflito de agenda: o horário acabou de ser ocupado. Escolha outro slot.');
+        setSelectedTime(null);
+        if (selectedMedico && selectedDate) {
+          const slots = await fetchDisponibilidadeMedico(selectedMedico.id, selectedDate);
+          setAvailableSlots(slots);
+        }
+      } else {
+        showErrorAlert(error, 'Erro ao agendar consulta');
+      }
+    }
     finally { setSubmitting(false); }
   }
 
@@ -121,12 +158,23 @@ export default function BookAppointment() {
         </div>
 
         <h4 style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary, marginTop: Space.lg, marginBottom: Space.md, letterSpacing: -0.3 }}>Horário</h4>
+        {!selectedMedico || !selectedDate ? (
+          <div style={{ fontSize: 13, color: Colors.textMuted, marginBottom: 12 }}>Selecione médico e data para ver horários disponíveis.</div>
+        ) : availabilityLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div className="spinner--primary spinner" style={{ width: 18, height: 18 }} />
+            <span style={{ fontSize: 13, color: Colors.textSecondary }}>Carregando disponibilidade...</span>
+          </div>
+        ) : availableSlots.length === 0 ? (
+          <div style={{ fontSize: 13, color: Colors.warning, marginBottom: 12 }}>Sem horários livres nesta data.</div>
+        ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TIME_SLOTS.map(slot => {
+            const enabled = !selectedMedico || !selectedDate ? false : availableSlots.includes(slot);
             const sel = selectedTime === slot;
             return (
-              <div key={slot} onClick={() => setSelectedTime(slot)}
-                style={{ minWidth: 72, backgroundColor: sel ? Colors.primary : Colors.card, borderRadius: Radius.md, padding: '12px 16px', textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: 'pointer' }}
+              <div key={slot} onClick={() => enabled && setSelectedTime(slot)}
+                style={{ minWidth: 72, backgroundColor: sel ? Colors.primary : Colors.card, borderRadius: Radius.md, padding: '12px 16px', textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: enabled ? 'pointer' : 'not-allowed', opacity: enabled ? 1 : 0.45 }}
               >
                 <span style={{ fontSize: 14, fontWeight: 700, color: sel ? '#fff' : Colors.textPrimary }}>{slot}</span>
               </div>
