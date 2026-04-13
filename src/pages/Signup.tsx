@@ -77,12 +77,11 @@ export default function SignupScreen() {
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primary,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
-          }}>
-            <span style={{ color: '#fff', fontSize: 22, fontWeight: 800 }}>SA</span>
-          </div>
+          <img
+            src={`${import.meta.env.BASE_URL}logo-oficial.png`}
+            alt="Seja Atendido"
+            style={{ width: '100%', maxHeight: 120, objectFit: 'contain', marginBottom: 8 }}
+          />
           <h1 style={{ fontSize: Font.xl - 4, fontWeight: 800, color: Colors.textPrimary }}>Criar Conta</h1>
           <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: Space.xl }}>Preencha seus dados para começar</p>
         </div>
