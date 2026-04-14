@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPasswordRequest } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
@@ -11,6 +11,10 @@ export default function ResetPassword() {
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token) navigate('/esqueci-senha', { replace: true });
+  }, [token, navigate]);
 
   async function handleReset() {
     if (!senha || !confirmarSenha) { window.alert('Preencha ambos os campos'); return; }

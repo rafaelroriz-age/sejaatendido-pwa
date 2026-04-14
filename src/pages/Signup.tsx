@@ -28,10 +28,16 @@ export default function SignupScreen() {
   const [diplomaFile, setDiplomaFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [registered, setRegistered] = useState(false);
+
   async function handleSignup() {
     if (!nome || !email || !senha || !confirmaSenha) { window.alert('Preencha todos os campos'); return; }
     if (senha !== confirmaSenha) { window.alert('As senhas não coincidem'); return; }
-    if (senha.length < 6) { window.alert('A senha deve ter no mínimo 6 caracteres'); return; }
+    if (senha.length < 8) { window.alert('A senha deve ter pelo menos 8 caracteres'); return; }
+    if (!/[A-Z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra maiúscula'); return; }
+    if (!/[a-z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra minúscula'); return; }
+    if (!/[0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um número'); return; }
+    if (!/[^A-Za-z0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um caractere especial'); return; }
     if (tipo === 'MEDICO' && !crm.trim()) { window.alert('Informe o número do CRM'); return; }
     if (tipo === 'MEDICO' && !diplomaFile) { window.alert('Envie o diploma para cadastro de médico'); return; }
 
@@ -51,11 +57,7 @@ export default function SignupScreen() {
         }
       }
       await registerRequest(payload);
-      const msg = tipo === 'MEDICO'
-        ? 'Conta criada com sucesso. Seu cadastro será analisado pela equipe antes da aprovação.'
-        : 'Conta criada com sucesso. Faça login para continuar.';
-      window.alert(msg);
-      navigate('/login');
+      setRegistered(true);
     } catch (error) {
       showErrorAlert(error, 'Erro ao criar conta');
     } finally {
@@ -72,6 +74,27 @@ export default function SignupScreen() {
     backgroundColor: Colors.inputBg, borderRadius: Radius.md,
     marginBottom: Space.md + 2, border: `1px solid ${Colors.border}`,
   };
+
+  if (registered) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <div style={{ backgroundColor: Colors.card, borderRadius: 24, padding: 36, textAlign: 'center', width: '100%', maxWidth: 380, boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
+          <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}>📧</div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 8 }}>Conta Criada!</h2>
+          <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>
+            Enviamos um email de confirmação para <strong>{email}</strong>. Verifique sua caixa de entrada e spam para ativar sua conta.
+            {tipo === 'MEDICO' && ' Seu cadastro médico será analisado pela equipe.'}
+          </p>
+          <button onClick={() => navigate('/login', { replace: true })} style={{
+            width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Space.lg,
+            border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D`,
+          }}>
+            <span style={{ color: '#fff', fontSize: Font.md, fontWeight: 700 }}>Ir para Login</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
@@ -92,7 +115,7 @@ export default function SignupScreen() {
         }}>
           <div style={wrapperStyle}><input placeholder="Nome completo" value={nome} onChange={e => setNome(e.target.value)} disabled={loading} style={inputStyle} /></div>
           <div style={wrapperStyle}><input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} style={inputStyle} /></div>
-          <div style={wrapperStyle}><input type="password" placeholder="Senha (mínimo 6 caracteres)" value={senha} onChange={e => setSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
+          <div style={wrapperStyle}><input type="password" placeholder="Senha (mín. 8, maiúsc., minúsc., número, especial)" value={senha} onChange={e => setSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
           <div style={wrapperStyle}><input type="password" placeholder="Confirmar senha" value={confirmaSenha} onChange={e => setConfirmaSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
 
           <div style={{ marginBottom: Space.lg }}>

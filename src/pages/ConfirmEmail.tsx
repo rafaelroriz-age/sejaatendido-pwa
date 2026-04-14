@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { confirmEmailRequest } from '../services/api';
+import { confirmEmailRequest, resendConfirmEmailRequest } from '../services/api';
 import Colors from '../theme/colors';
 
 type Status = 'loading' | 'success' | 'error';
@@ -58,6 +58,16 @@ export default function ConfirmEmail() {
             <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>{message}</p>
             <button onClick={doConfirm} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: 14, padding: 16, border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D` }}>
               <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Tentar Novamente</span>
+            </button>
+            <button onClick={async () => {
+              try {
+                await resendConfirmEmailRequest();
+                window.alert('Email de confirmação reenviado! Verifique sua caixa de entrada.');
+              } catch {
+                window.alert('Não foi possível reenviar. Faça login primeiro para reenviar o email.');
+              }
+            }} style={{ width: '100%', backgroundColor: 'transparent', borderRadius: 14, padding: 16, border: `2px solid ${Colors.primary}`, cursor: 'pointer', marginTop: 12 }}>
+              <span style={{ color: Colors.primary, fontSize: 16, fontWeight: 700 }}>Reenviar Email</span>
             </button>
             <button onClick={() => navigate('/login', { replace: true })} style={{ background: 'none', border: 'none', marginTop: 16, padding: 8, cursor: 'pointer' }}>
               <span style={{ color: Colors.primary, fontSize: 15, fontWeight: 600 }}>Voltar para Login</span>
