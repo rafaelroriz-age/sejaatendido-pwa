@@ -150,6 +150,7 @@ export default function LoginScreen() {
             />
           </div>
 
+
           <button
             onClick={handleLogin}
             disabled={loading}
@@ -166,6 +167,15 @@ export default function LoginScreen() {
               : <span style={{ color: '#fff', fontSize: Font.md + 1, fontWeight: 700, letterSpacing: 0.5 }}>Entrar</span>
             }
           </button>
+
+          <div style={{ textAlign: 'right', marginTop: 8, marginBottom: 8 }}>
+            <span
+              onClick={() => navigate('/resetar-senha')}
+              style={{ color: Colors.primary, fontWeight: 600, cursor: 'pointer', fontSize: Font.sm }}
+            >
+              Esqueceu sua senha?
+            </span>
+          </div>
 
           {GOOGLE_CLIENT_ID && (
             <>
