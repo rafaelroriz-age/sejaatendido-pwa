@@ -15,6 +15,7 @@ import Profile from './pages/Profile';
 import Chat from './pages/Chat';
 import ConfirmEmail from './pages/ConfirmEmail';
 import ResetPassword from './pages/ResetPassword';
+import ForgotPassword from './pages/ForgotPassword';
 import BankDetails from './pages/BankDetails';
 import NotificationPreferences from './pages/NotificationPreferences';
 import Earnings from './pages/Earnings';
@@ -119,6 +120,7 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/confirmar-email" element={<ConfirmEmail />} />
         <Route path="/resetar-senha" element={<ResetPassword />} />
+        <Route path="/esqueci-senha" element={<ForgotPassword />} />
 
         {/* Authenticated routes */}
         <Route path="/home" element={<ProtectedRoute><HomeScreen /></ProtectedRoute>} />

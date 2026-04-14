@@ -15,7 +15,12 @@ export default function ResetPassword() {
   async function handleReset() {
     if (!senha || !confirmarSenha) { window.alert('Preencha ambos os campos'); return; }
     if (senha !== confirmarSenha) { window.alert('As senhas não coincidem'); return; }
-    if (senha.length < 6) { window.alert('A senha deve ter pelo menos 6 caracteres'); return; }
+    if (senha.length < 8) { window.alert('A senha deve ter pelo menos 8 caracteres'); return; }
+    if (!/[A-Z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra maiúscula'); return; }
+    if (!/[a-z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra minúscula'); return; }
+    if (!/[0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um número'); return; }
+    if (!/[^A-Za-z0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um caractere especial'); return; }
+    if (!token) { window.alert('Token de recuperação não encontrado. Use o link enviado por email.'); return; }
 
     setLoading(true);
     try {
@@ -38,7 +43,7 @@ export default function ResetPassword() {
 
         <div style={{ textAlign: 'left', marginBottom: 16 }}>
           <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Nova Senha</label>
-          <input type="password" value={senha} onChange={e => setSenha(e.target.value)} placeholder="Mínimo 6 caracteres" style={inputStyle} />
+          <input type="password" value={senha} onChange={e => setSenha(e.target.value)} placeholder="Mín. 8 chars, maiúsc., minúsc., número e especial" style={inputStyle} />
         </div>
 
         <div style={{ textAlign: 'left', marginBottom: 16 }}>

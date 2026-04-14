@@ -170,7 +170,7 @@ export default function LoginScreen() {
 
           <div style={{ textAlign: 'right', marginTop: 8, marginBottom: 8 }}>
             <span
-              onClick={() => navigate('/resetar-senha')}
+              onClick={() => navigate('/esqueci-senha')}
               style={{ color: Colors.primary, fontWeight: 600, cursor: 'pointer', fontSize: Font.sm }}
             >
               Esqueceu sua senha?

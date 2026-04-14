@@ -100,26 +100,25 @@ export async function loginRequest(data: LoginRequest): Promise<AuthResponse> {
   const r = await api.post('/auth/login', data); return r.data;
 }
 export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
-  const r = await api.post('/auth/google', { idToken });
+  const r = await api.post('/auth/login-google', { idToken });
   return r.data;
 }
 export async function registerRequest(data: RegisterRequest): Promise<{ id: string }> {
   const r = await api.post('/auth/registro', data); return r.data;
 }
 export async function confirmEmailRequest(token: string): Promise<void> {
-  try { await api.post('/auth/confirmar-email', { token }); }
-  catch (error: any) {
-    if (error?.response?.status === 404) { await api.post('/auth/confirm-email', { token }); return; }
-    throw error;
-  }
+  await api.post('/emails/confirmar-email', { token });
 }
-export async function resetPasswordRequest(token: string, senha: string): Promise<void> {
-  const payload = { token, senha, novaSenha: senha, password: senha, newPassword: senha };
-  try { await api.post('/auth/resetar-senha', payload); }
-  catch (error: any) {
-    if (error?.response?.status === 404) { await api.post('/auth/reset-password', payload); return; }
-    throw error;
-  }
+export async function resetPasswordRequest(token: string, novaSenha: string): Promise<void> {
+  await api.post('/emails/resetar-senha', { token, novaSenha });
+}
+
+export async function forgotPasswordRequest(email: string): Promise<void> {
+  await api.post('/emails/recuperar-senha', { email });
+}
+
+export async function resendConfirmEmailRequest(): Promise<void> {
+  await api.post('/emails/confirmar-email/enviar');
 }
 
 // ============ MÉDICOS ============
