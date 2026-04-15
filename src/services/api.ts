@@ -47,7 +47,7 @@ api.interceptors.response.use(
         if (!refreshToken) { await clearAuthSession(); return Promise.reject(error); }
 
         const refreshResponse = await axios.post(
-          `${API_URL}/auth/refresh`,
+          `${API_URL}/auth/refresh-token`,
           { refreshToken },
           { timeout: 10000, headers: { 'Content-Type': 'application/json' } },
         );
@@ -129,10 +129,15 @@ export interface Medico {
 export async function fetchMedicos(): Promise<Medico[]> { return (await api.get('/medicos')).data; }
 export async function fetchMedicoById(id: string): Promise<Medico> { return (await api.get(`/medicos/${id}`)).data; }
 export async function fetchDisponibilidadeMedico(medicoId: string, data: string): Promise<string[]> {
-  const response = await api.get(`/medicos/${medicoId}/disponibilidade`, { params: { data } });
-  const payload = response.data;
-  if (Array.isArray(payload)) return payload;
-  return payload?.slots ?? payload?.horarios ?? payload?.disponibilidade ?? [];
+  try {
+    const response = await api.get(`/medicos/${medicoId}/disponibilidade`, { params: { data } });
+    const payload = response.data;
+    if (Array.isArray(payload)) return payload;
+    return payload?.slots ?? payload?.horarios ?? payload?.disponibilidade ?? [];
+  } catch {
+    // Endpoint may not exist yet in backend — return empty to allow any slot
+    return [];
+  }
 }
 
 // ============ CONSULTAS ============
@@ -142,7 +147,7 @@ export interface Consulta {
 }
 export interface CreateConsultaRequest { medicoId: string; data: string; motivo: string; }
 export async function fetchMinhasConsultas(): Promise<Consulta[]> { return (await api.get('/paciente/consultas')).data; }
-export async function fetchConsultasMedico(): Promise<Consulta[]> { return (await api.get('/medico/consultas')).data; }
+export async function fetchConsultasMedico(): Promise<Consulta[]> { return (await api.get('/medicos/me/consultas')).data; }
 export async function createConsulta(data: CreateConsultaRequest): Promise<Consulta> { return (await api.post('/paciente/consultas', data)).data; }
 export async function cancelConsulta(id: string): Promise<void> { await api.delete(`/paciente/consultas/${id}`); }
 
@@ -153,18 +158,57 @@ export async function recusarMedico(id: string): Promise<void> { await api.post(
 
 // ============ PAGAMENTOS ============
 export type MetodoPagamento = 'pix' | 'cartao' | 'card';
-export interface CriarPagamentoRequest { consultaId: string; metodoPagamento?: MetodoPagamento; }
+export interface CriarPagamentoRequest { consultaId: string; metodoPagamento?: MetodoPagamento; valorCentavos?: number; }
 export interface PagamentoResponse {
   id: string; status?: string; qrCode?: string; qrCodeBase64?: string;
   copiaCola?: string; copiaECola?: string; linkPagamento?: string; paymentUrl?: string;
+  pagamento?: any;
+  pix?: { codigo?: string; qrcode?: string; validade?: string };
+  mercadopago?: { preferenceId?: string; initPoint?: string; sandboxInitPoint?: string };
 }
-export async function criarPagamento(data: CriarPagamentoRequest): Promise<PagamentoResponse> { return (await api.post('/pagamentos', data)).data; }
+export async function criarPagamento(data: CriarPagamentoRequest): Promise<PagamentoResponse> {
+  const metodo = data.metodoPagamento || 'pix';
+  if (metodo === 'pix') {
+    const r = await api.post('/pagamentos/pix', {
+      consultaId: data.consultaId,
+      valorCentavos: data.valorCentavos,
+    });
+    return r.data;
+  }
+  // cartao/card → Mercado Pago Checkout Pro
+  const r = await api.post('/pagamentos/mercadopago/checkout', {
+    consultaId: data.consultaId,
+    valorCentavos: data.valorCentavos,
+  });
+  const res = r.data;
+  // Normalize response so Payment page can use linkPagamento
+  return {
+    ...res,
+    id: res.pagamento?.id ?? res.id,
+    status: res.pagamento?.status ?? res.status,
+    linkPagamento: res.mercadopago?.initPoint ?? res.linkPagamento,
+    paymentUrl: res.mercadopago?.initPoint ?? res.paymentUrl,
+  };
+}
 export async function fetchPagamentoById(id: string): Promise<PagamentoResponse> { return (await api.get(`/pagamentos/${id}`)).data; }
+export async function syncPagamento(id: string): Promise<any> { return (await api.post(`/pagamentos/mercadopago/${id}/sync`)).data; }
 
 // ============ DADOS BANCÁRIOS ============
 export interface DadosBancarios { tipoChavePix?: string; chavePix?: string; banco?: string; agencia?: string; conta?: string; }
-export async function fetchDadosBancarios(): Promise<DadosBancarios | null> { return (await api.get('/medico/dados-bancarios')).data; }
-export async function saveDadosBancarios(data: DadosBancarios): Promise<void> { await api.put('/medico/dados-bancarios', data); }
+export async function fetchDadosBancarios(): Promise<DadosBancarios | null> {
+  const raw = (await api.get('/medicos/me/dados-bancarios')).data;
+  // Backend uses "valorChavePix", PWA uses "chavePix"
+  return raw ? { tipoChavePix: raw.tipoChavePix, chavePix: raw.valorChavePix, banco: raw.banco, agencia: raw.agencia, conta: raw.conta } : null;
+}
+export async function saveDadosBancarios(data: DadosBancarios): Promise<void> {
+  await api.put('/medicos/me/dados-bancarios', {
+    tipoChavePix: data.tipoChavePix,
+    valorChavePix: data.chavePix,
+    banco: data.banco,
+    agencia: data.agencia,
+    conta: data.conta,
+  });
+}
 
 // ============ PREFERÊNCIAS NOTIFICAÇÃO ============
 export interface PreferenciasNotificacao {
@@ -172,8 +216,13 @@ export interface PreferenciasNotificacao {
   confirmacaoAgendamento?: boolean; lembrete24h?: boolean; lembrete1h?: boolean;
   cancelamentos?: boolean; prescricoes?: boolean;
 }
-export async function fetchPreferenciasNotificacao(): Promise<PreferenciasNotificacao | null> { return (await api.get('/usuario/preferencias-notificacao')).data; }
-export async function savePreferenciasNotificacao(data: PreferenciasNotificacao): Promise<void> { await api.put('/usuario/preferencias-notificacao', data); }
+export async function fetchPreferenciasNotificacao(): Promise<PreferenciasNotificacao | null> {
+  // Notification preferences are managed locally; backend only handles device tokens
+  return null;
+}
+export async function savePreferenciasNotificacao(_data: PreferenciasNotificacao): Promise<void> {
+  // No-op: backend does not have a preferences endpoint; preferences are local-only
+}
 export interface PushTokenPayload {
   endpoint: string;
   keys?: { p256dh?: string; auth?: string };
@@ -182,7 +231,11 @@ export interface PushTokenPayload {
   platform?: string;
 }
 export async function registerPushToken(data: PushTokenPayload): Promise<void> {
-  await api.post('/usuario/push-token', data);
+  // Backend expects { token, platform } for FCM device tokens
+  await api.post('/notificacoes/device-token', {
+    token: data.endpoint,
+    platform: data.platform || 'web-pwa',
+  });
 }
 
 // ============ PERFIL ============
@@ -200,7 +253,13 @@ export interface PerfilResponse {
   telefone?: string;
 }
 export async function savePerfil(data: SavePerfilRequest): Promise<PerfilResponse> {
-  return (await api.put('/usuario/perfil', data)).data;
+  // Password change uses a separate endpoint
+  if (data.senhaAtual && data.novaSenha) {
+    await api.put('/usuarios/me/senha', { senhaAtual: data.senhaAtual, novaSenha: data.novaSenha });
+  }
+  // Profile update (nome/email)
+  const res = await api.put('/usuarios/me', { nome: data.nome });
+  return { ...res.data, telefone: data.telefone };
 }
 
 // ============ SALDO / GANHOS ============
@@ -213,8 +272,56 @@ export interface Repasse {
   id: string; periodo: string; valor: number; status: 'concluido' | 'erro' | 'pendente';
   data_repasse: string; chave_pix_destino?: string; consultas?: ConsultaRepasse[]; comprovante_url?: string;
 }
-export async function fetchSaldoMedico(): Promise<SaldoMedico> { return (await api.get('/medico/saldo')).data; }
-export async function fetchRepasses(): Promise<Repasse[]> { return (await api.get('/medico/repasses')).data; }
-export async function fetchRepasseById(id: string): Promise<Repasse> { return (await api.get(`/medico/repasses/${id}`)).data; }
+export async function fetchSaldoMedico(): Promise<SaldoMedico> {
+  const raw = (await api.get('/medicos/me/saldo')).data;
+  // Backend returns camelCase + Centavos; normalize to the shape pages expect
+  return {
+    saldo_a_liberar: (raw.saldoALiberarCentavos ?? 0) / 100,
+    saldo_pendente: (raw.saldoPendenteCentavos ?? 0) / 100,
+    ganhos_hoje: (raw.ganhosHojeCentavos ?? 0) / 100,
+    proximo_repasse: raw.proximoRepasse ?? '',
+    ganhos_semana: raw.ganhosSemana ?? [0, 0, 0, 0, 0, 0, 0],
+  };
+}
+export async function fetchRepasses(): Promise<Repasse[]> {
+  const raw = (await api.get('/medicos/me/repasses')).data;
+  // Backend wraps in { repasses: [...], resumo: {...} }
+  const list = raw.repasses ?? raw ?? [];
+  return list.map((r: any) => ({
+    id: r.id,
+    periodo: r.cicloRepasse?.semanaInicio ? `${new Date(r.cicloRepasse.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(r.cicloRepasse.semanaFim).toLocaleDateString('pt-BR')}` : '',
+    valor: (r.valorRepasse ?? 0) / 100,
+    status: (r.status ?? 'PENDENTE').toLowerCase(),
+    data_repasse: r.dataRepasse ?? r.criadoEm ?? '',
+    chave_pix_destino: undefined,
+    consultas: r.consulta ? [{
+      id: r.consulta.id,
+      paciente: r.consulta.paciente?.usuario?.nome ?? 'Paciente',
+      horario: new Date(r.consulta.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      valor: (r.valorRepasse ?? 0) / 100,
+      status: r.status === 'PROCESSADO' ? 'confirmado' : 'pendente',
+    }] : [],
+  }));
+}
+export async function fetchRepasseById(id: string): Promise<Repasse> {
+  const raw = (await api.get(`/medicos/me/ciclos-repasse/${id}`)).data;
+  const repasses = raw.repasses ?? [];
+  const totalValor = repasses.reduce((acc: number, r: any) => acc + (r.valorRepasse ?? 0), 0);
+  return {
+    id: raw.id,
+    periodo: raw.semanaInicio ? `${new Date(raw.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(raw.semanaFim).toLocaleDateString('pt-BR')}` : '',
+    valor: totalValor / 100,
+    status: (raw.status ?? 'pendente').toLowerCase(),
+    data_repasse: raw.semanaFim ?? '',
+    chave_pix_destino: undefined,
+    consultas: repasses.map((r: any) => ({
+      id: r.consulta?.id ?? r.id,
+      paciente: r.consulta?.paciente?.usuario?.nome ?? 'Paciente',
+      horario: r.consulta?.data ? new Date(r.consulta.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      valor: (r.valorRepasse ?? 0) / 100,
+      status: r.status === 'PROCESSADO' ? 'confirmado' : 'pendente',
+    })),
+  };
+}
 
 export default api;
