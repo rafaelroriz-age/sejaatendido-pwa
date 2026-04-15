@@ -19,7 +19,8 @@ declare global {
 }
 
 const LOGO_URL = `${import.meta.env.BASE_URL}logo-oficial.png`;
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const _rawGoogleId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const GOOGLE_CLIENT_ID = _rawGoogleId && _rawGoogleId.endsWith('.apps.googleusercontent.com') && !_rawGoogleId.startsWith('seu-') ? _rawGoogleId : undefined;
 
 export default function LoginScreen() {
   const navigate = useNavigate();
