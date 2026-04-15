@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Colors from '../theme/colors';
 
 const ANDROID_APK_URL = 'https://expo.dev/accounts/rafaelroriz_dev/projects/sejaatendido-rn/builds/d5be9460-48c7-4829-be64-b386d0bf62c1';
-const OFFICIAL_LOGO = '/sejaatendido-pwa/logo-oficial.png';
+const OFFICIAL_LOGO = '/logo-oficial.png';
 
 /* ─── Inline SVG logo matching the provided brand image ─── */
 function Logo({ size = 48 }: { size?: number }) {

@@ -110,7 +110,7 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter basename="/sejaatendido-pwa">
+    <BrowserRouter>
       <Routes>
         {/* Landing page */}
         <Route path="/" element={<LandingPage />} />

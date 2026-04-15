@@ -6,7 +6,7 @@
     <script>
       // SPA redirect for GitHub Pages
       // Converts the path into a query string so index.html can restore it
-      var pathSegmentsToKeep = 1; // keep /sejaatendido-pwa
+      var pathSegmentsToKeep = 0; // custom domain serves from root
       var l = window.location;
       l.replace(
         l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
