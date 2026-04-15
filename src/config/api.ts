@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = 'https://sejaatendido.api.br';
+const DEFAULT_API_URL = 'https://sejaatendido-backend.onrender.com';
 const configuredApiUrl = (import.meta.env.VITE_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
 
 if (import.meta.env.PROD && !configuredApiUrl.startsWith('https://')) {
