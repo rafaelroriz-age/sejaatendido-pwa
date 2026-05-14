@@ -195,7 +195,7 @@ export default function LandingPage() {
               Sua saúde, <span style={{ color: Colors.primary }}>sem complicação</span>
             </h1>
             <p style={s.heroDesc}>
-              Seja Atendido conecta pacientes a médicos verificados para agendamento rápido, pagamento seguro via PIX e acompanhamento por chat — tudo pelo celular.
+              Seja Atendido conecta pacientes a médicos verificados para agendamento rápido, pagamento seguro via PIX e acompanhamento por chat, tudo pelo celular.
             </p>
             <div style={{ ...s.heroCTA, ...(isMobile ? { justifyContent: 'center' } : {}) }}>
               <a href={ANDROID_APK_URL} target="_blank" rel="noreferrer" style={{ ...s.btnPrimary, padding: '14px 32px', fontSize: 16 }}>

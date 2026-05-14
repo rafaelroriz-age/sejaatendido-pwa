@@ -6,7 +6,11 @@ export interface User {
   id: string;
   nome: string;
   email: string;
+  cpf?: string;
   tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN';
+  crmCartaoValidado?: boolean;
+  crmNumero?: string;
+  crmUf?: string;
 }
 
 export async function saveToken(token: string): Promise<void> {

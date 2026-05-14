@@ -1,60 +1,55 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerRequest } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || '');
-      const base64 = result.includes(',') ? result.split(',')[1] : result;
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('Falha ao ler arquivo de diploma'));
-    reader.readAsDataURL(file);
-  });
+function applyCpfMask(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
 export default function SignupScreen() {
   const navigate = useNavigate();
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
+  const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmaSenha, setConfirmaSenha] = useState('');
   const [tipo, setTipo] = useState<'PACIENTE' | 'MEDICO'>('PACIENTE');
   const [crm, setCrm] = useState('');
-  const [diplomaFile, setDiplomaFile] = useState<File | null>(null);
+  const [crmUf, setCrmUf] = useState('');
   const [loading, setLoading] = useState(false);
-
   const [registered, setRegistered] = useState(false);
 
   async function handleSignup() {
     if (!nome || !email || !senha || !confirmaSenha) { window.alert('Preencha todos os campos'); return; }
-    if (senha !== confirmaSenha) { window.alert('As senhas não coincidem'); return; }
+    if (senha !== confirmaSenha) { window.alert('As senhas nao coincidem'); return; }
     if (senha.length < 8) { window.alert('A senha deve ter pelo menos 8 caracteres'); return; }
-    if (!/[A-Z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra maiúscula'); return; }
-    if (!/[a-z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra minúscula'); return; }
-    if (!/[0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um número'); return; }
+    if (!/[A-Z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra maiuscula'); return; }
+    if (!/[a-z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra minuscula'); return; }
+    if (!/[0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um numero'); return; }
     if (!/[^A-Za-z0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um caractere especial'); return; }
-    if (tipo === 'MEDICO' && !crm.trim()) { window.alert('Informe o número do CRM'); return; }
-    if (tipo === 'MEDICO' && !diplomaFile) { window.alert('Envie o diploma para cadastro de médico'); return; }
+    if (tipo === 'MEDICO' && !crm.trim()) { window.alert('Informe o numero do CRM'); return; }
+    if (tipo === 'MEDICO' && !crmUf.trim()) { window.alert('Informe a UF do CRM (ex: SP)'); return; }
+    const rawCpf = cpf.replace(/\D/g, '');
+    if (tipo === 'MEDICO' && rawCpf.length !== 11) { window.alert('Informe um CPF valido (11 digitos)'); return; }
 
     setLoading(true);
     try {
       const payload: Parameters<typeof registerRequest>[0] = {
         nome,
         email,
+        cpf: rawCpf || undefined,
         senha,
         tipo,
       };
       if (tipo === 'MEDICO') {
-        payload.crm = crm.trim().toUpperCase();
-        if (diplomaFile) {
-          payload.diplomaFileName = diplomaFile.name;
-          payload.diplomaFileBase64 = await fileToBase64(diplomaFile);
-        }
+        payload.crm = crm.trim().replace(/\D/g, '');
+        payload.crmUf = crmUf.trim().toUpperCase();
       }
       await registerRequest(payload);
       setRegistered(true);
@@ -79,11 +74,11 @@ export default function SignupScreen() {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <div style={{ backgroundColor: Colors.card, borderRadius: 24, padding: 36, textAlign: 'center', width: '100%', maxWidth: 380, boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}>📧</div>
+          <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}>&#128231;</div>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 8 }}>Conta Criada!</h2>
           <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>
-            Enviamos um email de confirmação para <strong>{email}</strong>. Verifique sua caixa de entrada e spam para ativar sua conta.
-            {tipo === 'MEDICO' && ' Seu cadastro médico será analisado pela equipe.'}
+            Enviamos um email de confirmacao para <strong>{email}</strong>. Verifique sua caixa de entrada e spam para ativar sua conta.
+            {tipo === 'MEDICO' && ' Apos confirmar o email, valide sua carteirinha CRM na area de perfil.'}
           </p>
           <button onClick={() => navigate('/login', { replace: true })} style={{
             width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Space.lg,
@@ -106,17 +101,36 @@ export default function SignupScreen() {
             style={{ width: '100%', maxHeight: 120, objectFit: 'contain', marginBottom: 8 }}
           />
           <h1 style={{ fontSize: Font.xl - 4, fontWeight: 800, color: Colors.textPrimary }}>Criar Conta</h1>
-          <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: Space.xl }}>Preencha seus dados para começar</p>
+          <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: Space.xl }}>Preencha seus dados para comecar</p>
         </div>
 
         <div style={{
           backgroundColor: Colors.card, borderRadius: Radius.xl, padding: Space.xl,
           boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
         }}>
-          <div style={wrapperStyle}><input placeholder="Nome completo" value={nome} onChange={e => setNome(e.target.value)} disabled={loading} style={inputStyle} /></div>
-          <div style={wrapperStyle}><input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} style={inputStyle} /></div>
-          <div style={wrapperStyle}><input type="password" placeholder="Senha (mín. 8, maiúsc., minúsc., número, especial)" value={senha} onChange={e => setSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
-          <div style={wrapperStyle}><input type="password" placeholder="Confirmar senha" value={confirmaSenha} onChange={e => setConfirmaSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
+          <div style={wrapperStyle}>
+            <input placeholder="Nome completo" value={nome} onChange={e => setNome(e.target.value)} disabled={loading} style={inputStyle} />
+          </div>
+          <div style={wrapperStyle}>
+            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} style={inputStyle} />
+          </div>
+          <div style={wrapperStyle}>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="CPF (obrigatorio para Medico)"
+              value={cpf}
+              onChange={e => setCpf(applyCpfMask(e.target.value))}
+              disabled={loading}
+              style={inputStyle}
+            />
+          </div>
+          <div style={wrapperStyle}>
+            <input type="password" placeholder="Senha (min. 8, maiusc., minusc., numero, especial)" value={senha} onChange={e => setSenha(e.target.value)} disabled={loading} style={inputStyle} />
+          </div>
+          <div style={wrapperStyle}>
+            <input type="password" placeholder="Confirmar senha" value={confirmaSenha} onChange={e => setConfirmaSenha(e.target.value)} disabled={loading} style={inputStyle} />
+          </div>
 
           <div style={{ marginBottom: Space.lg }}>
             <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Tipo de conta</label>
@@ -129,7 +143,7 @@ export default function SignupScreen() {
                     fontWeight: 700, fontSize: Font.sm, cursor: 'pointer',
                   }}
                 >
-                  {t === 'PACIENTE' ? 'Paciente' : 'Médico'}
+                  {t === 'PACIENTE' ? 'Paciente' : 'Medico'}
                 </button>
               ))}
             </div>
@@ -138,18 +152,30 @@ export default function SignupScreen() {
           {tipo === 'MEDICO' && (
             <div>
               <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Dados Profissionais</label>
-              <div style={wrapperStyle}><input placeholder="Número do CRM" value={crm} onChange={e => setCrm(e.target.value.toUpperCase())} disabled={loading} style={{ ...inputStyle, textTransform: 'uppercase' }} /></div>
-              <div style={wrapperStyle}>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={e => setDiplomaFile(e.target.files?.[0] || null)}
-                  disabled={loading}
-                  style={{ ...inputStyle, paddingTop: 12, paddingBottom: 12 }}
-                />
+              <div style={{ display: 'flex', gap: 8, marginBottom: Space.md + 2 }}>
+                <div style={{ ...wrapperStyle, flex: 2, marginBottom: 0 }}>
+                  <input
+                    placeholder="Numero CRM"
+                    value={crm}
+                    onChange={e => setCrm(e.target.value.replace(/\D/g, ''))}
+                    disabled={loading}
+                    inputMode="numeric"
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ ...wrapperStyle, flex: 1, marginBottom: 0 }}>
+                  <input
+                    placeholder="UF"
+                    value={crmUf}
+                    onChange={e => setCrmUf(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
+                    disabled={loading}
+                    maxLength={2}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
               <span style={{ fontSize: 12, color: Colors.textMuted, display: 'block', marginTop: -8, marginBottom: 12 }}>
-                Envie diploma ou comprovante profissional (PDF ou imagem)
+                Voce podera validar sua carteirinha CRM apos o cadastro.
               </span>
             </div>
           )}
@@ -169,7 +195,7 @@ export default function SignupScreen() {
 
         <div style={{ textAlign: 'center', marginTop: Space.xl }}>
           <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>
-            Já tem conta?{' '}
+            Ja tem conta?{' '}
             <span onClick={() => navigate('/login')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>Fazer login</span>
           </span>
         </div>

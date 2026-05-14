@@ -81,30 +81,43 @@ api.interceptors.response.use(
 
 // ============ AUTH ============
 export interface LoginRequest { email: string; senha: string; }
+export interface LoginCpfRequest { cpf: string; senha: string; }
 export interface RegisterRequest {
   nome: string;
   email: string;
+  cpf?: string;
   senha: string;
   tipo: 'PACIENTE' | 'MEDICO';
   crm?: string;
-  diplomaFileName?: string;
-  diplomaFileBase64?: string;
+  crmUf?: string;
 }
 export interface AuthResponse {
   token: string;
   refreshToken?: string;
-  usuario: { id: string; nome: string; email: string; tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN'; };
+  usuario: {
+    id: string;
+    nome: string;
+    email: string;
+    cpf?: string;
+    tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN';
+    crmCartaoValidado?: boolean;
+    crmNumero?: string;
+    crmUf?: string;
+  };
 }
 
 export async function loginRequest(data: LoginRequest): Promise<AuthResponse> {
   const r = await api.post('/auth/login', data); return r.data;
+}
+export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthResponse> {
+  const r = await api.post('/auth/login-cpf', data); return r.data;
 }
 export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
   const r = await api.post('/auth/login-google', { idToken });
   return r.data;
 }
 export async function registerRequest(data: RegisterRequest): Promise<{ id: string }> {
-  const r = await api.post('/auth/registro', data); return r.data;
+  const r = await api.post('/auth/registro', data, { timeout: 30000 }); return r.data;
 }
 export async function confirmEmailRequest(token: string): Promise<void> {
   await api.post('/emails/confirmar-email', { token });
@@ -119,6 +132,21 @@ export async function forgotPasswordRequest(email: string): Promise<void> {
 
 export async function resendConfirmEmailRequest(): Promise<void> {
   await api.post('/emails/confirmar-email/enviar');
+}
+
+// ============ CRM ============
+export interface CrmStatusResponse {
+  validado: boolean;
+  crmNumero?: string;
+  crmUf?: string;
+}
+export async function fetchCrmStatus(): Promise<CrmStatusResponse> {
+  const r = await api.get('/medicos/me/crm-status');
+  return r.data;
+}
+export async function validarCrmQr(payload: string): Promise<CrmStatusResponse> {
+  const r = await api.post('/medicos/me/validar-crm-qr', { payload });
+  return r.data;
 }
 
 // ============ MÉDICOS ============

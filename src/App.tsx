@@ -21,6 +21,7 @@ import NotificationPreferences from './pages/NotificationPreferences';
 import Earnings from './pages/Earnings';
 import RepasseDetail from './pages/RepasseDetail';
 import LandingPage from './pages/LandingPage';
+import CrmValidation from './pages/CrmValidation';
 
 type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
 
@@ -135,6 +136,7 @@ export default function App() {
         <Route path="/notifications" element={<ProtectedRoute><NotificationPreferences /></ProtectedRoute>} />
         <Route path="/earnings" element={<ProtectedRoute allow={['MEDICO']}><Earnings /></ProtectedRoute>} />
         <Route path="/repasse/:id" element={<ProtectedRoute allow={['MEDICO']}><RepasseDetail /></ProtectedRoute>} />
+        <Route path="/crm-validation" element={<ProtectedRoute allow={['MEDICO']}><CrmValidation /></ProtectedRoute>} />
 
         {/* Default redirect */}
         <Route path="*" element={<Navigate to={initialRoute} replace />} />

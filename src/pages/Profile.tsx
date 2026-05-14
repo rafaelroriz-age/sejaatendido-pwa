@@ -116,6 +116,37 @@ export default function Profile() {
 
         {user?.tipo === 'MEDICO' && (
           <Card style={{ marginBottom: Space.lg }}>
+            <h4 style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.lg }}>Carteirinha CRM</h4>
+            <div
+              onClick={() => navigate('/crm-validation')}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 18, fontSize: 16,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: user?.crmCartaoValidado ? Colors.successLight : Colors.warningLight,
+                }}>
+                  {user?.crmCartaoValidado ? '✅' : '⏳'}
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, color: Colors.textPrimary, fontWeight: 600 }}>
+                    {user?.crmCartaoValidado ? 'CRM Validado' : 'Validar Carteirinha CRM'}
+                  </div>
+                  {(user?.crmNumero || user?.crmUf) && (
+                    <div style={{ fontSize: Font.xs, color: Colors.textSecondary, marginTop: 2 }}>
+                      {[user?.crmNumero, user?.crmUf].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <span style={{ fontSize: 22, color: Colors.textMuted }}>›</span>
+            </div>
+          </Card>
+        )}
+
+        {user?.tipo === 'MEDICO' && (
+          <Card style={{ marginBottom: Space.lg }}>
             <h4 style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.lg }}>Financeiro</h4>
             <div onClick={() => navigate('/earnings')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${Colors.borderLight}`, cursor: 'pointer' }}>
               <span style={{ fontSize: 15, color: Colors.textPrimary, fontWeight: 500 }}>Meus Ganhos</span>
