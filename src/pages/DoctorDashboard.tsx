@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearAuthSession, User } from '../storage/localStorage';
-import { Consulta, fetchConsultasMedico } from '../services/api';
+import { Consulta, fetchConsultasMedico, fetchCrmStatus } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
@@ -13,6 +13,7 @@ export default function DoctorDashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [crmValidado, setCrmValidado] = useState<boolean | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -21,6 +22,10 @@ export default function DoctorDashboard() {
         const [userData, consultasData] = await Promise.all([getUser(), fetchConsultasMedico()]);
         setUser(userData);
         setConsultas(consultasData);
+        // Fetch CRM status independently (don't block main load on failure)
+        fetchCrmStatus()
+          .then(s => setCrmValidado(s.crmCartaoValidado))
+          .catch(() => setCrmValidado(userData?.crmCartaoValidado ?? null));
       } catch (error) {
         showErrorAlert(error, 'Erro ao carregar consultas do médico');
       } finally {
@@ -80,6 +85,30 @@ export default function DoctorDashboard() {
           }}>Sair</button>
         </div>
       </div>
+
+      {crmValidado === false && (
+        <div
+          onClick={() => navigate('/crm-validation')}
+          style={{
+            margin: '12px 20px 0',
+            backgroundColor: '#FFF3CD',
+            border: '1px solid #FFC107',
+            borderRadius: Radius.md,
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>CRM não validado</div>
+            <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Valide sua carteirinha para receber pacientes. Toque aqui.</div>
+          </div>
+          <span style={{ fontSize: 18, color: '#856404' }}>›</span>
+        </div>
+      )}
 
       <div style={{ padding: 20 }}>
         {/* Stats */}

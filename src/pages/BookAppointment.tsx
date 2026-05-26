@@ -64,16 +64,26 @@ export default function BookAppointment() {
       window.alert('Consulta agendada com sucesso!');
       navigate(-1);
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
-        window.alert('Conflito de agenda: o horário acabou de ser ocupado. Escolha outro slot.');
-        setSelectedTime(null);
-        if (selectedMedico && selectedDate) {
-          const slots = await fetchDisponibilidadeMedico(selectedMedico.id, selectedDate);
-          setAvailableSlots(slots);
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 400) {
+          const msg = (error.response?.data as Record<string, string>)?.message
+            ?? (error.response?.data as Record<string, string>)?.erro
+            ?? 'Não foi possível agendar. Verifique se o médico tem CRM validado.';
+          window.alert(msg);
+          return;
         }
-      } else {
-        showErrorAlert(error, 'Erro ao agendar consulta');
+        if (status === 409) {
+          window.alert('Conflito de agenda: o horário acabou de ser ocupado. Escolha outro slot.');
+          setSelectedTime(null);
+          if (selectedMedico && selectedDate) {
+            const slots = await fetchDisponibilidadeMedico(selectedMedico.id, selectedDate);
+            setAvailableSlots(slots);
+          }
+          return;
+        }
       }
+      showErrorAlert(error, 'Erro ao agendar consulta');
     }
     finally { setSubmitting(false); }
   }

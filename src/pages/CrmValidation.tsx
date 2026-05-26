@@ -105,7 +105,7 @@ export default function CrmValidation() {
       if (user) {
         await saveUser({
           ...user,
-          crmCartaoValidado: result.validado,
+          crmCartaoValidado: result.crmCartaoValidado,
           crmNumero: result.crmNumero,
           crmUf: result.crmUf,
         });
@@ -165,17 +165,17 @@ export default function CrmValidation() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: Space.lg }}>
                 <div style={{
                   width: 48, height: 48, borderRadius: 24,
-                  backgroundColor: status?.validado ? Colors.successLight : Colors.warningLight,
+                  backgroundColor: status?.crmCartaoValidado ? Colors.successLight : Colors.warningLight,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
                 }}>
-                  {status?.validado ? '✅' : '⏳'}
+                  {status?.crmCartaoValidado ? '✅' : '⏳'}
                 </div>
                 <div>
                   <div style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary }}>
-                    {status?.validado ? 'CRM Validado' : 'CRM Pendente de Validação'}
+                    {status?.crmCartaoValidado ? 'CRM Validado' : 'CRM Pendente de Validação'}
                   </div>
                   <div style={{ fontSize: Font.sm, color: Colors.textSecondary, marginTop: 2 }}>
-                    {status?.validado
+                    {status?.crmCartaoValidado
                       ? 'Sua carteirinha profissional foi verificada.'
                       : 'Escaneie ou cole o QR Code da sua carteirinha.'}
                   </div>

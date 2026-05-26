@@ -17,11 +17,20 @@ export default function Profile() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [cpf, setCpf] = useState('');
+
+  function applyCpfMask(value: string): string {
+    const d = value.replace(/\D/g, '').slice(0, 11);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  }
 
   useEffect(() => {
     getUser().then(u => {
       setUser(u);
-      if (u) { setNome(u.nome); setEmail(u.email); }
+      if (u) { setNome(u.nome); setEmail(u.email); if (u.cpf) setCpf(applyCpfMask(u.cpf)); }
     }).finally(() => setLoading(false));
   }, []);
 
@@ -32,12 +41,16 @@ export default function Profile() {
     }
     setSaving(true);
     try {
-      const updated = await savePerfil({ nome: nome.trim(), telefone: telefone.trim() || undefined });
+      const updated = await savePerfil({ nome: nome.trim(), cpf: user?.tipo === 'PACIENTE' ? cpf.replace(/\D/g, '') || undefined : undefined, telefone: telefone.trim() || undefined });
       const updatedUser: User = {
         id: updated.id,
         nome: updated.nome,
         email: updated.email,
+        cpf: updated.cpf,
         tipo: updated.tipo,
+        crmCartaoValidado: user?.crmCartaoValidado,
+        crmNumero: user?.crmNumero,
+        crmUf: user?.crmUf,
       };
       await saveUser(updatedUser);
       setUser(updatedUser);
@@ -99,6 +112,21 @@ export default function Profile() {
             <label style={labelStyle}>Telefone</label>
             <input value={telefone} onChange={e => setTelefone(e.target.value)} disabled={!editing} placeholder="(00) 00000-0000" style={{ ...inputStyle, color: editing ? Colors.textPrimary : Colors.textSecondary }} />
           </div>
+          {user?.tipo === 'PACIENTE' && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>CPF</label>
+              <input
+                value={cpf}
+                onChange={e => setCpf(applyCpfMask(e.target.value))}
+                disabled={!editing}
+                placeholder="000.000.000-00"
+                style={{ ...inputStyle, color: editing ? Colors.textPrimary : Colors.textSecondary }}
+              />
+              {!editing && !cpf && (
+                <span style={{ fontSize: 12, color: Colors.textMuted, marginTop: 6, display: 'block' }}>CPF não cadastrado</span>
+              )}
+            </div>
+          )}
           {editing && (
             <button onClick={handleSave} disabled={saving} style={{ width: '100%', backgroundColor: Colors.success, borderRadius: Radius.md, padding: Space.lg, border: 'none', color: '#fff', fontSize: 16, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, boxShadow: `0 6px 12px ${Colors.success}59` }}>{saving ? 'Salvando...' : 'Salvar Alterações'}</button>
           )}

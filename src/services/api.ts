@@ -110,7 +110,7 @@ export async function loginRequest(data: LoginRequest): Promise<AuthResponse> {
   const r = await api.post('/auth/login', data); return r.data;
 }
 export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthResponse> {
-  const r = await api.post('/auth/login-cpf', data); return r.data;
+  const r = await api.post('/auth/medicos/login', data); return r.data;
 }
 export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
   const r = await api.post('/auth/login-google', { idToken });
@@ -136,16 +136,16 @@ export async function resendConfirmEmailRequest(): Promise<void> {
 
 // ============ CRM ============
 export interface CrmStatusResponse {
-  validado: boolean;
+  crmCartaoValidado: boolean;
   crmNumero?: string;
   crmUf?: string;
 }
 export async function fetchCrmStatus(): Promise<CrmStatusResponse> {
-  const r = await api.get('/medicos/me/crm-status');
+  const r = await api.get('/medicos/me/crm/status');
   return r.data;
 }
 export async function validarCrmQr(payload: string): Promise<CrmStatusResponse> {
-  const r = await api.post('/medicos/me/validar-crm-qr', { payload });
+  const r = await api.post('/medicos/me/crm/validar-cartao', { payload });
   return r.data;
 }
 
@@ -269,6 +269,7 @@ export async function registerPushToken(data: PushTokenPayload): Promise<void> {
 // ============ PERFIL ============
 export interface SavePerfilRequest {
   nome?: string;
+  cpf?: string;
   telefone?: string;
   senhaAtual?: string;
   novaSenha?: string;
@@ -277,6 +278,7 @@ export interface PerfilResponse {
   id: string;
   nome: string;
   email: string;
+  cpf?: string;
   tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN';
   telefone?: string;
 }
@@ -285,8 +287,10 @@ export async function savePerfil(data: SavePerfilRequest): Promise<PerfilRespons
   if (data.senhaAtual && data.novaSenha) {
     await api.put('/usuarios/me/senha', { senhaAtual: data.senhaAtual, novaSenha: data.novaSenha });
   }
-  // Profile update (nome/email)
-  const res = await api.put('/usuarios/me', { nome: data.nome });
+  // Profile update (nome/cpf)
+  const body: Record<string, unknown> = { nome: data.nome };
+  if (data.cpf !== undefined) body.cpf = data.cpf;
+  const res = await api.put('/usuarios/me', body);
   return { ...res.data, telefone: data.telefone };
 }
 
