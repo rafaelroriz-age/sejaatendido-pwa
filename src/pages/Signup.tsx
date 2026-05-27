@@ -118,7 +118,7 @@ export default function SignupScreen() {
             <input
               type="tel"
               inputMode="numeric"
-              placeholder="CPF (obrigatorio para Medico)"
+              placeholder="CPF"
               value={cpf}
               onChange={e => setCpf(applyCpfMask(e.target.value))}
               disabled={loading}
