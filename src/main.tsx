@@ -1,7 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { initMercadoPago } from '@mercadopago/sdk-react';
 import App from './App';
 import './styles/global.css';
+
+const mpPublicKey = import.meta.env.VITE_MP_PUBLIC_KEY as string | undefined;
+if (mpPublicKey && mpPublicKey !== 'YOUR_MP_PUBLIC_KEY_HERE') {
+  initMercadoPago(mpPublicKey, { locale: 'pt-BR' });
+}
 
 async function prepare() {
   if (import.meta.env.VITE_MOCK === 'true') {

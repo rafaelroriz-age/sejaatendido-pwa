@@ -22,6 +22,9 @@ import Earnings from './pages/Earnings';
 import RepasseDetail from './pages/RepasseDetail';
 import LandingPage from './pages/LandingPage';
 import CrmValidation from './pages/CrmValidation';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentPending from './pages/PaymentPending';
+import PaymentFailure from './pages/PaymentFailure';
 
 type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
 
@@ -122,6 +125,9 @@ export default function App() {
         <Route path="/confirmar-email" element={<ConfirmEmail />} />
         <Route path="/resetar-senha" element={<ResetPassword />} />
         <Route path="/esqueci-senha" element={<ForgotPassword />} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/pending" element={<PaymentPending />} />
+        <Route path="/payment/failure" element={<PaymentFailure />} />
 
         {/* Authenticated routes */}
         <Route path="/home" element={<ProtectedRoute><HomeScreen /></ProtectedRoute>} />

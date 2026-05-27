@@ -204,9 +204,16 @@ export async function criarPagamento(data: CriarPagamentoRequest): Promise<Pagam
     return r.data;
   }
   // cartao/card → Mercado Pago Checkout Pro
+  const origin = window.location.origin;
   const r = await api.post('/pagamentos/mercadopago/checkout', {
     consultaId: data.consultaId,
     valorCentavos: data.valorCentavos,
+    back_urls: {
+      success: `${origin}/payment/success`,
+      failure: `${origin}/payment/failure`,
+      pending: `${origin}/payment/pending`,
+    },
+    auto_return: 'approved',
   });
   const res = r.data;
   // Normalize response so Payment page can use linkPagamento
