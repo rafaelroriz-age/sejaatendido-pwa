@@ -33,7 +33,7 @@ export default function CrmValidation() {
       .then(setStatus)
       .catch(() => {
         // If endpoint doesn't exist yet, show as unvalidated
-        setStatus({ validado: false });
+        setStatus({ crmCartaoValidado: false });
       })
       .finally(() => setLoadingStatus(false));
   }, []);
@@ -230,7 +230,7 @@ export default function CrmValidation() {
         )}
 
         {/* Action buttons */}
-        {scanState !== 'loading' && !status?.validado && (
+        {scanState !== 'loading' && !status?.crmCartaoValidado && (
           <>
             {/* Option A – Camera */}
             <button
@@ -300,7 +300,7 @@ export default function CrmValidation() {
         )}
 
         {/* Re-validate button if already validated */}
-        {scanState !== 'loading' && status?.validado && (
+        {scanState !== 'loading' && status?.crmCartaoValidado && (
           <button
             onClick={openCamera}
             style={{

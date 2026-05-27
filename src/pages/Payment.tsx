@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Wallet } from '@mercadopago/sdk-react';
 import { criarPagamento, fetchPagamentoById, PagamentoResponse } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Radius } from '../theme/colors';
 
-type PaymentMethod = 'pix' | 'cartao';
+type PaymentMethod = 'pix' | 'mercadopago';
 
 export default function Payment() {
   const navigate = useNavigate();
@@ -14,13 +15,12 @@ export default function Payment() {
   const [loading, setLoading] = useState(false);
   const [pagamento, setPagamento] = useState<PagamentoResponse | null>(null);
   const [status, setStatus] = useState('');
+  const [preferenceId, setPreferenceId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  useEffect(() => { setPagamento(null); setPreferenceId(null); setStatus(''); }, [method]);
 
   const startPolling = useCallback((paymentId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -46,17 +46,19 @@ export default function Payment() {
     finally { setLoading(false); }
   }
 
-  async function handleCardPayment() {
+  async function handleMpPayment() {
     if (!consultaId) { window.alert('ID da consulta não encontrado'); return; }
-    if (!cardNumber || !cardName || !cardExpiry || !cardCvv) { window.alert('Preencha todos os dados do cartão'); return; }
     setLoading(true);
     try {
       const data = await criarPagamento({ consultaId, metodoPagamento: 'card' });
       setPagamento(data);
-      const url = data.linkPagamento || data.paymentUrl;
-      if (url) window.open(url, '_blank');
-      setStatus(data.status || 'PROCESSANDO'); startPolling(data.id);
-    } catch (e) { showErrorAlert(e, 'Erro ao processar pagamento'); }
+      const pid = data.mercadopago?.preferenceId ?? (data.pagamento as any)?.preferenceId;
+      if (pid) {
+        setPreferenceId(pid);
+      } else if (data.linkPagamento || data.paymentUrl) {
+        window.location.href = (data.linkPagamento || data.paymentUrl)!;
+      }
+    } catch (e) { showErrorAlert(e, 'Erro ao iniciar pagamento'); }
     finally { setLoading(false); }
   }
 
@@ -64,8 +66,6 @@ export default function Payment() {
     const code = pagamento?.copiaCola || pagamento?.copiaECola || '';
     if (code) { navigator.clipboard.writeText(code); window.alert('Código PIX copiado!'); }
   }
-
-  const inputStyle: React.CSSProperties = { width: '100%', backgroundColor: Colors.inputBg, borderRadius: 14, padding: 16, fontSize: 16, border: `1px solid ${Colors.border}`, color: Colors.textPrimary, outline: 'none' };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg }}>
@@ -82,12 +82,12 @@ export default function Payment() {
         </div>
 
         <div style={{ display: 'flex', backgroundColor: Colors.card, borderRadius: 16, padding: 4, marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          {(['pix', 'cartao'] as const).map(m => (
+          {(['pix', 'mercadopago'] as const).map(m => (
             <button key={m} onClick={() => setMethod(m)} style={{
               flex: 1, padding: '14px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
               backgroundColor: method === m ? Colors.primary : 'transparent',
               color: method === m ? '#fff' : Colors.textSecondary, fontSize: 15, fontWeight: 700,
-            }}>{m === 'pix' ? 'PIX' : 'Cartão'}</button>
+            }}>{m === 'pix' ? 'PIX' : 'Mercado Pago'}</button>
           ))}
         </div>
 
@@ -128,28 +128,20 @@ export default function Payment() {
             )
           ) : (
             <>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: Colors.textPrimary, marginBottom: 10 }}>Dados do Cartão</h3>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Número do Cartão</label>
-                <input value={cardNumber} onChange={e => setCardNumber(e.target.value)} placeholder="0000 0000 0000 0000" maxLength={19} style={inputStyle} />
-              </div>
-              <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Nome do Titular</label>
-                <input value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Como aparece no cartão" style={{ ...inputStyle, textTransform: 'uppercase' }} />
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Validade</label>
-                  <input value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} placeholder="MM/AA" maxLength={5} style={inputStyle} />
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: Colors.textPrimary, marginBottom: 10 }}>Pagar com Mercado Pago</h3>
+              <p style={{ fontSize: 14, color: Colors.textSecondary, lineHeight: '20px', marginBottom: 20 }}>Você será redirecionado para o ambiente seguro do Mercado Pago para concluir o pagamento.</p>
+              {!preferenceId ? (
+                <button onClick={handleMpPayment} disabled={loading} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 6px 12px ${Colors.primary}59` }}>
+                  {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Continuar para Pagamento</span>}
+                </button>
+              ) : (
+                <div style={{ marginTop: 8 }}>
+                  <Wallet
+                    initialization={{ preferenceId }}
+                    onError={(e) => { console.error('MP Wallet error', e); showErrorAlert(e, 'Erro no checkout Mercado Pago'); }}
+                  />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>CVV</label>
-                  <input type="password" value={cardCvv} onChange={e => setCardCvv(e.target.value)} placeholder="000" maxLength={4} style={inputStyle} />
-                </div>
-              </div>
-              <button onClick={handleCardPayment} disabled={loading} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 20, boxShadow: `0 6px 12px ${Colors.primary}59` }}>
-                {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Pagar com Cartão</span>}
-              </button>
+              )}
             </>
           )}
         </div>
