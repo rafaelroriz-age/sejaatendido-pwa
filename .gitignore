@@ -4,3 +4,4 @@ dist
 # Local env files (never commit)
 .env.local
 .env.*.local
+.env
