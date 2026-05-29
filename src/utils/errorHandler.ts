@@ -3,6 +3,21 @@ import axios from 'axios';
 function extractMessage(data: unknown): string | undefined {
   if (!data || typeof data !== 'object') return undefined;
   const anyData = data as Record<string, unknown>;
+
+  // Try to pull field-level detail from "detalhes" array first
+  if (Array.isArray(anyData.detalhes) && anyData.detalhes.length > 0) {
+    const parts = anyData.detalhes
+      .map((d: unknown) => {
+        if (d && typeof d === 'object') {
+          const det = d as Record<string, unknown>;
+          return det.mensagem ?? det.message ?? det.campo ?? undefined;
+        }
+        return undefined;
+      })
+      .filter(Boolean);
+    if (parts.length > 0) return parts.join(', ');
+  }
+
   return (
     (anyData.message as string) ??
     (anyData.erro as string) ??

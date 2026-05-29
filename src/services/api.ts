@@ -88,7 +88,7 @@ export interface RegisterRequest {
   cpf?: string;
   senha: string;
   tipo: 'PACIENTE' | 'MEDICO';
-  crm?: string;
+  crmNumero?: string;
   crmUf?: string;
 }
 export interface AuthResponse {
@@ -116,7 +116,14 @@ export async function loginGoogleRequest(idToken: string): Promise<AuthResponse>
   const r = await api.post('/auth/login-google', { idToken });
   return r.data;
 }
-export async function registerRequest(data: RegisterRequest): Promise<{ id: string }> {
+export interface RegisterResponse {
+  id: string;
+  accessToken?: string;
+  refreshToken?: string;
+  usuario?: AuthResponse['usuario'];
+  mensagem?: string;
+}
+export async function registerRequest(data: RegisterRequest): Promise<RegisterResponse> {
   const r = await api.post('/auth/registro', data, { timeout: 30000 }); return r.data;
 }
 export async function confirmEmailRequest(token: string): Promise<void> {

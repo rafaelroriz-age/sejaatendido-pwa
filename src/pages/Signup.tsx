@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerRequest } from '../services/api';
+import { saveAuthSession } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 
@@ -10,6 +11,21 @@ function applyCpfMask(value: string): string {
   if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
   if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+function isValidCpf(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * (10 - i);
+  let r = (sum * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  if (r !== parseInt(d[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(d[i]) * (11 - i);
+  r = (sum * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  return r === parseInt(d[10]);
 }
 
 export default function SignupScreen() {
@@ -36,7 +52,8 @@ export default function SignupScreen() {
     if (tipo === 'MEDICO' && !crm.trim()) { window.alert('Informe o numero do CRM'); return; }
     if (tipo === 'MEDICO' && !crmUf.trim()) { window.alert('Informe a UF do CRM (ex: SP)'); return; }
     const rawCpf = cpf.replace(/\D/g, '');
-    if (tipo === 'MEDICO' && rawCpf.length !== 11) { window.alert('Informe um CPF valido (11 digitos)'); return; }
+    if (rawCpf && !isValidCpf(rawCpf)) { window.alert('CPF invalido. Verifique os digitos.'); return; }
+    if (tipo === 'MEDICO' && !rawCpf) { window.alert('Informe um CPF valido (11 digitos)'); return; }
 
     setLoading(true);
     try {
@@ -48,10 +65,13 @@ export default function SignupScreen() {
         tipo,
       };
       if (tipo === 'MEDICO') {
-        payload.crm = crm.trim().replace(/\D/g, '');
+        payload.crmNumero = crm.trim().replace(/\D/g, '');
         payload.crmUf = crmUf.trim().toUpperCase();
       }
-      await registerRequest(payload);
+      const response = await registerRequest(payload);
+      if (response.accessToken && response.usuario) {
+        await saveAuthSession(response.accessToken, response.usuario, response.refreshToken);
+      }
       setRegistered(true);
     } catch (error) {
       showErrorAlert(error, 'Erro ao criar conta');
