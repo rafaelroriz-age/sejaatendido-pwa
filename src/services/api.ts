@@ -47,7 +47,7 @@ api.interceptors.response.use(
         if (!refreshToken) { await clearAuthSession(); return Promise.reject(error); }
 
         const refreshResponse = await axios.post(
-          `${API_URL}/auth/refresh-token`,
+          `${API_URL}/auth/refresh`,
           { refreshToken },
           { timeout: 10000, headers: { 'Content-Type': 'application/json' } },
         );
@@ -92,7 +92,7 @@ export interface RegisterRequest {
   crmUf?: string;
 }
 export interface AuthResponse {
-  token: string;
+  accessToken: string;
   refreshToken?: string;
   usuario: {
     id: string;
@@ -161,7 +161,7 @@ export interface Medico {
   id: string; usuarioId: string; crm: string; especialidades: string[]; aprovado: boolean;
   usuario: { id: string; nome: string; email: string; };
 }
-export async function fetchMedicos(): Promise<Medico[]> { return (await api.get('/medicos')).data; }
+export async function fetchMedicos(): Promise<Medico[]> { return (await api.get('/medicos', { params: { status: 'APROVADO' } })).data; }
 export async function fetchMedicoById(id: string): Promise<Medico> { return (await api.get(`/medicos/${id}`)).data; }
 export async function fetchDisponibilidadeMedico(medicoId: string, data: string): Promise<string[]> {
   try {
@@ -182,9 +182,10 @@ export interface Consulta {
 }
 export interface CreateConsultaRequest { medicoId: string; data: string; motivo: string; }
 export async function fetchMinhasConsultas(): Promise<Consulta[]> { return (await api.get('/paciente/consultas')).data; }
-export async function fetchConsultasMedico(): Promise<Consulta[]> { return (await api.get('/medicos/me/consultas')).data; }
+export async function fetchConsultasMedico(): Promise<Consulta[]> { return (await api.get('/medicos/consultas')).data; }
 export async function createConsulta(data: CreateConsultaRequest): Promise<Consulta> { return (await api.post('/paciente/consultas', data)).data; }
 export async function cancelConsulta(id: string): Promise<void> { await api.delete(`/paciente/consultas/${id}`); }
+export async function updateConsultaMedico(id: string, status: 'ACEITA' | 'RECUSADA'): Promise<void> { await api.patch(`/medicos/consultas/${id}`, { status }); }
 
 // ============ ADMIN ============
 export async function fetchMedicosPendentes(): Promise<Medico[]> { return (await api.get('/admin/medicos/pendentes')).data; }
@@ -215,12 +216,9 @@ export async function criarPagamento(data: CriarPagamentoRequest): Promise<Pagam
   const r = await api.post('/pagamentos/mercadopago/checkout', {
     consultaId: data.consultaId,
     valorCentavos: data.valorCentavos,
-    back_urls: {
-      success: `${origin}/payment/success`,
-      failure: `${origin}/payment/failure`,
-      pending: `${origin}/payment/pending`,
-    },
-    auto_return: 'approved',
+    backUrlSuccess: `${origin}/payment/success`,
+    backUrlPending: `${origin}/payment/pending`,
+    backUrlFailure: `${origin}/payment/failure`,
   });
   const res = r.data;
   // Normalize response so Payment page can use linkPagamento
@@ -368,6 +366,34 @@ export async function fetchRepasseById(id: string): Promise<Repasse> {
       status: r.status === 'PROCESSADO' ? 'confirmado' : 'pendente',
     })),
   };
+}
+
+// ============ CHAT ============
+export interface ChatSummary {
+  chatId: string;
+  consultaId: string;
+  outraParte?: { id: string; nome: string };
+  ultimaMensagem?: string;
+  naoLidas?: number;
+  atualizadoEm?: string;
+}
+export interface ChatMessage {
+  id: string;
+  texto: string;
+  remetente: { id: string; nome?: string };
+  criadoEm: string;
+}
+export async function fetchChatsUsuario(userId: string): Promise<ChatSummary[]> {
+  const r = await api.get(`/api/chats/usuario/${userId}`); return r.data;
+}
+export async function fetchMensagensChat(chatId: string, limit = 50, cursor?: string): Promise<ChatMessage[]> {
+  const r = await api.get(`/api/chats/${chatId}/mensagens`, { params: { limit, ...(cursor ? { cursor } : {}) } }); return r.data;
+}
+export async function enviarMensagem(chatId: string, texto: string): Promise<ChatMessage> {
+  const r = await api.post(`/api/chats/${chatId}/mensagens`, { texto }); return r.data;
+}
+export async function iniciarChat(consultaId: string): Promise<{ chatId: string }> {
+  const r = await api.post('/api/chats/iniciar', { consultaId }); return r.data;
 }
 
 export default api;

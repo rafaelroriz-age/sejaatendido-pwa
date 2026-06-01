@@ -78,7 +78,7 @@ export default function LoginScreen() {
     if (!isValidCpf(rawCpf)) { setErrorMsg('CPF inválido, verifique o número digitado.'); return; }
     setLoading(true);
     try {
-      const { token, usuario, refreshToken } = await loginCpfRequest({ cpf: rawCpf, senha });
+      const { accessToken, usuario, refreshToken } = await loginCpfRequest({ cpf: rawCpf, senha });
       const user = {
         id: usuario.id,
         nome: usuario.nome,
@@ -89,7 +89,7 @@ export default function LoginScreen() {
         crmNumero: usuario.crmNumero,
         crmUf: usuario.crmUf,
       };
-      await saveAuthSession(token, user, refreshToken);
+      await saveAuthSession(accessToken, user, refreshToken);
       navigateByRole(usuario.tipo);
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -112,14 +112,14 @@ export default function LoginScreen() {
     if (!email || !senha) { setErrorMsg('Preencha email e senha.'); return; }
     setLoading(true);
     try {
-      const { token, usuario, refreshToken } = await loginRequest({ email, senha });
+      const { accessToken, usuario, refreshToken } = await loginRequest({ email, senha });
       const user = {
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
         tipo: usuario.tipo,
       };
-      await saveAuthSession(token, user, refreshToken);
+      await saveAuthSession(accessToken, user, refreshToken);
       navigateByRole(usuario.tipo);
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -148,8 +148,8 @@ export default function LoginScreen() {
         callback: async (response: { credential: string }) => {
           setLoading(true);
           try {
-            const { token, usuario, refreshToken } = await loginGoogleRequest(response.credential);
-            await saveAuthSession(token, usuario, refreshToken);
+            const { accessToken, usuario, refreshToken } = await loginGoogleRequest(response.credential);
+            await saveAuthSession(accessToken, usuario, refreshToken);
             navigateByRole(usuario.tipo);
           } catch (error) {
             showErrorAlert(error, 'Erro ao fazer login com Google');

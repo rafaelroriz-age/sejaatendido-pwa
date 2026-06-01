@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearAuthSession, User } from '../storage/localStorage';
-import { Consulta, fetchConsultasMedico, fetchCrmStatus } from '../services/api';
+import { Consulta, fetchConsultasMedico, fetchCrmStatus, updateConsultaMedico } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
@@ -38,6 +38,15 @@ export default function DoctorDashboard() {
   async function handleLogout() {
     await clearAuthSession();
     navigate('/login', { replace: true });
+  }
+
+  async function handleUpdateConsulta(id: string, status: 'ACEITA' | 'RECUSADA') {
+    try {
+      await updateConsultaMedico(id, status);
+      setConsultas(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+    } catch (error) {
+      showErrorAlert(error, 'Erro ao atualizar consulta');
+    }
   }
 
   function toYmd(dateIso: string) {
@@ -146,7 +155,10 @@ export default function DoctorDashboard() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ flex: 1, backgroundColor: Colors.doctor, borderRadius: Radius.md, padding: 12, border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Iniciar Consulta</button>
               {c.status.toUpperCase().includes('PEND') && (
-                <button style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.success, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Confirmar</button>
+                <>
+                  <button onClick={() => handleUpdateConsulta(c.id, 'ACEITA')} style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.success, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Confirmar</button>
+                  <button onClick={() => handleUpdateConsulta(c.id, 'RECUSADA')} style={{ flex: 1, backgroundColor: Colors.errorLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.error, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Recusar</button>
+                </>
               )}
             </div>
           </Card>
