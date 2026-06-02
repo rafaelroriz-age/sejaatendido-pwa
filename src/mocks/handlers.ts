@@ -157,7 +157,7 @@ const MOCK_MEDICOS_PENDENTES = [
 
 function authResponse(user: typeof MOCK_PACIENTE | typeof MOCK_MEDICO_USER | typeof MOCK_ADMIN_USER) {
   return HttpResponse.json({
-    token: MOCK_TOKEN,
+    accessToken: MOCK_TOKEN,
     refreshToken: MOCK_REFRESH,
     usuario: user,
   });
@@ -181,11 +181,23 @@ export const handlers = [
 
   http.post(`${BASE}/auth/registro`, async () => {
     await new Promise(r => setTimeout(r, 800)); // simula latência
-    return HttpResponse.json({ id: 'novo-usuario-mock' }, { status: 201 });
+    return HttpResponse.json({
+      id: 'novo-usuario-mock',
+      accessToken: MOCK_TOKEN,
+      refreshToken: MOCK_REFRESH,
+      usuario: MOCK_PACIENTE,
+      mensagem: 'Cadastro realizado. Verifique seu email.',
+    }, { status: 201 });
   }),
 
-  http.post(`${BASE}/auth/refresh-token`, () =>
-    HttpResponse.json({ token: MOCK_TOKEN, refreshToken: MOCK_REFRESH }),
+  http.post(`${BASE}/auth/medicos/login`, async ({ request }) => {
+    const body = await request.json() as { cpf?: string };
+    if (!body?.cpf) return HttpResponse.json({ erro: 'CPF obrigatorio' }, { status: 400 });
+    return authResponse(MOCK_MEDICO_USER);
+  }),
+
+  http.post(`${BASE}/auth/refresh`, () =>
+    HttpResponse.json({ accessToken: MOCK_TOKEN, refreshToken: MOCK_REFRESH }),
   ),
 
   // ── EMAILS ────────────────────────────────────────────────────────────────
@@ -316,6 +328,31 @@ export const handlers = [
   // ── NOTIFICAÇÕES ──────────────────────────────────────────────────────────
 
   http.post(`${BASE}/notificacoes/device-token`, () => HttpResponse.json({ ok: true })),
+
+  // ── CHAT ──────────────────────────────────────────────────────────────────
+
+  http.get(`${BASE}/api/chats/usuario/:userId`, () =>
+    HttpResponse.json([]),
+  ),
+
+  http.get(`${BASE}/api/chats/:chatId/mensagens`, () =>
+    HttpResponse.json([]),
+  ),
+
+  http.post(`${BASE}/api/chats/:chatId/mensagens`, async ({ request, params }) => {
+    const body = await request.json() as { texto?: string };
+    return HttpResponse.json({
+      id: `msg-${Date.now()}`,
+      texto: body.texto ?? '',
+      remetente: { id: 'paciente-001', nome: 'João Silva (Mock)' },
+      criadoEm: new Date().toISOString(),
+    }, { status: 201 });
+  }),
+
+  http.post(`${BASE}/api/chats/iniciar`, async ({ request }) => {
+    const body = await request.json() as { consultaId?: string };
+    return HttpResponse.json({ chatId: `chat-${body.consultaId ?? Date.now()}` });
+  }),
 
   // ── PERFIL ────────────────────────────────────────────────────────────────
 

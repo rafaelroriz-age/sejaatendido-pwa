@@ -55,9 +55,6 @@ export default function AdminDashboard() {
 
   const stats = [
     { label: 'Pendentes', value: pendentes.length, icon: '⏳', bg: Colors.warningLight },
-    { label: 'Médicos', value: 24, icon: '🩺', bg: Colors.doctorLight },
-    { label: 'Pacientes', value: 156, icon: '👥', bg: Colors.accent },
-    { label: 'Consultas', value: 89, icon: '📋', bg: Colors.successLight },
   ];
 
   return (

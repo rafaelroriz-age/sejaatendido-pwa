@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   fetchSaldoMedico,
   fetchRepasses,
+  fetchConsultasMedico,
   SaldoMedico,
   Repasse,
-  ConsultaRepasse,
+  Consulta,
 } from '../services/api';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Card from '../components/Card';
@@ -59,29 +60,36 @@ function WeekChart({ data }: { data: number[] }) {
   );
 }
 
-const DEMO_CONSULTAS: ConsultaRepasse[] = [
-  { id: '1', paciente: 'Maria Santos', horario: '09:00', valor: 150, status: 'confirmado' },
-  { id: '2', paciente: 'Joao Oliveira', horario: '10:30', valor: 200, status: 'pendente' },
-  { id: '3', paciente: 'Ana Costa', horario: '14:00', valor: 150, status: 'confirmado' },
-];
-
 export default function Earnings() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('semana');
   const [saldo, setSaldo] = useState<SaldoMedico | null>(null);
   const [repasses, setRepasses] = useState<Repasse[]>([]);
+  const [consultasSemana, setConsultasSemana] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     try {
-      const [saldoData, repassesData] = await Promise.all([
+      const [saldoData, repassesData, consultasData] = await Promise.all([
         fetchSaldoMedico().catch(() => ({ saldo_a_liberar: 0, saldo_pendente: 0, ganhos_hoje: 0, proximo_repasse: '', ganhos_semana: [0, 0, 0, 0, 0, 0, 0] })),
         fetchRepasses().catch(() => []),
+        fetchConsultasMedico().catch(() => []),
       ]);
       setSaldo(saldoData);
       setRepasses(repassesData);
+      // Filter to current ISO week
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // Monday
+      startOfWeek.setHours(0, 0, 0, 0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
+      setConsultasSemana(consultasData.filter(c => {
+        const d = new Date(c.data);
+        return d >= startOfWeek && d < endOfWeek;
+      }));
     } finally { setLoading(false); }
   }
 
@@ -97,30 +105,34 @@ export default function Earnings() {
   }
 
   function renderSemana() {
-    const consultas = DEMO_CONSULTAS;
     return (
       <>
         <WeekChart data={saldo?.ganhos_semana ?? [0, 0, 0, 0, 0, 0, 0]} />
         <span style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.md, display: 'block', letterSpacing: -0.3 }}>Consultas da semana</span>
-        {consultas.length === 0 ? (
+        {consultasSemana.length === 0 ? (
           <EmptyState title="Nenhuma consulta" subtitle="Você ainda não teve consultas esta semana" />
-        ) : consultas.map(c => (
+        ) : consultasSemana.map(c => {
+          const anyC = c as any;
+          const pacienteNome = anyC.paciente?.usuario?.nome || anyC.paciente?.nome || anyC.pacienteNome || anyC.nomePaciente || 'Paciente';
+          const horario = new Date(c.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const isPend = c.status.toUpperCase().includes('PEND');
+          return (
           <Card key={c.id} style={{ marginBottom: Space.md }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <Avatar name={c.paciente} size={40} color={Colors.doctor} />
+              <Avatar name={pacienteNome} size={40} color={Colors.doctor} />
               <div style={{ flex: 1, marginLeft: Space.md }}>
-                <span style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textPrimary, display: 'block' }}>{c.paciente}</span>
-                <span style={{ fontSize: Font.xs, color: Colors.textSecondary, marginTop: 2, display: 'block' }}>{c.horario}</span>
+                <span style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textPrimary, display: 'block' }}>{pacienteNome}</span>
+                <span style={{ fontSize: Font.xs, color: Colors.textSecondary, marginTop: 2, display: 'block' }}>{horario}</span>
               </div>
               <div style={{ textAlign: 'right' as const }}>
-                <span style={{ fontSize: Font.sm, fontWeight: 800, color: Colors.textPrimary, display: 'block' }}>{formatCurrency(c.valor)}</span>
-                <div style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2, borderRadius: Radius.full, marginTop: 4, backgroundColor: c.status === 'confirmado' ? Colors.successLight : Colors.warningLight, display: 'inline-block' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: c.status === 'confirmado' ? Colors.success : Colors.warning }}>{c.status === 'confirmado' ? 'Confirmado' : 'Pendente'}</span>
+                <div style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2, borderRadius: Radius.full, marginTop: 4, backgroundColor: isPend ? Colors.warningLight : Colors.successLight, display: 'inline-block' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: isPend ? Colors.warning : Colors.success }}>{isPend ? 'Pendente' : 'Confirmado'}</span>
                 </div>
               </div>
             </div>
           </Card>
-        ))}
+        );
+        })}
       </>
     );
   }

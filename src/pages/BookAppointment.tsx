@@ -54,7 +54,7 @@ export default function BookAppointment() {
 
   async function handleConfirm() {
     if (!selectedMedico || !selectedDate || !selectedTime) { window.alert('Selecione médico, data e horário'); return; }
-    if (!availableSlots.includes(selectedTime)) { window.alert('Este horário não está mais disponível. Escolha outro.'); return; }
+    if (availableSlots.length > 0 && !availableSlots.includes(selectedTime)) { window.alert('Este horário não está mais disponível. Escolha outro.'); return; }
     const dateObj = new Date(selectedDate);
     const [h, m] = selectedTime.split(':');
     dateObj.setHours(parseInt(h), parseInt(m), 0, 0);
@@ -175,12 +175,10 @@ export default function BookAppointment() {
             <div className="spinner--primary spinner" style={{ width: 18, height: 18 }} />
             <span style={{ fontSize: 13, color: Colors.textSecondary }}>Carregando disponibilidade...</span>
           </div>
-        ) : availableSlots.length === 0 ? (
-          <div style={{ fontSize: 13, color: Colors.warning, marginBottom: 12 }}>Sem horários livres nesta data.</div>
         ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {TIME_SLOTS.map(slot => {
-            const enabled = !selectedMedico || !selectedDate ? false : availableSlots.includes(slot);
+            const enabled = !selectedMedico || !selectedDate ? false : availableSlots.length === 0 || availableSlots.includes(slot);
             const sel = selectedTime === slot;
             return (
               <div key={slot} onClick={() => enabled && setSelectedTime(slot)}
