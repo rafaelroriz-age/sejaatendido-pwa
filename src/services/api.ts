@@ -188,9 +188,27 @@ export async function cancelConsulta(id: string): Promise<void> { await api.dele
 export async function updateConsultaMedico(id: string, status: 'ACEITA' | 'RECUSADA'): Promise<void> { await api.patch(`/medicos/consultas/${id}`, { status }); }
 
 // ============ ADMIN ============
-export async function fetchMedicosPendentes(): Promise<Medico[]> { return (await api.get('/admin/medicos/pendentes')).data; }
-export async function aprovarMedico(id: string): Promise<void> { await api.post(`/admin/medicos/${id}/aprovar`); }
-export async function recusarMedico(id: string): Promise<void> { await api.post(`/admin/medicos/${id}/recusar`); }
+export interface AdminDashboardStats {
+  totalUsuarios: number; totalMedicos: number; medicosAprovados: number; medicosPendentes: number;
+  totalPacientes: number; totalConsultas: number; consultasPendentes: number;
+  consultasConcluidas: number; receitaTotal: number;
+}
+export interface AdminMedico {
+  id: string; cpf?: string; crm?: string; status?: string; aprovado?: boolean;
+  especialidades?: string[]; usuarioId?: string;
+  usuario: { id?: string; nome: string; email: string; };
+}
+export interface AdminUsuario {
+  id: string; nome: string; email: string; tipo: string; cpf?: string; criadoEm?: string;
+}
+export async function fetchAdminDashboard(): Promise<AdminDashboardStats> { return (await api.get('/admin/dashboard')).data; }
+export async function fetchMedicosPendentes(): Promise<AdminMedico[]> { return (await api.get('/admin/medicos/pendentes')).data; }
+export async function fetchAdminMedicos(): Promise<AdminMedico[]> { return (await api.get('/admin/medicos')).data; }
+export async function aprovarMedico(id: string): Promise<void> { await api.patch(`/admin/medicos/${id}/aprovar`); }
+export async function rejeitarMedico(id: string, motivo: string): Promise<void> { await api.patch(`/admin/medicos/${id}/rejeitar`, { motivo }); }
+export async function fetchAdminConsultas(): Promise<Consulta[]> { return (await api.get('/admin/consultas')).data; }
+export async function fetchAdminUsuarios(): Promise<AdminUsuario[]> { return (await api.get('/admin/usuarios')).data; }
+export async function deleteAdminUsuario(id: string): Promise<void> { await api.delete(`/admin/usuarios/${id}`); }
 
 // ============ PAGAMENTOS ============
 export type MetodoPagamento = 'pix' | 'cartao' | 'card';
