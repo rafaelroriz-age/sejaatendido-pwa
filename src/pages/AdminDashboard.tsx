@@ -58,14 +58,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function init() {
       try {
-        const [userData, statsData, pendentesData] = await Promise.all([
+        const [userData, statsData] = await Promise.all([
           getUser(),
           fetchAdminDashboard().catch(() => null),
-          fetchMedicosPendentes().catch(() => []),
         ]);
         setUser(userData);
         if (statsData) setStats(statsData);
-        setPendentes(pendentesData);
       } catch (error) {
         showErrorAlert(error, 'Erro ao carregar painel admin');
       } finally {
@@ -83,11 +81,17 @@ export default function AdminDashboard() {
       else if (t === 'consultas') setConsultas(await fetchAdminConsultas());
       else if (t === 'usuarios') setUsuarios(await fetchAdminUsuarios());
     } catch (error) {
+      const httpStatus = (error as any)?.response?.status;
+      if (httpStatus === 401 || httpStatus === 403) {
+        await clearAuthSession();
+        navigate('/login', { replace: true });
+        return;
+      }
       showErrorAlert(error, 'Erro ao carregar dados');
     } finally {
       setLoadingTab(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => { loadTab(tab); }, [tab, loadTab]);
 
@@ -224,10 +228,10 @@ export default function AdminDashboard() {
                 : pendentes.map(m => (
                   <Card key={m.id} style={{ marginBottom: Space.md }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: Space.md }}>
-                      <Avatar name={m.usuario.nome} size={48} color={Colors.admin} />
+                      <Avatar name={m.usuario?.nome ?? '?'} size={48} color={Colors.admin} />
                       <div style={{ flex: 1, marginLeft: Space.md }}>
-                        <div style={{ fontSize: Font.md, fontWeight: 700, color: Colors.textPrimary }}>{m.usuario.nome}</div>
-                        <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>{m.usuario.email}</div>
+                        <div style={{ fontSize: Font.md, fontWeight: 700, color: Colors.textPrimary }}>{m.usuario?.nome ?? '—'}</div>
+                        <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>{m.usuario?.email ?? '—'}</div>
                         {m.cpf && <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>CPF: {m.cpf}</div>}
                         {m.crm && <div style={{ fontSize: Font.xs + 1, color: Colors.admin, marginTop: 2, fontWeight: 700 }}>CRM: {m.crm}</div>}
                         {m.especialidades && m.especialidades.length > 0 && (
@@ -256,10 +260,10 @@ export default function AdminDashboard() {
                 : medicos.map(m => (
                   <Card key={m.id} style={{ marginBottom: Space.md }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar name={m.usuario.nome} size={44} color={Colors.doctor} />
+                      <Avatar name={m.usuario?.nome ?? '?'} size={44} color={Colors.doctor} />
                       <div style={{ flex: 1, marginLeft: Space.md }}>
-                        <div style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textPrimary }}>{m.usuario.nome}</div>
-                        <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>{m.usuario.email}</div>
+                        <div style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textPrimary }}>{m.usuario?.nome ?? '—'}</div>
+                        <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>{m.usuario?.email ?? '—'}</div>
                         {m.crm && <div style={{ fontSize: Font.xs, color: Colors.doctor, marginTop: 2, fontWeight: 600 }}>CRM: {m.crm}</div>}
                         {m.cpf && <div style={{ fontSize: Font.xs, color: Colors.textMuted, marginTop: 2 }}>CPF: {m.cpf}</div>}
                       </div>
