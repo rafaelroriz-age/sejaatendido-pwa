@@ -1,4 +1,4 @@
-import axios, { AxiosHeaders } from 'axios';
+﻿import axios, { AxiosHeaders } from 'axios';
 import { API_URL } from '../config/api';
 import {
   clearAuthSession,
@@ -44,10 +44,13 @@ api.interceptors.response.use(
       originalConfig._retry = true;
       try {
         const refreshToken = await getRefreshToken();
-        if (!refreshToken) { await clearAuthSession(); return Promise.reject(error); }
+        if (!refreshToken) {
+          await clearAuthSession();
+          return Promise.reject(error);
+        }
 
         const refreshResponse = await axios.post(
-          `${API_URL}/auth/refresh`,
+          `${API_URL}/auth/refresh-token`,
           { refreshToken },
           { timeout: 10000, headers: { 'Content-Type': 'application/json' } },
         );
@@ -56,7 +59,10 @@ api.interceptors.response.use(
           refreshResponse.data?.accessToken ?? refreshResponse.data?.token;
         const newRefreshToken: string | undefined = refreshResponse.data?.refreshToken;
 
-        if (!accessToken) { await clearAuthSession(); return Promise.reject(error); }
+        if (!accessToken) {
+          await clearAuthSession();
+          return Promise.reject(error);
+        }
 
         await saveToken(accessToken);
         if (newRefreshToken) await saveRefreshToken(newRefreshToken);
@@ -79,17 +85,16 @@ api.interceptors.response.use(
   },
 );
 
-// ============ AUTH ============
+// AUTH
 export interface LoginRequest { email: string; senha: string; }
 export interface LoginCpfRequest { cpf: string; senha: string; }
 export interface RegisterRequest {
   nome: string;
   email: string;
   cpf?: string;
+  telefone?: string;
   senha: string;
   tipo: 'PACIENTE' | 'MEDICO';
-  crmNumero?: string;
-  crmUf?: string;
 }
 export interface AuthResponse {
   accessToken: string;
@@ -107,28 +112,48 @@ export interface AuthResponse {
 }
 
 export async function loginRequest(data: LoginRequest): Promise<AuthResponse> {
-  const r = await api.post('/auth/login', data); return r.data;
-}
-export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthResponse> {
-  const r = await api.post('/auth/medicos/login', data); return r.data;
-}
-export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
-  const r = await api.post('/auth/login-google', { idToken });
+  const r = await api.post('/auth/login', data);
   return r.data;
 }
+
+export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthResponse> {
+  const r = await api.post('/auth/login', data);
+  return r.data;
+}
+
+export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
+  const r = await api.post('/auth/google', { idToken });
+  return r.data;
+}
+
+export async function loginAppleRequest(identityToken: string, firstName?: string, lastName?: string): Promise<AuthResponse> {
+  const body: Record<string, unknown> = { identityToken };
+  if (firstName || lastName) body.user = { name: { firstName: firstName ?? '', lastName: lastName ?? '' } };
+  const r = await api.post('/auth/apple', body);
+  return r.data;
+}
+
+export async function logoutRequest(refreshToken: string): Promise<void> {
+  await api.post('/auth/logout', { refreshToken });
+}
+
 export interface RegisterResponse {
-  id: string;
-  accessToken?: string;
-  refreshToken?: string;
-  usuario?: AuthResponse['usuario'];
+  id?: string;
+  accessToken: string;
+  refreshToken: string;
+  usuario: AuthResponse['usuario'];
   mensagem?: string;
 }
+
 export async function registerRequest(data: RegisterRequest): Promise<RegisterResponse> {
-  const r = await api.post('/auth/registro', data, { timeout: 30000 }); return r.data;
+  const r = await api.post('/auth/registro', data, { timeout: 30000 });
+  return r.data;
 }
+
 export async function confirmEmailRequest(token: string): Promise<void> {
   await api.post('/emails/confirmar-email', { token });
 }
+
 export async function resetPasswordRequest(token: string, novaSenha: string): Promise<void> {
   await api.post('/emails/resetar-senha', { token, novaSenha });
 }
@@ -141,123 +166,379 @@ export async function resendConfirmEmailRequest(): Promise<void> {
   await api.post('/emails/confirmar-email/enviar');
 }
 
-// ============ CRM ============
+// CRM
 export interface CrmStatusResponse {
   crmCartaoValidado: boolean;
   crmNumero?: string;
   crmUf?: string;
 }
+
 export async function fetchCrmStatus(): Promise<CrmStatusResponse> {
   const r = await api.get('/medicos/me/crm/status');
   return r.data;
 }
+
 export async function validarCrmQr(payload: string): Promise<CrmStatusResponse> {
   const r = await api.post('/medicos/me/crm/validar-cartao', { payload });
   return r.data;
 }
 
-// ============ MÉDICOS ============
+// MEDICOS
 export interface Medico {
-  id: string; usuarioId: string; crm: string; especialidades: string[]; aprovado: boolean;
-  usuario: { id: string; nome: string; email: string; };
+  id: string;
+  usuarioId: string;
+  especialidade?: string;
+  especialidades?: string[];
+  crmNumero?: string;
+  crmUf?: string;
+  crm?: string;
+  fotoPerfil?: string;
+  bio?: string;
+  valorConsulta?: number;
+  status?: string;
+  aprovado?: boolean;
+  usuario: { id: string; nome: string; email: string };
 }
-export async function fetchMedicos(): Promise<Medico[]> { return (await api.get('/medicos', { params: { status: 'APROVADO' } })).data; }
-export async function fetchMedicoById(id: string): Promise<Medico> { return (await api.get(`/medicos/${id}`)).data; }
+
+export interface MedicoListResponse {
+  medicos: Medico[];
+  total: number;
+  page: number;
+}
+
+export async function fetchMedicos(params?: { especialidade?: string; nome?: string; page?: number; limit?: number }): Promise<Medico[]> {
+  const r = await api.get('/medicos', { params });
+  return r.data?.medicos ?? r.data ?? [];
+}
+
+export async function fetchMedicoById(id: string): Promise<Medico> {
+  const r = await api.get(`/medicos/${id}`);
+  return r.data?.medico ?? r.data;
+}
+
+export async function fetchMedicoPerfil(): Promise<Medico> {
+  const r = await api.get('/medicos/me');
+  return r.data?.medico ?? r.data;
+}
+
+export async function updateMedicoPerfil(data: { especialidade?: string; bio?: string; valorConsulta?: number; fotoPerfil?: string }): Promise<Medico> {
+  const r = await api.put('/medicos/me', data);
+  return r.data?.medico ?? r.data;
+}
+
+export interface SlotsResponse {
+  slots: string[];
+  duracaoSlotMinutos: number;
+}
+
 export async function fetchDisponibilidadeMedico(medicoId: string, data: string): Promise<string[]> {
   try {
-    const response = await api.get(`/medicos/${medicoId}/disponibilidade`, { params: { data } });
-    const payload = response.data;
-    if (Array.isArray(payload)) return payload;
-    return payload?.slots ?? payload?.horarios ?? payload?.disponibilidade ?? [];
+    const response = await api.get(`/medicos/${medicoId}/slots`, { params: { data } });
+    const payload = response.data as SlotsResponse;
+    return payload?.slots ?? [];
   } catch {
-    // Endpoint may not exist yet in backend — return empty to allow any slot
     return [];
   }
 }
 
-// ============ CONSULTAS ============
+export interface DisponibilidadeItem {
+  id?: string;
+  diaSemana: number;
+  horaInicio: string;
+  horaFim: string;
+  duracaoSlot?: number;
+  ativo?: boolean;
+}
+
+export interface HorarioBloqueado {
+  id?: string;
+  dataHora: string;
+  duracao?: number;
+  motivo?: string;
+}
+
+export async function fetchMinhaDisponibilidade(): Promise<DisponibilidadeItem[]> {
+  const r = await api.get('/medicos/me/disponibilidade');
+  return r.data?.disponibilidades ?? r.data ?? [];
+}
+
+export async function saveMinhaDisponibilidade(disponibilidades: DisponibilidadeItem[]): Promise<DisponibilidadeItem[]> {
+  const r = await api.put('/medicos/me/disponibilidade', { disponibilidades });
+  return r.data?.disponibilidades ?? r.data ?? [];
+}
+
+export async function criarHorarioBloqueado(data: HorarioBloqueado): Promise<HorarioBloqueado> {
+  const r = await api.post('/medicos/me/horario-bloqueado', data);
+  return r.data?.horarioBloqueado ?? r.data;
+}
+
+export async function deletarHorarioBloqueado(id: string): Promise<void> {
+  await api.delete(`/medicos/me/horario-bloqueado/${id}`);
+}
+
+export async function fetchHorariosBloqueados(from?: string): Promise<HorarioBloqueado[]> {
+  const r = await api.get('/medicos/me/horarios-bloqueados', { params: from ? { from } : undefined });
+  return r.data?.horariosBloqueados ?? r.data ?? [];
+}
+
+// PACIENTE PERFIL
+export interface PacientePerfil {
+  id: string;
+  usuarioId: string;
+  dataNascimento?: string;
+  fotoPerfil?: string;
+}
+
+export async function fetchPacientePerfil(): Promise<PacientePerfil> {
+  const r = await api.get('/pacientes/me');
+  return r.data?.paciente ?? r.data;
+}
+
+export async function updatePacientePerfil(data: { dataNascimento?: string; fotoPerfil?: string }): Promise<PacientePerfil> {
+  const r = await api.put('/pacientes/me', data);
+  return r.data?.paciente ?? r.data;
+}
+
+// AVALIACOES
+export interface Avaliacao {
+  id: string;
+  consultaId: string;
+  nota: number;
+  comentario?: string;
+  criadoEm: string;
+}
+
+export interface AvaliacoesMedicoResponse {
+  avaliacoes: Avaliacao[];
+  media: number;
+  total: number;
+}
+
+export async function criarAvaliacao(consultaId: string, nota: number, comentario?: string): Promise<Avaliacao> {
+  const r = await api.post('/pacientes/avaliacoes', { consultaId, nota, ...(comentario ? { comentario } : {}) });
+  return r.data?.avaliacao ?? r.data;
+}
+
+export async function fetchAvaliacoesMedico(medicoId: string): Promise<AvaliacoesMedicoResponse> {
+  const r = await api.get(`/medicos/${medicoId}/avaliacoes`);
+  return r.data;
+}
+
+// CONSULTAS
 export interface Consulta {
-  id: string; medicoId: string; pacienteId: string; data: string; motivo: string; status: string;
-  meetLink?: string; medico?: Medico;
+  id: string;
+  medicoId: string;
+  pacienteId: string;
+  dataHora?: string;
+  data?: string;
+  sintomas?: string;
+  motivo?: string;
+  status: string;
+  valor?: number;
+  meetLink?: string;
+  medico?: Medico;
 }
-export interface CreateConsultaRequest { medicoId: string; data: string; motivo: string; }
-export async function fetchMinhasConsultas(): Promise<Consulta[]> { return (await api.get('/paciente/consultas')).data; }
-export async function fetchConsultasMedico(): Promise<Consulta[]> { return (await api.get('/medicos/consultas')).data; }
-export async function createConsulta(data: CreateConsultaRequest): Promise<Consulta> { return (await api.post('/paciente/consultas', data)).data; }
-export async function cancelConsulta(id: string): Promise<void> { await api.delete(`/paciente/consultas/${id}`); }
-export async function updateConsultaMedico(id: string, status: 'ACEITA' | 'RECUSADA'): Promise<void> { await api.patch(`/medicos/consultas/${id}`, { status }); }
 
-// ============ ADMIN ============
-export interface AdminDashboardStats {
-  totalUsuarios: number; totalMedicos: number; medicosAprovados: number; medicosPendentes: number;
-  totalPacientes: number; totalConsultas: number; consultasPendentes: number;
-  consultasConcluidas: number; receitaTotal: number;
+export interface CreateConsultaRequest {
+  medicoId: string;
+  dataHora: string;
+  sintomas: string;
 }
-export interface AdminMedico {
-  id: string; cpf?: string; crm?: string; status?: string; aprovado?: boolean;
-  especialidades?: string[]; usuarioId?: string;
-  usuario: { id?: string; nome: string; email: string; };
-}
-export interface AdminUsuario {
-  id: string; nome: string; email: string; tipo: string; cpf?: string; criadoEm?: string;
-}
-export async function fetchAdminDashboard(): Promise<AdminDashboardStats> { return (await api.get('/admin/dashboard')).data; }
-export async function fetchMedicosPendentes(): Promise<AdminMedico[]> { return (await api.get('/admin/medicos/pendentes')).data; }
-export async function fetchAdminMedicos(): Promise<AdminMedico[]> { return (await api.get('/admin/medicos')).data; }
-export async function aprovarMedico(id: string): Promise<void> { await api.patch(`/admin/medicos/${id}/aprovar`); }
-export async function rejeitarMedico(id: string, motivo: string): Promise<void> { await api.patch(`/admin/medicos/${id}/rejeitar`, { motivo }); }
-export async function fetchAdminConsultas(): Promise<Consulta[]> { return (await api.get('/admin/consultas')).data; }
-export async function fetchAdminUsuarios(): Promise<AdminUsuario[]> { return (await api.get('/admin/usuarios')).data; }
-export async function deleteAdminUsuario(id: string): Promise<void> { await api.delete(`/admin/usuarios/${id}`); }
 
-// ============ PAGAMENTOS ============
-export type MetodoPagamento = 'pix' | 'cartao' | 'card';
-export interface CriarPagamentoRequest { consultaId: string; metodoPagamento?: MetodoPagamento; valorCentavos?: number; }
-export interface PagamentoResponse {
-  id: string; status?: string; qrCode?: string; qrCodeBase64?: string;
-  copiaCola?: string; copiaECola?: string; linkPagamento?: string; paymentUrl?: string;
-  pagamento?: any;
-  pix?: { codigo?: string; qrcode?: string; validade?: string };
-  mercadopago?: { preferenceId?: string; initPoint?: string; sandboxInitPoint?: string };
+export async function fetchMinhasConsultas(): Promise<Consulta[]> {
+  const r = await api.get('/pacientes/me/consultas');
+  return r.data?.consultas ?? r.data ?? [];
 }
-export async function criarPagamento(data: CriarPagamentoRequest): Promise<PagamentoResponse> {
-  const metodo = data.metodoPagamento || 'pix';
-  if (metodo === 'pix') {
-    const r = await api.post('/pagamentos/pix', {
-      consultaId: data.consultaId,
-      valorCentavos: data.valorCentavos,
-    });
-    return r.data;
-  }
-  // cartao/card → Mercado Pago Checkout Pro
-  const origin = window.location.origin;
-  const r = await api.post('/pagamentos/mercadopago/checkout', {
-    consultaId: data.consultaId,
-    valorCentavos: data.valorCentavos,
-    backUrlSuccess: `${origin}/payment/success`,
-    backUrlPending: `${origin}/payment/pending`,
-    backUrlFailure: `${origin}/payment/failure`,
+
+export async function fetchConsultasMedico(): Promise<Consulta[]> {
+  const r = await api.get('/medicos/me/consultas');
+  return r.data?.consultas ?? r.data ?? [];
+}
+
+export async function createConsulta(data: CreateConsultaRequest): Promise<Consulta> {
+  const r = await api.post('/pacientes/consultas', data);
+  return r.data?.consulta ?? r.data;
+}
+
+export async function cancelConsulta(id: string): Promise<void> {
+  await api.delete(`/pacientes/me/consultas/${id}`);
+}
+
+export async function updateConsultaMedico(id: string, acao: 'ACEITA' | 'RECUSADA', motivoRecusa?: string): Promise<void> {
+  const acaoMap = { ACEITA: 'ACEITAR', RECUSADA: 'RECUSAR' } as const;
+  await api.patch(`/medicos/me/consultas/${id}`, {
+    acao: acaoMap[acao],
+    ...(motivoRecusa ? { motivoRecusa } : {}),
   });
-  const res = r.data;
-  // Normalize response so Payment page can use linkPagamento
-  return {
-    ...res,
-    id: res.pagamento?.id ?? res.id,
-    status: res.pagamento?.status ?? res.status,
-    linkPagamento: res.mercadopago?.initPoint ?? res.linkPagamento,
-    paymentUrl: res.mercadopago?.initPoint ?? res.paymentUrl,
+}
+
+// ADMIN
+export interface AdminDashboardStats {
+  totalUsuarios: number;
+  totalMedicos: number;
+  medicosAprovados: number;
+  medicosPendentes: number;
+  totalPacientes: number;
+  totalConsultas: number;
+  consultasPendentes: number;
+  consultasConcluidas: number;
+  receitaTotal: number;
+}
+
+export interface AdminMedico {
+  id: string;
+  cpf?: string;
+  crm?: string;
+  status?: string;
+  aprovado?: boolean;
+  especialidades?: string[];
+  usuarioId?: string;
+  usuario: { id?: string; nome: string; email: string };
+}
+
+export interface AdminUsuario {
+  id: string;
+  nome: string;
+  email: string;
+  tipo: string;
+  cpf?: string;
+  criadoEm?: string;
+}
+
+export async function fetchAdminDashboard(): Promise<AdminDashboardStats> {
+  return (await api.get('/admin/dashboard')).data;
+}
+
+export async function fetchMedicosPendentes(): Promise<AdminMedico[]> {
+  const r = await api.get('/admin/medicos/pendentes');
+  return r.data?.medicos ?? r.data ?? [];
+}
+
+export async function fetchAdminMedicos(): Promise<AdminMedico[]> {
+  const r = await api.get('/admin/medicos');
+  return r.data?.medicos ?? r.data ?? [];
+}
+
+export async function aprovarMedico(id: string): Promise<void> {
+  await api.post(`/admin/medicos/${id}/aprovar`);
+}
+
+export async function rejeitarMedico(id: string, motivo: string): Promise<void> {
+  await api.post(`/admin/medicos/${id}/recusar`, { motivo });
+}
+
+export async function fetchAdminConsultas(): Promise<Consulta[]> {
+  const r = await api.get('/admin/consultas');
+  return r.data?.consultas ?? r.data ?? [];
+}
+
+export async function fetchAdminUsuarios(): Promise<AdminUsuario[]> {
+  const r = await api.get('/admin/usuarios');
+  return r.data?.usuarios ?? r.data ?? [];
+}
+
+export async function deleteAdminUsuario(id: string): Promise<void> {
+  await api.delete(`/admin/usuarios/${id}`);
+}
+
+// PAGAMENTOS
+export type MetodoPagamento = 'pix' | 'cartao' | 'card';
+export interface CriarPagamentoRequest {
+  consultaId: string;
+  metodoPagamento?: MetodoPagamento;
+  valorCentavos?: number;
+}
+
+export interface PagamentoCriado {
+  id: string;
+  consultaId: string;
+  valor: number;
+  status: string;
+  metodo: string;
+  criadoEm: string;
+}
+
+export interface PagamentoResponse {
+  id: string;
+  status?: string;
+  qrCode?: string;
+  qrCodeBase64?: string;
+  copiaCola?: string;
+  copiaECola?: string;
+  linkPagamento?: string;
+  paymentUrl?: string;
+  preferenceId?: string;
+  pagamento?: PagamentoCriado;
+  pix?: {
+    qrCode?: string;
+    qrCodeBase64?: string;
+    ticketUrl?: string;
+    validade?: string;
+  };
+  mercadopago?: {
+    publicKey?: string;
+    preferenceId?: string;
+    initPoint?: string;
+    sandboxInitPoint?: string;
   };
 }
-export async function fetchPagamentoById(id: string): Promise<PagamentoResponse> { return (await api.get(`/pagamentos/${id}`)).data; }
-export async function syncPagamento(id: string): Promise<any> { return (await api.post(`/pagamentos/mercadopago/${id}/sync`)).data; }
 
-// ============ DADOS BANCÁRIOS ============
-export interface DadosBancarios { tipoChavePix?: string; chavePix?: string; banco?: string; agencia?: string; conta?: string; }
+function normalizePagamentoResponse(res: any): PagamentoResponse {
+  return {
+    ...res,
+    id: res?.pagamento?.id ?? res?.id ?? '',
+    status: res?.pagamento?.status ?? res?.status,
+    qrCode: res?.pix?.qrCode ?? res?.qrCode,
+    qrCodeBase64: res?.pix?.qrCodeBase64 ?? res?.qrCodeBase64,
+    copiaCola: res?.pix?.qrCode ?? res?.copiaCola ?? res?.copiaECola,
+    preferenceId: res?.mercadopago?.preferenceId ?? res?.preferenceId,
+    linkPagamento: res?.mercadopago?.initPoint ?? res?.linkPagamento ?? res?.paymentUrl,
+    paymentUrl: res?.mercadopago?.initPoint ?? res?.paymentUrl ?? res?.linkPagamento,
+  };
+}
+
+export async function criarPagamento(data: CriarPagamentoRequest): Promise<PagamentoResponse> {
+  const metodo = data.metodoPagamento === 'card' ? 'cartao' : (data.metodoPagamento || 'pix');
+  if (metodo === 'pix') {
+    const r = await api.post('/pagamentos/pix', { consultaId: data.consultaId });
+    return normalizePagamentoResponse(r.data);
+  }
+
+  const r = await api.post('/pagamentos/cartao', { consultaId: data.consultaId });
+  return normalizePagamentoResponse(r.data);
+}
+
+export async function fetchPagamentoById(id: string): Promise<PagamentoResponse> {
+  return (await api.get(`/pagamentos/${id}`)).data;
+}
+
+export async function syncPagamento(consultaId: string): Promise<PagamentoResponse> {
+  const r = await api.get(`/pagamentos/sync/${consultaId}`);
+  return normalizePagamentoResponse(r.data);
+}
+
+// DADOS BANCARIOS
+export interface DadosBancarios {
+  tipoChavePix?: string;
+  chavePix?: string;
+  banco?: string;
+  agencia?: string;
+  conta?: string;
+}
+
 export async function fetchDadosBancarios(): Promise<DadosBancarios | null> {
   const raw = (await api.get('/medicos/me/dados-bancarios')).data;
-  // Backend uses "valorChavePix", PWA uses "chavePix"
-  return raw ? { tipoChavePix: raw.tipoChavePix, chavePix: raw.valorChavePix, banco: raw.banco, agencia: raw.agencia, conta: raw.conta } : null;
+  return raw
+    ? {
+        tipoChavePix: raw.tipoChavePix,
+        chavePix: raw.valorChavePix,
+        banco: raw.banco,
+        agencia: raw.agencia,
+        conta: raw.conta,
+      }
+    : null;
 }
+
 export async function saveDadosBancarios(data: DadosBancarios): Promise<void> {
   await api.put('/medicos/me/dados-bancarios', {
     tipoChavePix: data.tipoChavePix,
@@ -268,19 +549,27 @@ export async function saveDadosBancarios(data: DadosBancarios): Promise<void> {
   });
 }
 
-// ============ PREFERÊNCIAS NOTIFICAÇÃO ============
+// PREFERENCIAS NOTIFICACAO
 export interface PreferenciasNotificacao {
-  pushEnabled?: boolean; emailEnabled?: boolean; whatsappEnabled?: boolean; whatsappNumber?: string;
-  confirmacaoAgendamento?: boolean; lembrete24h?: boolean; lembrete1h?: boolean;
-  cancelamentos?: boolean; prescricoes?: boolean;
+  pushEnabled?: boolean;
+  emailEnabled?: boolean;
+  whatsappEnabled?: boolean;
+  whatsappNumber?: string;
+  confirmacaoAgendamento?: boolean;
+  lembrete24h?: boolean;
+  lembrete1h?: boolean;
+  cancelamentos?: boolean;
+  prescricoes?: boolean;
 }
+
 export async function fetchPreferenciasNotificacao(): Promise<PreferenciasNotificacao | null> {
-  // Notification preferences are managed locally; backend only handles device tokens
   return null;
 }
+
 export async function savePreferenciasNotificacao(_data: PreferenciasNotificacao): Promise<void> {
-  // No-op: backend does not have a preferences endpoint; preferences are local-only
+  // no-op: backend currently does not expose preferences endpoint
 }
+
 export interface PushTokenPayload {
   endpoint: string;
   keys?: { p256dh?: string; auth?: string };
@@ -288,15 +577,21 @@ export interface PushTokenPayload {
   userAgent?: string;
   platform?: string;
 }
+
 export async function registerPushToken(data: PushTokenPayload): Promise<void> {
-  // Backend expects { token, platform } for FCM device tokens
-  await api.post('/notificacoes/device-token', {
-    token: data.endpoint,
-    platform: data.platform || 'web-pwa',
-  });
+  const plataforma =
+    data.platform?.toUpperCase() === 'IOS' || data.platform?.toUpperCase() === 'ANDROID'
+      ? (data.platform.toUpperCase() as 'IOS' | 'ANDROID')
+      : null;
+  if (!plataforma) return;
+  await api.post('/usuarios/me/push-token', { token: data.endpoint, plataforma });
 }
 
-// ============ PERFIL ============
+export async function unregisterPushToken(): Promise<void> {
+  await api.delete('/usuarios/me/push-token');
+}
+
+// PERFIL
 export interface SavePerfilRequest {
   nome?: string;
   cpf?: string;
@@ -304,6 +599,7 @@ export interface SavePerfilRequest {
   senhaAtual?: string;
   novaSenha?: string;
 }
+
 export interface PerfilResponse {
   id: string;
   nome: string;
@@ -312,31 +608,47 @@ export interface PerfilResponse {
   tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN';
   telefone?: string;
 }
+
 export async function savePerfil(data: SavePerfilRequest): Promise<PerfilResponse> {
-  // Password change uses a separate endpoint
   if (data.senhaAtual && data.novaSenha) {
     await api.put('/usuarios/me/senha', { senhaAtual: data.senhaAtual, novaSenha: data.novaSenha });
   }
-  // Profile update (nome/cpf)
   const body: Record<string, unknown> = { nome: data.nome };
   if (data.cpf !== undefined) body.cpf = data.cpf;
   const res = await api.put('/usuarios/me', body);
   return { ...res.data, telefone: data.telefone };
 }
 
-// ============ SALDO / GANHOS ============
+// SALDO / GANHOS
 export interface SaldoMedico {
-  saldo_a_liberar: number; saldo_pendente: number; ganhos_hoje: number;
-  proximo_repasse: string; ganhos_semana: number[];
+  saldo_a_liberar: number;
+  saldo_pendente: number;
+  ganhos_hoje: number;
+  proximo_repasse: string;
+  ganhos_semana: number[];
 }
-export interface ConsultaRepasse { id: string; paciente: string; horario: string; valor: number; status: 'pendente' | 'confirmado'; }
+
+export interface ConsultaRepasse {
+  id: string;
+  paciente: string;
+  horario: string;
+  valor: number;
+  status: 'pendente' | 'confirmado';
+}
+
 export interface Repasse {
-  id: string; periodo: string; valor: number; status: 'concluido' | 'erro' | 'pendente';
-  data_repasse: string; chave_pix_destino?: string; consultas?: ConsultaRepasse[]; comprovante_url?: string;
+  id: string;
+  periodo: string;
+  valor: number;
+  status: 'concluido' | 'erro' | 'pendente';
+  data_repasse: string;
+  chave_pix_destino?: string;
+  consultas?: ConsultaRepasse[];
+  comprovante_url?: string;
 }
+
 export async function fetchSaldoMedico(): Promise<SaldoMedico> {
   const raw = (await api.get('/medicos/me/saldo')).data;
-  // Backend returns camelCase + Centavos; normalize to the shape pages expect
   return {
     saldo_a_liberar: (raw.saldoALiberarCentavos ?? 0) / 100,
     saldo_pendente: (raw.saldoPendenteCentavos ?? 0) / 100,
@@ -345,33 +657,42 @@ export async function fetchSaldoMedico(): Promise<SaldoMedico> {
     ganhos_semana: raw.ganhosSemana ?? [0, 0, 0, 0, 0, 0, 0],
   };
 }
+
 export async function fetchRepasses(): Promise<Repasse[]> {
   const raw = (await api.get('/medicos/me/repasses')).data;
-  // Backend wraps in { repasses: [...], resumo: {...} }
   const list = raw.repasses ?? raw ?? [];
   return list.map((r: any) => ({
     id: r.id,
-    periodo: r.cicloRepasse?.semanaInicio ? `${new Date(r.cicloRepasse.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(r.cicloRepasse.semanaFim).toLocaleDateString('pt-BR')}` : '',
+    periodo: r.cicloRepasse?.semanaInicio
+      ? `${new Date(r.cicloRepasse.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(r.cicloRepasse.semanaFim).toLocaleDateString('pt-BR')}`
+      : '',
     valor: (r.valorRepasse ?? 0) / 100,
     status: (r.status ?? 'PENDENTE').toLowerCase(),
     data_repasse: r.dataRepasse ?? r.criadoEm ?? '',
     chave_pix_destino: undefined,
-    consultas: r.consulta ? [{
-      id: r.consulta.id,
-      paciente: r.consulta.paciente?.usuario?.nome ?? 'Paciente',
-      horario: new Date(r.consulta.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      valor: (r.valorRepasse ?? 0) / 100,
-      status: r.status === 'PROCESSADO' ? 'confirmado' : 'pendente',
-    }] : [],
+    consultas: r.consulta
+      ? [
+          {
+            id: r.consulta.id,
+            paciente: r.consulta.paciente?.usuario?.nome ?? 'Paciente',
+            horario: new Date(r.consulta.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            valor: (r.valorRepasse ?? 0) / 100,
+            status: r.status === 'PROCESSADO' ? 'confirmado' : 'pendente',
+          },
+        ]
+      : [],
   }));
 }
+
 export async function fetchRepasseById(id: string): Promise<Repasse> {
   const raw = (await api.get(`/medicos/me/ciclos-repasse/${id}`)).data;
   const repasses = raw.repasses ?? [];
   const totalValor = repasses.reduce((acc: number, r: any) => acc + (r.valorRepasse ?? 0), 0);
   return {
     id: raw.id,
-    periodo: raw.semanaInicio ? `${new Date(raw.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(raw.semanaFim).toLocaleDateString('pt-BR')}` : '',
+    periodo: raw.semanaInicio
+      ? `${new Date(raw.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(raw.semanaFim).toLocaleDateString('pt-BR')}`
+      : '',
     valor: totalValor / 100,
     status: (raw.status ?? 'pendente').toLowerCase(),
     data_repasse: raw.semanaFim ?? '',
@@ -379,14 +700,16 @@ export async function fetchRepasseById(id: string): Promise<Repasse> {
     consultas: repasses.map((r: any) => ({
       id: r.consulta?.id ?? r.id,
       paciente: r.consulta?.paciente?.usuario?.nome ?? 'Paciente',
-      horario: r.consulta?.data ? new Date(r.consulta.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+      horario: r.consulta?.data
+        ? new Date(r.consulta.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        : '',
       valor: (r.valorRepasse ?? 0) / 100,
       status: r.status === 'PROCESSADO' ? 'confirmado' : 'pendente',
     })),
   };
 }
 
-// ============ CHAT ============
+// CHAT
 export interface ChatSummary {
   chatId: string;
   consultaId: string;
@@ -395,23 +718,32 @@ export interface ChatSummary {
   naoLidas?: number;
   atualizadoEm?: string;
 }
+
 export interface ChatMessage {
   id: string;
   texto: string;
   remetente: { id: string; nome?: string };
   criadoEm: string;
 }
+
 export async function fetchChatsUsuario(userId: string): Promise<ChatSummary[]> {
-  const r = await api.get(`/api/chats/usuario/${userId}`); return r.data;
+  const r = await api.get(`/api/chats/usuario/${userId}`);
+  return r.data;
 }
+
 export async function fetchMensagensChat(chatId: string, limit = 50, cursor?: string): Promise<ChatMessage[]> {
-  const r = await api.get(`/api/chats/${chatId}/mensagens`, { params: { limit, ...(cursor ? { cursor } : {}) } }); return r.data;
+  const r = await api.get(`/api/chats/${chatId}/mensagens`, { params: { limit, ...(cursor ? { cursor } : {}) } });
+  return r.data;
 }
+
 export async function enviarMensagem(chatId: string, texto: string): Promise<ChatMessage> {
-  const r = await api.post(`/api/chats/${chatId}/mensagens`, { texto }); return r.data;
+  const r = await api.post(`/api/chats/${chatId}/mensagens`, { texto });
+  return r.data;
 }
+
 export async function iniciarChat(consultaId: string): Promise<{ chatId: string }> {
-  const r = await api.post('/api/chats/iniciar', { consultaId }); return r.data;
+  const r = await api.post('/api/chats/iniciar', { consultaId });
+  return r.data;
 }
 
 export default api;

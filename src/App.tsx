@@ -25,6 +25,7 @@ import CrmValidation from './pages/CrmValidation';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentPending from './pages/PaymentPending';
 import PaymentFailure from './pages/PaymentFailure';
+import DoctorSchedule from './pages/DoctorSchedule';
 
 type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
 
@@ -143,6 +144,7 @@ export default function App() {
         <Route path="/earnings" element={<ProtectedRoute allow={['MEDICO']}><Earnings /></ProtectedRoute>} />
         <Route path="/repasse/:id" element={<ProtectedRoute allow={['MEDICO']}><RepasseDetail /></ProtectedRoute>} />
         <Route path="/crm-validation" element={<ProtectedRoute allow={['MEDICO']}><CrmValidation /></ProtectedRoute>} />
+        <Route path="/doctor/schedule" element={<ProtectedRoute allow={['MEDICO']}><DoctorSchedule /></ProtectedRoute>} />
 
         {/* Default redirect */}
         <Route path="*" element={<Navigate to={initialRoute} replace />} />

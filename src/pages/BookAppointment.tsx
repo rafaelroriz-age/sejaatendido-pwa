@@ -6,11 +6,20 @@ import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 
-const TIME_SLOTS = [
+// Fallback slots when doctor has no configured availability (backward compat)
+const FALLBACK_TIME_SLOTS = [
   '08:00','08:30','09:00','09:30','10:00','10:30',
   '11:00','11:30','13:00','13:30','14:00','14:30',
   '15:00','15:30','16:00','16:30','17:00','17:30',
 ];
+
+/** Format a slot for display. Slots from API are ISO timestamps; fallbacks are "HH:MM". */
+function formatSlotDisplay(slot: string): string {
+  if (slot.includes('T')) {
+    return new Date(slot).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+  return slot;
+}
 
 export default function BookAppointment() {
   const navigate = useNavigate();
@@ -55,12 +64,21 @@ export default function BookAppointment() {
   async function handleConfirm() {
     if (!selectedMedico || !selectedDate || !selectedTime) { window.alert('Selecione médico, data e horário'); return; }
     if (availableSlots.length > 0 && !availableSlots.includes(selectedTime)) { window.alert('Este horário não está mais disponível. Escolha outro.'); return; }
-    const dateObj = new Date(selectedDate);
-    const [h, m] = selectedTime.split(':');
-    dateObj.setHours(parseInt(h), parseInt(m), 0, 0);
+
+    // Build ISO dataHora: API slots are already ISO; fallback slots are "HH:MM"
+    let dataHora: string;
+    if (selectedTime.includes('T')) {
+      dataHora = selectedTime;
+    } else {
+      const dateObj = new Date(selectedDate);
+      const [h, m] = selectedTime.split(':');
+      dateObj.setHours(parseInt(h), parseInt(m), 0, 0);
+      dataHora = dateObj.toISOString();
+    }
+
     setSubmitting(true);
     try {
-      await createConsulta({ medicoId: selectedMedico.id, data: dateObj.toISOString(), motivo: motivo || 'Consulta geral' });
+      await createConsulta({ medicoId: selectedMedico.id, dataHora, sintomas: motivo || 'Consulta geral' });
       window.alert('Consulta agendada com sucesso!');
       navigate(-1);
     } catch (error) {
@@ -177,14 +195,15 @@ export default function BookAppointment() {
           </div>
         ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {TIME_SLOTS.map(slot => {
-            const enabled = !selectedMedico || !selectedDate ? false : availableSlots.length === 0 || availableSlots.includes(slot);
+          {(availableSlots.length > 0 ? availableSlots : FALLBACK_TIME_SLOTS).map(slot => {
+            const enabled = !selectedMedico || !selectedDate ? false
+              : availableSlots.length === 0 || availableSlots.includes(slot);
             const sel = selectedTime === slot;
             return (
               <div key={slot} onClick={() => enabled && setSelectedTime(slot)}
                 style={{ minWidth: 72, backgroundColor: sel ? Colors.primary : Colors.card, borderRadius: Radius.md, padding: '12px 16px', textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: enabled ? 'pointer' : 'not-allowed', opacity: enabled ? 1 : 0.45 }}
               >
-                <span style={{ fontSize: 14, fontWeight: 700, color: sel ? '#fff' : Colors.textPrimary }}>{slot}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: sel ? '#fff' : Colors.textPrimary }}>{formatSlotDisplay(slot)}</span>
               </div>
             );
           })}

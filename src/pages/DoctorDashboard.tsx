@@ -40,10 +40,10 @@ export default function DoctorDashboard() {
     navigate('/login', { replace: true });
   }
 
-  async function handleUpdateConsulta(id: string, status: 'ACEITA' | 'RECUSADA') {
+  async function handleUpdateConsulta(id: string, acao: 'ACEITA' | 'RECUSADA') {
     try {
-      await updateConsultaMedico(id, status);
-      setConsultas(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+      await updateConsultaMedico(id, acao);
+      setConsultas(prev => prev.map(c => c.id === id ? { ...c, status: acao } : c));
     } catch (error) {
       showErrorAlert(error, 'Erro ao atualizar consulta');
     }
@@ -54,11 +54,13 @@ export default function DoctorDashboard() {
     return `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
   }
 
-  function formatDate(dateIso: string) {
+  function formatDate(dateIso: string | undefined) {
+    if (!dateIso) return '';
     return new Date(dateIso).toLocaleDateString('pt-BR');
   }
 
-  function formatHour(dateIso: string) {
+  function formatHour(dateIso: string | undefined) {
+    if (!dateIso) return '';
     return new Date(dateIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   }
 
@@ -68,7 +70,7 @@ export default function DoctorDashboard() {
   }
 
   const stats = {
-    hoje: consultas.filter(c => toYmd(c.data) === toYmd(new Date().toISOString())).length,
+    hoje: consultas.filter(c => { const d = c.dataHora ?? c.data; return d ? toYmd(d) === toYmd(new Date().toISOString()) : false; }).length,
     pendentes: consultas.filter(c => c.status.toUpperCase().includes('PEND')).length,
     confirmadas: consultas.filter(c => c.status.toUpperCase().includes('CONFIRM')).length,
   };
@@ -143,14 +145,14 @@ export default function DoctorDashboard() {
                 <Avatar name={getPatientName(c)} size={42} color={Colors.doctor} />
                 <div style={{ marginLeft: Space.md }}>
                   <div style={{ fontSize: Font.sm + 1, fontWeight: 700, color: Colors.textPrimary }}>{getPatientName(c)}</div>
-                  <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>{c.motivo}</div>
+                  <div style={{ fontSize: Font.xs + 1, color: Colors.textSecondary, marginTop: 2 }}>{c.sintomas ?? c.motivo}</div>
                 </div>
               </div>
               <Badge status={c.status} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: Space.md }}>
-              <span style={{ backgroundColor: Colors.inputBg, borderRadius: Radius.sm, padding: '6px 10px', fontSize: Font.xs + 1, fontWeight: 700, color: Colors.textPrimary, marginRight: Space.md }}>{formatHour(c.data)}</span>
-              <span style={{ fontSize: Font.xs + 1, color: Colors.textSecondary }}>{formatDate(c.data)}</span>
+              <span style={{ backgroundColor: Colors.inputBg, borderRadius: Radius.sm, padding: '6px 10px', fontSize: Font.xs + 1, fontWeight: 700, color: Colors.textPrimary, marginRight: Space.md }}>{formatHour(c.dataHora ?? c.data)}</span>
+              <span style={{ fontSize: Font.xs + 1, color: Colors.textSecondary }}>{formatDate(c.dataHora ?? c.data)}</span>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ flex: 1, backgroundColor: Colors.doctor, borderRadius: Radius.md, padding: 12, border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Iniciar Consulta</button>
@@ -165,14 +167,15 @@ export default function DoctorDashboard() {
         ))}
 
         <h3 style={{ fontSize: Font.lg, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.md + 2, letterSpacing: -0.3 }}>Ações Rápidas</h3>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {[
-            { l: 'Prontuarios', icon: '📋', bg: Colors.doctorLight },
+            { l: 'Agenda', icon: '📅', bg: Colors.doctorLight, path: '/doctor/schedule' },
             { l: 'Mensagens', icon: '💬', bg: Colors.accent, path: '/chat' },
+            { l: 'Ganhos', icon: '💰', bg: Colors.successLight, path: '/earnings' },
             { l: 'Perfil', icon: '👤', bg: Colors.warningLight, path: '/profile' },
           ].map(a => (
             <div key={a.l} onClick={() => a.path && navigate(a.path)}
-              style={{ flex: 1, backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Space.lg, textAlign: 'center', cursor: a.path ? 'pointer' : 'default', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}
+              style={{ flex: '1 1 80px', backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Space.lg, textAlign: 'center', cursor: a.path ? 'pointer' : 'default', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}
             >
               <div style={{ width: 44, height: 44, borderRadius: Radius.md, backgroundColor: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontSize: 20 }}>{a.icon}</div>
               <div style={{ fontSize: 12, fontWeight: 700, color: Colors.textPrimary }}>{a.l}</div>

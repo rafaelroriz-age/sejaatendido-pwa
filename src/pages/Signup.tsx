@@ -64,14 +64,9 @@ export default function SignupScreen() {
         senha,
         tipo,
       };
-      if (tipo === 'MEDICO') {
-        payload.crmNumero = crm.trim().replace(/\D/g, '');
-        payload.crmUf = crmUf.trim().toUpperCase();
-      }
+      // Note: CRM number/UF are NOT part of registration — validated separately via /medicos/me/crm/validar-cartao
       const response = await registerRequest(payload);
-      if (response.accessToken && response.usuario) {
-        await saveAuthSession(response.accessToken, response.usuario, response.refreshToken);
-      }
+      await saveAuthSession(response.accessToken, response.usuario, response.refreshToken);
       setRegistered(true);
     } catch (error) {
       showErrorAlert(error, 'Erro ao criar conta');

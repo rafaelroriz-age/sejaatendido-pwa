@@ -61,14 +61,36 @@ const tomorrow = (() => {
   return d.toISOString();
 })();
 
+// ISO slots for /medicos/:id/slots endpoint (new format)
+function buildIsoSlots(dateStr: string): string[] {
+  const times = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+  return times.map(t => {
+    const d = new Date(dateStr);
+    const [h, m] = t.split(':');
+    d.setHours(parseInt(h), parseInt(m), 0, 0);
+    return d.toISOString();
+  });
+}
+
+const MOCK_DISPONIBILIDADE_MEDICO = [
+  { id: 'disp-001', diaSemana: 1, horaInicio: '08:00', horaFim: '18:00', duracaoSlot: 60, ativo: true },
+  { id: 'disp-002', diaSemana: 2, horaInicio: '09:00', horaFim: '17:00', duracaoSlot: 60, ativo: true },
+  { id: 'disp-003', diaSemana: 3, horaInicio: '08:00', horaFim: '17:00', duracaoSlot: 60, ativo: true },
+  { id: 'disp-004', diaSemana: 4, horaInicio: '08:00', horaFim: '17:00', duracaoSlot: 60, ativo: true },
+  { id: 'disp-005', diaSemana: 5, horaInicio: '08:00', horaFim: '12:00', duracaoSlot: 60, ativo: true },
+];
+
+const MOCK_HORARIOS_BLOQUEADOS: Array<{ id: string; dataHora: string; duracao: number; motivo: string }> = [];
+
 const MOCK_CONSULTAS_PACIENTE = [
   {
     id: 'consulta-001',
     medicoId: 'med-001',
     pacienteId: 'paciente-001',
-    data: tomorrow,
-    motivo: 'Consulta de rotina',
-    status: 'AGUARDANDO_PAGAMENTO',
+    dataHora: tomorrow,
+    sintomas: 'Consulta de rotina',
+    status: 'PENDENTE',
+    valor: 15000,
     meetLink: null,
     medico: MOCK_MEDICOS[0],
   },
@@ -79,9 +101,10 @@ const MOCK_CONSULTAS_MEDICO = [
     id: 'consulta-002',
     medicoId: 'med-001',
     pacienteId: 'paciente-001',
-    data: tomorrow,
-    motivo: 'Dor de cabeça frequente',
+    dataHora: tomorrow,
+    sintomas: 'Dor de cabeça frequente',
     status: 'CONFIRMADA',
+    valor: 15000,
     meetLink: 'https://meet.google.com/mock-link',
     paciente: { usuario: { nome: 'Maria Teste' } },
   },
@@ -220,19 +243,73 @@ export const handlers = [
 
   // ── MÉDICOS ───────────────────────────────────────────────────────────────
 
-  http.get(`${BASE}/medicos`, () => HttpResponse.json(MOCK_MEDICOS)),
+  http.get(`${BASE}/medicos`, () => HttpResponse.json({ medicos: MOCK_MEDICOS, total: MOCK_MEDICOS.length, page: 1 })),
 
   http.get(`${BASE}/medicos/:id`, ({ params }) => {
     const found = MOCK_MEDICOS.find(m => m.id === params.id);
     return found
-      ? HttpResponse.json(found)
-      : HttpResponse.json({ error: 'Médico não encontrado' }, { status: 404 });
+      ? HttpResponse.json({ medico: found })
+      : HttpResponse.json({ erro: 'Médico não encontrado' }, { status: 404 });
   }),
 
-  http.get(`${BASE}/medicos/:id/disponibilidade`, () => HttpResponse.json(MOCK_SLOTS)),
+  // Doctor own profile
+  http.get(`${BASE}/medicos/me`, () => HttpResponse.json({ medico: { ...MOCK_MEDICOS[0], bio: 'Médico de demonstração.', valorConsulta: 15000, especialidade: 'Clínico Geral' } })),
+  http.put(`${BASE}/medicos/me`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({ medico: { ...MOCK_MEDICOS[0], ...body } });
+  }),
+
+  // New slots endpoint — returns ISO timestamps
+  http.get(`${BASE}/medicos/:id/slots`, ({ request, params }) => {
+    const url = new URL(request.url);
+    const data = url.searchParams.get('data') ?? new Date().toISOString().split('T')[0];
+    return HttpResponse.json({
+      slots: buildIsoSlots(data),
+      duracaoSlotMinutos: 60,
+    });
+  }),
+
+  // Doctor self — disponibilidade
+  http.get(`${BASE}/medicos/me/disponibilidade`, () =>
+    HttpResponse.json({ disponibilidades: MOCK_DISPONIBILIDADE_MEDICO }),
+  ),
+
+  http.put(`${BASE}/medicos/me/disponibilidade`, async ({ request }) => {
+    const body = await request.json() as { disponibilidades?: typeof MOCK_DISPONIBILIDADE_MEDICO };
+    const updated = (body.disponibilidades ?? []).map((d, i) => ({ ...d, id: d.id ?? `disp-new-${i}` }));
+    MOCK_DISPONIBILIDADE_MEDICO.length = 0;
+    updated.forEach(d => MOCK_DISPONIBILIDADE_MEDICO.push(d));
+    return HttpResponse.json({ disponibilidades: MOCK_DISPONIBILIDADE_MEDICO });
+  }),
+
+  // Blocked slots
+  http.post(`${BASE}/medicos/me/horario-bloqueado`, async ({ request }) => {
+    const body = await request.json() as { dataHora: string; duracao?: number; motivo?: string };
+    const novo = { id: `blk-${Date.now()}`, dataHora: body.dataHora, duracao: body.duracao ?? 60, motivo: body.motivo ?? '' };
+    MOCK_HORARIOS_BLOQUEADOS.push(novo);
+    return HttpResponse.json({ horarioBloqueado: novo }, { status: 201 });
+  }),
+
+  http.delete(`${BASE}/medicos/me/horario-bloqueado/:id`, ({ params }) => {
+    const idx = MOCK_HORARIOS_BLOQUEADOS.findIndex(b => b.id === params.id);
+    if (idx !== -1) MOCK_HORARIOS_BLOQUEADOS.splice(idx, 1);
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(`${BASE}/medicos/me/horarios-bloqueados`, () =>
+    HttpResponse.json({ horariosBloqueados: MOCK_HORARIOS_BLOQUEADOS }),
+  ),
 
   // Painel médico
-  http.get(`${BASE}/medicos/me/consultas`, () => HttpResponse.json(MOCK_CONSULTAS_MEDICO)),
+  http.get(`${BASE}/medicos/me/consultas`, () => HttpResponse.json({ consultas: MOCK_CONSULTAS_MEDICO, total: MOCK_CONSULTAS_MEDICO.length })),
+  http.patch(`${BASE}/medicos/me/consultas/:id`, async ({ request, params }) => {
+    const body = await request.json() as { acao?: string };
+    const statusMap: Record<string, string> = { ACEITAR: 'ACEITA', RECUSAR: 'RECUSADA' };
+    const novoStatus = statusMap[body.acao ?? ''] ?? body.acao ?? 'PENDENTE';
+    const consulta = MOCK_CONSULTAS_MEDICO.find(c => c.id === params.id);
+    if (consulta) (consulta as any).status = novoStatus;
+    return HttpResponse.json({ consulta: { ...consulta, status: novoStatus } });
+  }),
   http.get(`${BASE}/medicos/me/saldo`, () => HttpResponse.json(MOCK_SALDO)),
   http.get(`${BASE}/medicos/me/repasses`, () => HttpResponse.json(MOCK_REPASSES)),
   http.get(`${BASE}/medicos/me/ciclos-repasse/:id`, () => HttpResponse.json(MOCK_REPASSE_DETAIL)),
@@ -241,72 +318,80 @@ export const handlers = [
 
   // ── CONSULTAS (PACIENTE) ──────────────────────────────────────────────────
 
-  http.get(`${BASE}/paciente/consultas`, () => HttpResponse.json(MOCK_CONSULTAS_PACIENTE)),
+  http.get(`${BASE}/pacientes/me/consultas`, () =>
+    HttpResponse.json({ consultas: MOCK_CONSULTAS_PACIENTE, total: MOCK_CONSULTAS_PACIENTE.length }),
+  ),
 
-  http.post(`${BASE}/paciente/consultas`, async ({ request }) => {
+  http.post(`${BASE}/pacientes/consultas`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const nova = {
       id: `consulta-${Date.now()}`,
       medicoId: body.medicoId,
       pacienteId: 'paciente-001',
-      data: body.data,
-      motivo: body.motivo ?? 'Consulta geral',
-      status: 'AGUARDANDO_PAGAMENTO',
+      dataHora: body.dataHora ?? body.data,
+      sintomas: body.sintomas ?? body.motivo ?? 'Consulta geral',
+      status: 'PENDENTE',
+      valor: 15000,
       meetLink: null,
       medico: MOCK_MEDICOS.find(m => m.id === body.medicoId) ?? MOCK_MEDICOS[0],
     };
     MOCK_CONSULTAS_PACIENTE.push(nova as typeof MOCK_CONSULTAS_PACIENTE[0]);
-    return HttpResponse.json(nova, { status: 201 });
+    return HttpResponse.json({ consulta: nova }, { status: 201 });
   }),
 
-  http.delete(`${BASE}/paciente/consultas/:id`, ({ params }) => {
+  http.delete(`${BASE}/pacientes/me/consultas/:id`, ({ params }) => {
     const idx = MOCK_CONSULTAS_PACIENTE.findIndex(c => c.id === params.id);
     if (idx !== -1) MOCK_CONSULTAS_PACIENTE.splice(idx, 1);
-    return new HttpResponse(null, { status: 204 });
+    return HttpResponse.json({ ok: true });
   }),
 
   // ── PAGAMENTOS ────────────────────────────────────────────────────────────
 
   http.post(`${BASE}/pagamentos/pix`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const pixCode = '00020126580014BR.GOV.BCB.PIX0136mock-pix-key-para-testes';
+    const pagId = `pag-${Date.now()}`;
     return HttpResponse.json({
-      id: `pag-${Date.now()}`,
-      status: 'PENDENTE',
-      qrCode: '00020126580014BR.GOV.BCB.PIX0136mock-pix-key-para-testes',
-      qrCodeBase64: '',
-      copiaCola: '00020126580014BR.GOV.BCB.PIX0136mock-pix-key-para-testes',
-      pix: {
-        codigo: '00020126580014BR.GOV.BCB.PIX0136mock-pix-key-para-testes',
-        qrcode: '',
-        validade: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      pagamento: {
+        id: pagId,
+        consultaId: body.consultaId,
+        valor: 15000,
+        status: 'PENDENTE',
+        metodo: 'PIX',
+        criadoEm: new Date().toISOString(),
       },
-      consultaId: body.consultaId,
+      pix: {
+        qrCode: pixCode,
+        qrCodeBase64: '',  // mock: empty; real backend returns PNG base64
+        ticketUrl: 'https://www.mercadopago.com.br/payments/mock/ticket',
+        validade: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      },
     });
   }),
 
-  http.post(`${BASE}/pagamentos/mercadopago/checkout`, async ({ request }) => {
+  http.post(`${BASE}/pagamentos/cartao`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const pagId = `pag-mp-${Date.now()}`;
     return HttpResponse.json({
-      id: `pag-mp-${Date.now()}`,
-      status: 'PENDENTE',
-      linkPagamento: 'https://www.mercadopago.com.br/checkout/mock',
-      paymentUrl: 'https://www.mercadopago.com.br/checkout/mock',
+      pagamento: {
+        id: pagId,
+        consultaId: body.consultaId,
+        valor: 15000,
+        status: 'PENDENTE',
+        metodo: 'CARTAO',
+        criadoEm: new Date().toISOString(),
+      },
       mercadopago: {
+        publicKey: 'APP_USR-mock-public-key',
         preferenceId: 'mock-preference-id',
         initPoint: 'https://www.mercadopago.com.br/checkout/mock',
         sandboxInitPoint: 'https://sandbox.mercadopago.com.br/checkout/mock',
       },
-      pagamento: { id: `pag-mp-${Date.now()}`, status: 'PENDENTE' },
-      consultaId: body.consultaId,
     });
   }),
 
-  http.get(`${BASE}/pagamentos/:id`, () =>
-    HttpResponse.json({ id: 'pag-001', status: 'PAGO' }),
-  ),
-
-  http.post(`${BASE}/pagamentos/mercadopago/:id/sync`, () =>
-    HttpResponse.json({ id: 'pag-001', status: 'PAGO' }),
+  http.get(`${BASE}/pagamentos/sync/:consultaId`, () =>
+    HttpResponse.json({ status: 'PENDENTE', pagamento: { id: 'pag-001', status: 'PENDENTE' } }),
   ),
 
   // ── ADMIN ─────────────────────────────────────────────────────────────────
@@ -327,7 +412,8 @@ export const handlers = [
 
   // ── NOTIFICAÇÕES ──────────────────────────────────────────────────────────
 
-  http.post(`${BASE}/notificacoes/device-token`, () => HttpResponse.json({ ok: true })),
+  http.post(`${BASE}/usuarios/me/push-token`, () => HttpResponse.json({ ok: true })),
+  http.delete(`${BASE}/usuarios/me/push-token`, () => HttpResponse.json({ ok: true })),
 
   // ── CHAT ──────────────────────────────────────────────────────────────────
 
@@ -362,4 +448,40 @@ export const handlers = [
   }),
 
   http.put(`${BASE}/usuarios/me/senha`, () => HttpResponse.json({ ok: true })),
+
+  // ── PACIENTE PERFIL ──────────────────────────────────────────────────
+
+  http.get(`${BASE}/pacientes/me`, () =>
+    HttpResponse.json({ paciente: { id: 'paciente-001', usuarioId: 'paciente-001', dataNascimento: '1990-01-01', fotoPerfil: null } }),
+  ),
+  http.put(`${BASE}/pacientes/me`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    return HttpResponse.json({ paciente: { id: 'paciente-001', usuarioId: 'paciente-001', ...body } });
+  }),
+
+  // ── AVALIAÇÕES ──────────────────────────────────────────────────
+
+  http.post(`${BASE}/pacientes/avaliacoes`, async ({ request }) => {
+    const body = await request.json() as { consultaId?: string; nota?: number; comentario?: string };
+    return HttpResponse.json({
+      avaliacao: {
+        id: `aval-${Date.now()}`,
+        consultaId: body.consultaId,
+        nota: body.nota ?? 5,
+        comentario: body.comentario ?? '',
+        criadoEm: new Date().toISOString(),
+      },
+    }, { status: 201 });
+  }),
+
+  http.get(`${BASE}/medicos/:id/avaliacoes`, ({ params }) => {
+    return HttpResponse.json({
+      avaliacoes: [
+        { id: 'aval-mock-1', consultaId: 'consulta-001', nota: 5, comentario: 'Excelente atendimento!', criadoEm: new Date().toISOString() },
+        { id: 'aval-mock-2', consultaId: 'consulta-002', nota: 4, comentario: 'Muito bom.', criadoEm: new Date().toISOString() },
+      ],
+      media: 4.5,
+      total: 2,
+    });
+  }),
 ];

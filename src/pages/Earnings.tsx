@@ -87,7 +87,7 @@ export default function Earnings() {
       const endOfWeek = new Date(startOfWeek);
       endOfWeek.setDate(startOfWeek.getDate() + 7);
       setConsultasSemana(consultasData.filter(c => {
-        const d = new Date(c.data);
+        const d = new Date(c.dataHora ?? c.data ?? '');
         return d >= startOfWeek && d < endOfWeek;
       }));
     } finally { setLoading(false); }
@@ -114,7 +114,7 @@ export default function Earnings() {
         ) : consultasSemana.map(c => {
           const anyC = c as any;
           const pacienteNome = anyC.paciente?.usuario?.nome || anyC.paciente?.nome || anyC.pacienteNome || anyC.nomePaciente || 'Paciente';
-          const horario = new Date(c.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const horario = new Date(c.dataHora ?? c.data ?? '').toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           const isPend = c.status.toUpperCase().includes('PEND');
           return (
           <Card key={c.id} style={{ marginBottom: Space.md }}>

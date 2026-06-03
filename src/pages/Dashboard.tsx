@@ -62,7 +62,8 @@ export default function Dashboard() {
     navigate('/login', { replace: true });
   }
 
-  function formatDate(dateString: string) {
+  function formatDate(dateString: string | undefined) {
+    if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('pt-BR', {
       day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
     });
@@ -146,12 +147,12 @@ export default function Dashboard() {
               <Avatar name={c.medico?.usuario?.nome || 'M'} size={44} color={Colors.doctor} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: Font.md, fontWeight: 700, color: Colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.medico?.usuario?.nome || 'Médico'}</div>
-                <div style={{ fontSize: Font.sm, color: Colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.motivo}</div>
+                <div style={{ fontSize: Font.sm, color: Colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.sintomas ?? c.motivo}</div>
               </div>
               <Badge status={c.status} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', marginTop: Space.md, paddingTop: Space.md, borderTop: `1px solid ${Colors.borderLight}` }}>
-              <span style={{ fontSize: Font.sm, color: Colors.primary, fontWeight: 600 }}>{formatDate(c.data)}</span>
+              <span style={{ fontSize: Font.sm, color: Colors.primary, fontWeight: 600 }}>{formatDate(c.dataHora ?? c.data)}</span>
             </div>
             {isPendingPayment(c.status) && (
               <button onClick={() => navigate('/payment', { state: { consultaId: c.id, valor: 150 } })} style={{
