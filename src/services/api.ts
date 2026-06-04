@@ -511,7 +511,11 @@ export async function fetchPagamentoById(id: string): Promise<PagamentoResponse>
 
 export async function syncPagamento(consultaId: string): Promise<PagamentoResponse> {
   const r = await api.get(`/pagamentos/sync/${consultaId}`);
-  return normalizePagamentoResponse(r.data);
+  const raw = r.data;
+  // Root-level 'status' from sync endpoint is definitive per contract.
+  // Preserve it so polling can detect APROVADO/CANCELADO/FALHOU correctly.
+  const normalized = normalizePagamentoResponse(raw);
+  return { ...normalized, status: raw?.status ?? normalized.status };
 }
 
 // DADOS BANCARIOS

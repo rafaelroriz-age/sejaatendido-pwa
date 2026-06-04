@@ -78,9 +78,8 @@ export default function BookAppointment() {
 
     setSubmitting(true);
     try {
-      await createConsulta({ medicoId: selectedMedico.id, dataHora, sintomas: motivo || 'Consulta geral' });
-      window.alert('Consulta agendada com sucesso!');
-      navigate(-1);
+      const consulta = await createConsulta({ medicoId: selectedMedico.id, dataHora, sintomas: motivo || 'Consulta geral' });
+      navigate('/payment', { state: { consultaId: consulta.id, valor: consulta.valor } });
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;

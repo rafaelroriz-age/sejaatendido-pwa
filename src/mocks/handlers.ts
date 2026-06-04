@@ -200,6 +200,7 @@ export const handlers = [
     return authResponse(MOCK_PACIENTE);
   }),
 
+  http.post(`${BASE}/auth/google`, () => authResponse(MOCK_PACIENTE)),
   http.post(`${BASE}/auth/login-google`, () => authResponse(MOCK_PACIENTE)),
 
   http.post(`${BASE}/auth/registro`, async () => {
@@ -219,6 +220,9 @@ export const handlers = [
     return authResponse(MOCK_MEDICO_USER);
   }),
 
+  http.post(`${BASE}/auth/refresh-token`, () =>
+    HttpResponse.json({ accessToken: MOCK_TOKEN, refreshToken: MOCK_REFRESH }),
+  ),
   http.post(`${BASE}/auth/refresh`, () =>
     HttpResponse.json({ accessToken: MOCK_TOKEN, refreshToken: MOCK_REFRESH }),
   ),
