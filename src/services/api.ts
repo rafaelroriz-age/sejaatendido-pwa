@@ -122,8 +122,25 @@ export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthRespon
 }
 
 export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
-  const r = await api.post('/auth/google', { idToken });
-  return r.data;
+  try {
+    const r = await api.post('/auth/login-google', { idToken });
+    return r.data;
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status !== 404) throw error;
+
+    // Compatibility fallback for environments still using alternative route/payload.
+    try {
+      const fallback = await api.post('/auth/google', { idToken });
+      return fallback.data;
+    } catch (secondError: any) {
+      const secondStatus = secondError?.response?.status;
+      if (secondStatus !== 404) throw secondError;
+
+      const legacy = await api.post('/auth/google', { token: idToken });
+      return legacy.data;
+    }
+  }
 }
 
 export async function loginAppleRequest(identityToken: string, firstName?: string, lastName?: string): Promise<AuthResponse> {
@@ -499,13 +516,10 @@ function normalizePagamentoResponse(res: any): PagamentoResponse {
 
 export async function criarPagamento(data: CriarPagamentoRequest): Promise<PagamentoResponse> {
   const metodo = data.metodoPagamento === 'card' ? 'cartao' : (data.metodoPagamento || 'pix');
-  if (metodo === 'pix') {
-    const r = await api.post('/pagamentos/pix', { consultaId: data.consultaId });
+    const endpoint = metodo === 'pix' ? '/pagamentos/pix' : '/pagamentos/cartao';
+    const body: Record<string, unknown> = { consultaId: data.consultaId };
+    const r = await api.post(endpoint, body);
     return normalizePagamentoResponse(r.data);
-  }
-
-  const r = await api.post('/pagamentos/cartao', { consultaId: data.consultaId });
-  return normalizePagamentoResponse(r.data);
 }
 
 export async function fetchPagamentoById(id: string): Promise<PagamentoResponse> {
