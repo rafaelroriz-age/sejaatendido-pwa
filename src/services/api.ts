@@ -122,25 +122,8 @@ export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthRespon
 }
 
 export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
-  try {
-    const r = await api.post('/auth/login-google', { idToken });
-    return r.data;
-  } catch (error: any) {
-    const status = error?.response?.status;
-    if (status !== 404) throw error;
-
-    // Compatibility fallback for environments still using alternative route/payload.
-    try {
-      const fallback = await api.post('/auth/google', { idToken });
-      return fallback.data;
-    } catch (secondError: any) {
-      const secondStatus = secondError?.response?.status;
-      if (secondStatus !== 404) throw secondError;
-
-      const legacy = await api.post('/auth/google', { token: idToken });
-      return legacy.data;
-    }
-  }
+  const r = await api.post('/auth/google', { idToken });
+  return r.data;
 }
 
 export async function loginAppleRequest(identityToken: string, firstName?: string, lastName?: string): Promise<AuthResponse> {
