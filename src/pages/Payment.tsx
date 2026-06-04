@@ -45,8 +45,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function normalizeStatus(data: PaymentResponse | null): PaymentStatus {
   if (!data) return 'AGUARDANDO';
-  // Root status is definitive for sync responses; pagamento.status is used for creation responses.
-  return data.status || data.pagamento?.status || 'AGUARDANDO';
+  // pagamento.status is the canonical field per backend contract ("PAGO", "PENDENTE", etc.)
+  return data.pagamento?.status || data.status || 'AGUARDANDO';
 }
 
 export default function Payment() {
@@ -152,7 +152,7 @@ export default function Payment() {
         const nextStatus = normalizeStatus(sync as PaymentResponse);
         setStatus(nextStatus);
 
-        if (nextStatus === 'APROVADO') {
+        if (nextStatus === 'PAGO') {
           stopPolling();
           navigate('/dashboard', {
             replace: true,
