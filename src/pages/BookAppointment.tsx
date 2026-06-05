@@ -21,6 +21,11 @@ function formatSlotDisplay(slot: string): string {
   return slot;
 }
 
+function getMedicoNome(m: Medico): string {
+  const anyMedico = m as any;
+  return m.usuario?.nome || anyMedico.nome || anyMedico.usuarioNome || 'Médico';
+}
+
 export default function BookAppointment() {
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -154,13 +159,14 @@ export default function BookAppointment() {
         <div style={{ display: 'flex', gap: Space.md, overflowX: 'auto', paddingBottom: 8 }}>
           {medicos.map(m => {
             const sel = selectedMedico?.id === m.id;
+            const nomeMedico = getMedicoNome(m);
             return (
               <div key={m.id} onClick={() => setSelectedMedico(m)}
                 style={{ minWidth: 130, backgroundColor: sel ? Colors.accent : Colors.card, borderRadius: Radius.lg, padding: Space.lg, textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', flexShrink: 0 }}
               >
-                <Avatar name={m.usuario.nome} size={52} color={sel ? Colors.primary : Colors.textMuted} style={{ margin: '0 auto' }} />
-                <div style={{ fontSize: Font.xs + 1, fontWeight: 700, color: sel ? Colors.primary : Colors.textPrimary, marginTop: Space.sm, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr(a). {m.usuario.nome}</div>
-                <div style={{ fontSize: 11, color: sel ? Colors.primaryDark : Colors.textSecondary, marginTop: 2 }}>{m.especialidades?.[0] || 'Clínico Geral'}</div>
+                <Avatar name={nomeMedico} size={52} color={sel ? Colors.primary : Colors.textMuted} style={{ margin: '0 auto' }} />
+                <div style={{ fontSize: Font.xs + 1, fontWeight: 700, color: sel ? Colors.primary : Colors.textPrimary, marginTop: Space.sm, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr(a). {nomeMedico}</div>
+                <div style={{ fontSize: 11, color: sel ? Colors.primaryDark : Colors.textSecondary, marginTop: 2 }}>{m.especialidades?.[0] || m.especialidade || 'Clínico Geral'}</div>
               </div>
             );
           })}

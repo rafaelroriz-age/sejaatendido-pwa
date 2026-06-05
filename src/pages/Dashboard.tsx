@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { cancelConsulta, fetchMinhasConsultas, Consulta } from '../services/api';
 import { clearAuthSession, getUser } from '../storage/localStorage';
+import { handleApiError } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
@@ -29,12 +31,10 @@ export default function Dashboard() {
       setLoadError(null);
       setConsultas(await fetchMinhasConsultas());
     } catch (error) {
-      const axios = (await import('axios')).default;
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         // Paciente profile not yet created — treat as empty list, not a hard error.
         setConsultas([]);
       } else {
-        const { handleApiError } = await import('../utils/errorHandler');
         setLoadError(handleApiError(error));
       }
     } finally { setLoading(false); }
@@ -60,7 +60,6 @@ export default function Dashboard() {
       setConsultas(prev => prev.filter(c => c.id !== id));
       window.alert('Consulta cancelada com sucesso.');
     } catch (error) {
-      const { handleApiError } = await import('../utils/errorHandler');
       window.alert(`Erro ao cancelar consulta\n${handleApiError(error)}`);
     } finally {
       setCancelingId(null);

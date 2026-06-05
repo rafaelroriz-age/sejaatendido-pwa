@@ -206,24 +206,57 @@ export interface MedicoListResponse {
   page: number;
 }
 
+function normalizeMedico(raw: any): Medico {
+  const usuarioRaw = raw?.usuario ?? {};
+  const nome = usuarioRaw?.nome ?? raw?.nome ?? raw?.usuarioNome ?? 'Médico';
+  const email = usuarioRaw?.email ?? raw?.email ?? '';
+  const especialidades = Array.isArray(raw?.especialidades)
+    ? raw.especialidades
+    : raw?.especialidade
+      ? [raw.especialidade]
+      : undefined;
+
+  return {
+    id: String(raw?.id ?? raw?.medicoId ?? ''),
+    usuarioId: String(raw?.usuarioId ?? usuarioRaw?.id ?? raw?.idUsuario ?? ''),
+    especialidade: raw?.especialidade ?? especialidades?.[0],
+    especialidades,
+    crmNumero: raw?.crmNumero,
+    crmUf: raw?.crmUf,
+    crm: raw?.crm,
+    fotoPerfil: raw?.fotoPerfil,
+    bio: raw?.bio,
+    valorConsulta: raw?.valorConsulta,
+    status: raw?.status,
+    aprovado: raw?.aprovado,
+    usuario: {
+      id: String(usuarioRaw?.id ?? raw?.usuarioId ?? raw?.id ?? ''),
+      nome,
+      email,
+    },
+  };
+}
+
 export async function fetchMedicos(params?: { especialidade?: string; nome?: string; page?: number; limit?: number }): Promise<Medico[]> {
   const r = await api.get('/medicos', { params });
-  return r.data?.medicos ?? r.data ?? [];
+  const list = r.data?.medicos ?? r.data ?? [];
+  if (!Array.isArray(list)) return [];
+  return list.map(normalizeMedico).filter((m) => Boolean(m.id));
 }
 
 export async function fetchMedicoById(id: string): Promise<Medico> {
   const r = await api.get(`/medicos/${id}`);
-  return r.data?.medico ?? r.data;
+  return normalizeMedico(r.data?.medico ?? r.data);
 }
 
 export async function fetchMedicoPerfil(): Promise<Medico> {
   const r = await api.get('/medicos/me');
-  return r.data?.medico ?? r.data;
+  return normalizeMedico(r.data?.medico ?? r.data);
 }
 
 export async function updateMedicoPerfil(data: { especialidade?: string; bio?: string; valorConsulta?: number; fotoPerfil?: string }): Promise<Medico> {
   const r = await api.put('/medicos/me', data);
-  return r.data?.medico ?? r.data;
+  return normalizeMedico(r.data?.medico ?? r.data);
 }
 
 export interface SlotsResponse {
