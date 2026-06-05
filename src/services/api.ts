@@ -237,11 +237,52 @@ function normalizeMedico(raw: any): Medico {
   };
 }
 
+function logMedicosTelemetry(rawPayload: unknown, normalized: Medico[], params?: { especialidade?: string; nome?: string; page?: number; limit?: number }) {
+  if (!import.meta.env.DEV) return;
+
+  const rawList = Array.isArray((rawPayload as any)?.medicos)
+    ? (rawPayload as any).medicos
+    : Array.isArray(rawPayload)
+      ? rawPayload
+      : [];
+
+  console.groupCollapsed('[telemetry] GET /medicos payload diagnostics');
+  console.log('query params:', params ?? null);
+  console.log('raw payload type:', typeof rawPayload, 'raw length:', rawList.length);
+  console.log('raw payload sample:', rawPayload);
+
+  const rawShape = rawList.map((item: any, index: number) => ({
+    index,
+    id: item?.id,
+    usuarioId: item?.usuarioId,
+    hasUsuarioObject: Boolean(item?.usuario && typeof item.usuario === 'object'),
+    usuarioKeys: item?.usuario && typeof item.usuario === 'object' ? Object.keys(item.usuario) : [],
+    topLevelKeys: item && typeof item === 'object' ? Object.keys(item) : [],
+    nomeCandidates: {
+      usuarioNome: item?.usuario?.nome,
+      nome: item?.nome,
+      usuarioNomeFlat: item?.usuarioNome,
+    },
+    status: item?.status,
+    aprovado: item?.aprovado,
+  }));
+
+  console.table(rawShape);
+  console.log('normalized doctors:', normalized);
+  console.groupEnd();
+}
+
 export async function fetchMedicos(params?: { especialidade?: string; nome?: string; page?: number; limit?: number }): Promise<Medico[]> {
   const r = await api.get('/medicos', { params });
   const list = r.data?.medicos ?? r.data ?? [];
-  if (!Array.isArray(list)) return [];
-  return list.map(normalizeMedico).filter((m) => Boolean(m.id));
+  if (!Array.isArray(list)) {
+    logMedicosTelemetry(r.data, [], params);
+    return [];
+  }
+
+  const normalized = list.map(normalizeMedico).filter((m) => Boolean(m.id));
+  logMedicosTelemetry(r.data, normalized, params);
+  return normalized;
 }
 
 export async function fetchMedicoById(id: string): Promise<Medico> {
