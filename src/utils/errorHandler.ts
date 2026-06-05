@@ -37,10 +37,10 @@ export const handleApiError = (error: unknown): string => {
 
     if (status === 401) return 'Sessão expirada. Faça login novamente.';
     if (status === 403) return 'Você não tem permissão para realizar esta ação.';
-    if (status === 404) return 'Recurso não encontrado.';
+    if (status === 404) return messageFromApi ?? 'Recurso não encontrado.';
     if (status === 413) return 'O arquivo enviado é muito grande. Use um arquivo menor.';
     if (status === 429) return 'Muitas requisições. Aguarde um momento.';
-    if (status && status >= 500) return 'Erro no servidor. Tente novamente mais tarde.';
+    if (status && status >= 500) return messageFromApi ?? 'Erro no servidor. Tente novamente mais tarde.';
 
     return messageFromApi ?? 'Erro ao conectar com o servidor';
   }

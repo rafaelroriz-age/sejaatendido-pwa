@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cancelConsulta, fetchMinhasConsultas, Consulta } from '../services/api';
 import { clearAuthSession, getUser } from '../storage/localStorage';
-import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
@@ -14,6 +13,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
 
@@ -25,9 +25,19 @@ export default function Dashboard() {
   }
 
   async function loadData() {
-    try { setConsultas(await fetchMinhasConsultas()); }
-    catch (error) { showErrorAlert(error, 'Erro ao carregar consultas'); }
-    finally { setLoading(false); }
+    try {
+      setLoadError(null);
+      setConsultas(await fetchMinhasConsultas());
+    } catch (error) {
+      const axios = (await import('axios')).default;
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        // Paciente profile not yet created — treat as empty list, not a hard error.
+        setConsultas([]);
+      } else {
+        const { handleApiError } = await import('../utils/errorHandler');
+        setLoadError(handleApiError(error));
+      }
+    } finally { setLoading(false); }
   }
 
   function isPendingPayment(status: string) {
@@ -50,7 +60,8 @@ export default function Dashboard() {
       setConsultas(prev => prev.filter(c => c.id !== id));
       window.alert('Consulta cancelada com sucesso.');
     } catch (error) {
-      showErrorAlert(error, 'Erro ao cancelar consulta');
+      const { handleApiError } = await import('../utils/errorHandler');
+      window.alert(`Erro ao cancelar consulta\n${handleApiError(error)}`);
     } finally {
       setCancelingId(null);
     }
@@ -138,6 +149,12 @@ export default function Dashboard() {
         </div>
 
         <h3 style={{ fontSize: Font.lg - 2, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.md, letterSpacing: -0.3 }}>Próximas Consultas</h3>
+
+        {loadError && (
+          <div style={{ backgroundColor: Colors.errorLight, border: `1px solid ${Colors.error}`, borderRadius: Radius.md, padding: `${Space.sm}px ${Space.lg}px`, marginBottom: Space.md, fontSize: Font.sm, color: Colors.error }}>
+            {loadError}
+          </div>
+        )}
 
         {loading ? <><SkeletonCard /><SkeletonCard /><SkeletonCard /></> : consultas.length === 0 ? (
           <EmptyState title="Nenhuma consulta" subtitle="Você ainda não tem consultas agendadas. Agende sua primeira consulta agora." actionLabel="Agendar agora" onAction={() => navigate('/book')} />
