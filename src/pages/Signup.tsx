@@ -49,8 +49,6 @@ export default function SignupScreen() {
     if (!/[a-z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra minuscula'); return; }
     if (!/[0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um numero'); return; }
     if (!/[^A-Za-z0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um caractere especial'); return; }
-    if (tipo === 'MEDICO' && !crm.trim()) { window.alert('Informe o numero do CRM'); return; }
-    if (tipo === 'MEDICO' && !crmUf.trim()) { window.alert('Informe a UF do CRM (ex: SP)'); return; }
     const rawCpf = cpf.replace(/\D/g, '');
     if (rawCpf && !isValidCpf(rawCpf)) { window.alert('CPF invalido. Verifique os digitos.'); return; }
     if (tipo === 'MEDICO' && !rawCpf) { window.alert('Informe um CPF valido (11 digitos)'); return; }

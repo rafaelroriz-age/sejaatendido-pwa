@@ -9,6 +9,10 @@ if (mpPublicKey && mpPublicKey !== 'YOUR_MP_PUBLIC_KEY_HERE') {
   initMercadoPago(mpPublicKey, { locale: 'pt-BR' });
 }
 
+if (import.meta.env.PROD && import.meta.env.VITE_MOCK === 'true') {
+  throw new Error('VITE_MOCK=true não é permitido em produção.');
+}
+
 async function prepare() {
   if (import.meta.env.VITE_MOCK === 'true') {
     const { worker } = await import('./mocks/browser');

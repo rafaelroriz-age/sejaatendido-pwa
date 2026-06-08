@@ -24,6 +24,7 @@ type PaymentResponse = {
   pix?: PixData;
   mercadopago?: {
     initPoint?: string;
+    sandboxInitPoint?: string;
     preferenceId?: string;
   };
 };
@@ -47,6 +48,11 @@ function normalizeStatus(data: PaymentResponse | null): PaymentStatus {
   if (!data) return 'AGUARDANDO';
   // pagamento.status is the canonical field per backend contract ("PAGO", "PENDENTE", etc.)
   return data.pagamento?.status || data.status || 'AGUARDANDO';
+}
+
+function isPendingStatus(status: PaymentStatus): boolean {
+  const normalized = String(status || '').toUpperCase();
+  return normalized === 'AGUARDANDO' || normalized === 'PENDENTE';
 }
 
 export default function Payment() {
@@ -161,7 +167,7 @@ export default function Payment() {
           return;
         }
 
-        if (nextStatus !== 'AGUARDANDO') {
+        if (!isPendingStatus(nextStatus)) {
           stopPolling();
           return;
         }
@@ -218,12 +224,14 @@ export default function Payment() {
     setErrorText('');
     try {
       const data = (await criarPagamento({ consultaId, metodoPagamento: 'card' })) as PaymentResponse;
-      const initPoint = data?.mercadopago?.initPoint;
-      if (!initPoint) {
+      const checkoutUrl = import.meta.env.PROD
+        ? data?.mercadopago?.initPoint
+        : data?.mercadopago?.sandboxInitPoint || data?.mercadopago?.initPoint;
+      if (!checkoutUrl) {
         setErrorText('Checkout do cartão não retornou link de pagamento.');
         return;
       }
-      window.location.href = initPoint;
+      window.location.href = checkoutUrl;
     } catch (error) {
       const message = getErrorMessage(error, 'Falha ao iniciar pagamento com cartão.');
       setErrorText(message);
