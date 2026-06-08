@@ -207,30 +207,31 @@ export interface MedicoListResponse {
 }
 
 function normalizeMedico(raw: any): Medico {
-  const usuarioRaw = raw?.usuario ?? {};
-  const nome = usuarioRaw?.nome ?? raw?.nome ?? raw?.usuarioNome ?? 'Médico';
-  const email = usuarioRaw?.email ?? raw?.email ?? '';
-  const especialidades = Array.isArray(raw?.especialidades)
-    ? raw.especialidades
-    : raw?.especialidade
-      ? [raw.especialidade]
+  const medicoRaw = raw?.medico && typeof raw.medico === 'object' ? raw.medico : raw;
+  const usuarioRaw = raw?.usuario ?? medicoRaw?.usuario ?? {};
+  const nome = usuarioRaw?.nome ?? medicoRaw?.nome ?? raw?.nome ?? medicoRaw?.usuarioNome ?? raw?.usuarioNome ?? 'Médico';
+  const email = usuarioRaw?.email ?? medicoRaw?.email ?? raw?.email ?? '';
+  const especialidades = Array.isArray(medicoRaw?.especialidades)
+    ? medicoRaw.especialidades
+    : medicoRaw?.especialidade
+      ? [medicoRaw.especialidade]
       : undefined;
 
   return {
-    id: String(raw?.id ?? raw?.medicoId ?? ''),
-    usuarioId: String(raw?.usuarioId ?? usuarioRaw?.id ?? raw?.idUsuario ?? ''),
-    especialidade: raw?.especialidade ?? especialidades?.[0],
+    id: String(medicoRaw?.id ?? raw?.id ?? medicoRaw?.medicoId ?? raw?.medicoId ?? medicoRaw?.usuarioId ?? raw?.usuarioId ?? ''),
+    usuarioId: String(medicoRaw?.usuarioId ?? raw?.usuarioId ?? usuarioRaw?.id ?? medicoRaw?.idUsuario ?? raw?.idUsuario ?? ''),
+    especialidade: medicoRaw?.especialidade ?? raw?.especialidade ?? especialidades?.[0],
     especialidades,
-    crmNumero: raw?.crmNumero,
-    crmUf: raw?.crmUf,
-    crm: raw?.crm,
-    fotoPerfil: raw?.fotoPerfil,
-    bio: raw?.bio,
-    valorConsulta: raw?.valorConsulta,
-    status: raw?.status,
-    aprovado: raw?.aprovado,
+    crmNumero: medicoRaw?.crmNumero ?? raw?.crmNumero,
+    crmUf: medicoRaw?.crmUf ?? raw?.crmUf,
+    crm: medicoRaw?.crm ?? raw?.crm,
+    fotoPerfil: medicoRaw?.fotoPerfil ?? raw?.fotoPerfil,
+    bio: medicoRaw?.bio ?? raw?.bio,
+    valorConsulta: medicoRaw?.valorConsulta ?? raw?.valorConsulta,
+    status: medicoRaw?.status ?? raw?.status,
+    aprovado: medicoRaw?.aprovado ?? raw?.aprovado,
     usuario: {
-      id: String(usuarioRaw?.id ?? raw?.usuarioId ?? raw?.id ?? ''),
+      id: String(usuarioRaw?.id ?? medicoRaw?.usuarioId ?? raw?.usuarioId ?? medicoRaw?.id ?? raw?.id ?? ''),
       nome,
       email,
     },
@@ -273,15 +274,21 @@ function logMedicosTelemetry(rawPayload: unknown, normalized: Medico[], params?:
 }
 
 export async function fetchMedicos(params?: { especialidade?: string; nome?: string; page?: number; limit?: number }): Promise<Medico[]> {
-  const r = await api.get('/medicos', { params });
+  const mergedParams = {
+    page: params?.page ?? 1,
+    limit: params?.limit ?? 100,
+    ...(params?.especialidade ? { especialidade: params.especialidade } : {}),
+    ...(params?.nome ? { nome: params.nome } : {}),
+  };
+  const r = await api.get('/medicos', { params: mergedParams });
   const list = r.data?.medicos ?? r.data ?? [];
   if (!Array.isArray(list)) {
-    logMedicosTelemetry(r.data, [], params);
+    logMedicosTelemetry(r.data, [], mergedParams);
     return [];
   }
 
   const normalized = list.map(normalizeMedico).filter((m) => Boolean(m.id));
-  logMedicosTelemetry(r.data, normalized, params);
+  logMedicosTelemetry(r.data, normalized, mergedParams);
   return normalized;
 }
 
