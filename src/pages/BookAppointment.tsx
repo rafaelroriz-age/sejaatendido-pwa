@@ -26,6 +26,18 @@ function getMedicoNome(m: Medico): string {
   return m.usuario?.nome || anyMedico.nome || anyMedico.usuarioNome || 'Médico';
 }
 
+function getMedicoCandidateIds(m: Medico): string[] {
+  const anyMedico = m as any;
+  const candidates = [
+    m.id,
+    m.usuarioId,
+    anyMedico.medicoId,
+    anyMedico.usuario?.id,
+  ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+
+  return [...new Set(candidates)];
+}
+
 export default function BookAppointment() {
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -52,7 +64,7 @@ export default function BookAppointment() {
       }
       setAvailabilityLoading(true);
       try {
-        const slots = await fetchDisponibilidadeMedico(selectedMedico.id, selectedDate);
+        const slots = await fetchDisponibilidadeMedico(getMedicoCandidateIds(selectedMedico), selectedDate);
         setAvailableSlots(slots);
         if (selectedTime && !slots.includes(selectedTime)) setSelectedTime(null);
       } catch (error) {
@@ -83,7 +95,28 @@ export default function BookAppointment() {
 
     setSubmitting(true);
     try {
-      const consulta = await createConsulta({ medicoId: selectedMedico.id, dataHora, sintomas: motivo || 'Consulta geral' });
+      const candidateIds = getMedicoCandidateIds(selectedMedico);
+      let consulta: Awaited<ReturnType<typeof createConsulta>> | null = null;
+      let lastError: unknown = null;
+
+      for (const medicoId of candidateIds) {
+        try {
+          consulta = await createConsulta({ medicoId, dataHora, sintomas: motivo || 'Consulta geral' });
+          break;
+        } catch (error) {
+          lastError = error;
+          if (!axios.isAxiosError(error)) break;
+          const status = error.response?.status;
+          const msg = String((error.response?.data as Record<string, string> | undefined)?.erro || (error.response?.data as Record<string, string> | undefined)?.message || '').toLowerCase();
+          const doctorIdMismatch = status === 404 || (status === 400 && msg.includes('médico') && msg.includes('não encontrado'));
+          if (!doctorIdMismatch) break;
+        }
+      }
+
+      if (!consulta) {
+        throw lastError ?? new Error('Não foi possível criar consulta para o médico selecionado.');
+      }
+
       navigate('/payment', { state: { consultaId: consulta.id, valor: consulta.valor } });
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -99,7 +132,7 @@ export default function BookAppointment() {
           window.alert('Conflito de agenda: o horário acabou de ser ocupado. Escolha outro slot.');
           setSelectedTime(null);
           if (selectedMedico && selectedDate) {
-            const slots = await fetchDisponibilidadeMedico(selectedMedico.id, selectedDate);
+            const slots = await fetchDisponibilidadeMedico(getMedicoCandidateIds(selectedMedico), selectedDate);
             setAvailableSlots(slots);
           }
           return;

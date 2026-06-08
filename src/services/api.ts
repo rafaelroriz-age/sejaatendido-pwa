@@ -305,14 +305,21 @@ export interface SlotsResponse {
   duracaoSlotMinutos: number;
 }
 
-export async function fetchDisponibilidadeMedico(medicoId: string, data: string): Promise<string[]> {
-  try {
-    const response = await api.get(`/medicos/${medicoId}/slots`, { params: { data } });
-    const payload = response.data as SlotsResponse;
-    return payload?.slots ?? [];
-  } catch {
-    return [];
+export async function fetchDisponibilidadeMedico(medicoId: string | string[], data: string): Promise<string[]> {
+  const ids = Array.isArray(medicoId) ? medicoId : [medicoId];
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+  for (const id of uniqueIds) {
+    try {
+      const response = await api.get(`/medicos/${id}/slots`, { params: { data } });
+      const payload = response.data as SlotsResponse;
+      return payload?.slots ?? [];
+    } catch {
+      // Try next candidate ID.
+    }
   }
+
+  return [];
 }
 
 export interface DisponibilidadeItem {
