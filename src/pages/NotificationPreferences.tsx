@@ -181,6 +181,9 @@ export default function NotificationPreferences() {
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${Colors.borderLight}` }}>
               <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Número do WhatsApp</label>
               <input value={prefs.whatsappNumber} onChange={e => updatePref('whatsappNumber', maskPhone(e.target.value))} placeholder="(00) 90000-0000" style={inputStyle} />
+              <p style={{ fontSize: 12, color: Colors.textMuted, marginTop: 8, lineHeight: '18px' }}>
+                Esta configuração salva sua preferência no app. O envio automático de mensagens de WhatsApp depende da integração operacional do backend.
+              </p>
             </div>
           )}
         </div>

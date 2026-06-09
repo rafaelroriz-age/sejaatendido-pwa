@@ -648,11 +648,22 @@ export interface PreferenciasNotificacao {
 }
 
 export async function fetchPreferenciasNotificacao(): Promise<PreferenciasNotificacao | null> {
-  return null;
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem('@notificationPreferences');
+    return raw ? JSON.parse(raw) as PreferenciasNotificacao : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function savePreferenciasNotificacao(_data: PreferenciasNotificacao): Promise<void> {
-  // no-op: backend currently does not expose preferences endpoint
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem('@notificationPreferences', JSON.stringify(_data));
+  } catch {
+    // ignore local persistence failures
+  }
 }
 
 export interface PushTokenPayload {

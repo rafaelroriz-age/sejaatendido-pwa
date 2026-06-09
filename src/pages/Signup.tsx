@@ -38,6 +38,7 @@ export default function SignupScreen() {
   const [tipo, setTipo] = useState<'PACIENTE' | 'MEDICO'>('PACIENTE');
   const [crm, setCrm] = useState('');
   const [crmUf, setCrmUf] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
 
@@ -52,6 +53,7 @@ export default function SignupScreen() {
     const rawCpf = cpf.replace(/\D/g, '');
     if (rawCpf && !isValidCpf(rawCpf)) { window.alert('CPF invalido. Verifique os digitos.'); return; }
     if (tipo === 'MEDICO' && !rawCpf) { window.alert('Informe um CPF valido (11 digitos)'); return; }
+    if (!acceptedTerms) { window.alert('Você precisa aceitar os Termos de Uso e a Política de Privacidade.'); return; }
 
     setLoading(true);
     try {
@@ -145,6 +147,26 @@ export default function SignupScreen() {
             <input type="password" placeholder="Confirmar senha" value={confirmaSenha} onChange={e => setConfirmaSenha(e.target.value)} disabled={loading} style={inputStyle} />
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: Space.lg }}>
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={e => setAcceptedTerms(e.target.checked)}
+              disabled={loading}
+              style={{ marginTop: 4, width: 18, height: 18 }}
+            />
+            <div style={{ fontSize: Font.sm, color: Colors.textSecondary, lineHeight: '20px' }}>
+              Li e aceito os{' '}
+              <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>
+                Termos de Uso
+              </span>{' '}
+              e a{' '}
+              <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>
+                Política de Privacidade
+              </span>.
+            </div>
+          </div>
+
           <div style={{ marginBottom: Space.lg }}>
             <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Tipo de conta</label>
             <div style={{ display: 'flex', gap: 10 }}>
@@ -203,6 +225,17 @@ export default function SignupScreen() {
             }}
           >
             {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: Font.md + 1, fontWeight: 700 }}>Cadastrar</span>}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/termos-e-condicoes')}
+            style={{
+              width: '100%', marginTop: 10, background: 'transparent', border: `1px solid ${Colors.border}`,
+              borderRadius: Radius.md, padding: Space.md, color: Colors.textSecondary, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            Ler termos e condições
           </button>
         </div>
 

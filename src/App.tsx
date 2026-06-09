@@ -26,6 +26,7 @@ import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentPending from './pages/PaymentPending';
 import PaymentFailure from './pages/PaymentFailure';
 import DoctorSchedule from './pages/DoctorSchedule';
+import TermsConditions from './pages/TermsConditions';
 
 type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
 
@@ -124,6 +125,7 @@ export default function App() {
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/confirmar-email" element={<ConfirmEmail />} />
+        <Route path="/termos-e-condicoes" element={<TermsConditions />} />
         <Route path="/resetar-senha" element={<ResetPassword />} />
         <Route path="/esqueci-senha" element={<ForgotPassword />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
