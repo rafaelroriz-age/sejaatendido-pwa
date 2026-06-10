@@ -13,6 +13,13 @@ function applyCpfMask(value: string): string {
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
+function maskPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 function isValidCpf(cpf: string): boolean {
   const d = cpf.replace(/\D/g, '');
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
@@ -36,6 +43,7 @@ export default function SignupScreen() {
   const [senha, setSenha] = useState('');
   const [confirmaSenha, setConfirmaSenha] = useState('');
   const [tipo, setTipo] = useState<'PACIENTE' | 'MEDICO'>('PACIENTE');
+  const [telefone, setTelefone] = useState('');
   const [crm, setCrm] = useState('');
   const [crmUf, setCrmUf] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -57,10 +65,12 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
+      const rawTelefone = telefone.replace(/\D/g, '');
       const payload: Parameters<typeof registerRequest>[0] = {
         nome,
         email,
         cpf: rawCpf || undefined,
+        telefone: rawTelefone || undefined,
         senha,
         tipo,
       };
@@ -128,6 +138,16 @@ export default function SignupScreen() {
           </div>
           <div style={wrapperStyle}>
             <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} style={inputStyle} />
+          </div>
+          <div style={wrapperStyle}>
+            <input
+              type="tel"
+              placeholder="WhatsApp / Telefone (ex: (11) 99999-9999)"
+              value={telefone}
+              onChange={e => setTelefone(maskPhone(e.target.value))}
+              disabled={loading}
+              style={inputStyle}
+            />
           </div>
           <div style={wrapperStyle}>
             <input

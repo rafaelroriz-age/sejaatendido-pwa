@@ -705,14 +705,20 @@ export interface PerfilResponse {
   telefone?: string;
 }
 
+export async function fetchPerfil(): Promise<PerfilResponse> {
+  const res = await api.get('/usuarios/me');
+  return res.data;
+}
+
 export async function savePerfil(data: SavePerfilRequest): Promise<PerfilResponse> {
   if (data.senhaAtual && data.novaSenha) {
     await api.put('/usuarios/me/senha', { senhaAtual: data.senhaAtual, novaSenha: data.novaSenha });
   }
   const body: Record<string, unknown> = { nome: data.nome };
   if (data.cpf !== undefined) body.cpf = data.cpf;
+  if (data.telefone !== undefined) body.telefone = data.telefone;
   const res = await api.put('/usuarios/me', body);
-  return { ...res.data, telefone: data.telefone };
+  return res.data;
 }
 
 // SALDO / GANHOS

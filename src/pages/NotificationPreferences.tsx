@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser } from '../storage/localStorage';
-import { fetchPreferenciasNotificacao, registerPushToken, savePreferenciasNotificacao } from '../services/api';
+import { fetchPreferenciasNotificacao, fetchPerfil, registerPushToken, savePreferenciasNotificacao } from '../services/api';
 import Colors from '../theme/colors';
 
 interface Prefs {
@@ -67,8 +67,21 @@ export default function NotificationPreferences() {
     try {
       const user = await getUser();
       if (user) setIsPaciente(user.tipo === 'PACIENTE');
-      const data = await fetchPreferenciasNotificacao();
-      if (data) setPrefs({ ...DEFAULT_PREFS, ...data });
+      const [savedPrefs, perfil] = await Promise.all([
+        fetchPreferenciasNotificacao(),
+        fetchPerfil().catch(() => null),
+      ]);
+      const phoneFromProfile = perfil?.telefone?.replace(/\D/g, '') ?? '';
+      if (savedPrefs) {
+        // pre-fill whatsappNumber from profile phone if prefs don't have one yet
+        setPrefs({
+          ...DEFAULT_PREFS,
+          ...savedPrefs,
+          whatsappNumber: savedPrefs.whatsappNumber || (phoneFromProfile ? `(${phoneFromProfile.slice(0,2)}) ${phoneFromProfile.slice(2,7)}-${phoneFromProfile.slice(7)}` : ''),
+        });
+      } else if (phoneFromProfile) {
+        setPrefs(prev => ({ ...prev, whatsappNumber: `(${phoneFromProfile.slice(0,2)}) ${phoneFromProfile.slice(2,7)}-${phoneFromProfile.slice(7)}` }));
+      }
     } catch {} finally { setLoading(false); }
   }
 

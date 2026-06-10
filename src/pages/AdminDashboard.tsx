@@ -100,6 +100,20 @@ export default function AdminDashboard() {
     navigate('/login', { replace: true });
   }
 
+  async function handleAprovarTodos() {
+    if (pendentes.length === 0) return;
+    if (!window.confirm(`Aprovar todos os ${pendentes.length} médicos pendentes? Um email será enviado a cada um.`)) return;
+    setActionId('__all__');
+    let aprovados = 0;
+    for (const m of pendentes) {
+      try { await aprovarMedico(m.id); aprovados++; } catch { /* skip individual failures */ }
+    }
+    setPendentes([]);
+    if (stats) setStats({ ...stats, medicosPendentes: 0, medicosAprovados: stats.medicosAprovados + aprovados });
+    setActionId(null);
+    window.alert(`${aprovados} médico(s) aprovado(s) com sucesso!`);
+  }
+
   async function handleAprovar(id: string) {
     if (!window.confirm('Aprovar este médico? Um email será enviado automaticamente.')) return;
     setActionId(id);
@@ -225,7 +239,17 @@ export default function AdminDashboard() {
             {tab === 'pendentes' && (
               pendentes.length === 0
                 ? <EmptyState title="Nenhum pendente" subtitle="Nenhum médico aguardando aprovação" />
-                : pendentes.map(m => (
+                : <>
+                  {pendentes.length > 1 && (
+                    <button
+                      disabled={actionId === '__all__'}
+                      onClick={handleAprovarTodos}
+                      style={{ width: '100%', backgroundColor: Colors.success, borderRadius: Radius.md, padding: 14, border: 'none', color: '#fff', fontSize: 15, fontWeight: 800, cursor: actionId === '__all__' ? 'not-allowed' : 'pointer', marginBottom: Space.md, opacity: actionId === '__all__' ? 0.6 : 1 }}
+                    >
+                      {actionId === '__all__' ? 'Aprovando...' : `✓ Aprovar Todos (${pendentes.length})`}
+                    </button>
+                  )}
+                  {pendentes.map(m => (
                   <Card key={m.id} style={{ marginBottom: Space.md }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: Space.md }}>
                       <Avatar name={m.usuario?.nome ?? '?'} size={48} color={Colors.admin} />
@@ -251,7 +275,8 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </Card>
-                ))
+                  ))}
+                </>
             )}
 
             {tab === 'medicos' && (
