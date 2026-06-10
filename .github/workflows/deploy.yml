@@ -36,7 +36,9 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://sejaatendido-backend.onrender.com' }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || secrets.VITE_API_URL }}
+          NEXT_PUBLIC_FRONTEND_URL: ${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
+          VITE_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || secrets.VITE_API_URL }}
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
           VITE_MP_PUBLIC_KEY: ${{ secrets.VITE_MP_PUBLIC_KEY }}
 

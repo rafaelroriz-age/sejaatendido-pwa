@@ -1,9 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerRequest } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
+
+type SignupStep = 1 | 2 | 3 | 4;
 
 function applyCpfMask(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -18,6 +20,10 @@ function maskPhone(v: string): string {
   if (d.length <= 2) return d.length ? `(${d}` : '';
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+function normalizePhone(v: string): string {
+  return v.replace(/\D/g, '');
 }
 
 function isValidCpf(cpf: string): boolean {
@@ -35,46 +41,118 @@ function isValidCpf(cpf: string): boolean {
   return r === parseInt(d[10]);
 }
 
+function validatePassword(senha: string): string | null {
+  if (senha.length < 8) return 'A senha deve ter pelo menos 8 caracteres';
+  if (!/[A-Z]/.test(senha)) return 'A senha deve conter pelo menos uma letra maiuscula';
+  if (!/[a-z]/.test(senha)) return 'A senha deve conter pelo menos uma letra minuscula';
+  if (!/[0-9]/.test(senha)) return 'A senha deve conter pelo menos um numero';
+  if (!/[^A-Za-z0-9]/.test(senha)) return 'A senha deve conter pelo menos um caractere especial';
+  return null;
+}
+
 export default function SignupScreen() {
   const navigate = useNavigate();
+
+  const [step, setStep] = useState<SignupStep>(1);
+
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [cpf, setCpf] = useState('');
+  const [tipo, setTipo] = useState<'PACIENTE' | 'MEDICO'>('PACIENTE');
+
+  const [telefone, setTelefone] = useState('');
+
   const [senha, setSenha] = useState('');
   const [confirmaSenha, setConfirmaSenha] = useState('');
-  const [tipo, setTipo] = useState<'PACIENTE' | 'MEDICO'>('PACIENTE');
-  const [telefone, setTelefone] = useState('');
   const [crm, setCrm] = useState('');
   const [crmUf, setCrmUf] = useState('');
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  const [aceitouTermos, setAceitouTermos] = useState(false);
+  const [aceitouPrivacidade, setAceitouPrivacidade] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
 
+  const progress = useMemo(() => (step / 4) * 100, [step]);
+
+  function validateStep(current: SignupStep): boolean {
+    if (current === 1) {
+      if (!nome.trim() || !email.trim()) {
+        window.alert('Preencha nome e email para continuar.');
+        return false;
+      }
+      const rawCpf = cpf.replace(/\D/g, '');
+      if (rawCpf && !isValidCpf(rawCpf)) {
+        window.alert('CPF invalido. Verifique os digitos.');
+        return false;
+      }
+      if (tipo === 'MEDICO' && !rawCpf) {
+        window.alert('Informe um CPF valido (11 digitos).');
+        return false;
+      }
+      return true;
+    }
+
+    if (current === 2) {
+      const normalized = normalizePhone(telefone);
+      if (normalized.length < 10 || normalized.length > 11) {
+        window.alert('Informe um telefone/WhatsApp valido com DDD.');
+        return false;
+      }
+      return true;
+    }
+
+    if (current === 3) {
+      const pwdError = validatePassword(senha);
+      if (pwdError) {
+        window.alert(pwdError);
+        return false;
+      }
+      if (senha !== confirmaSenha) {
+        window.alert('As senhas nao coincidem.');
+        return false;
+      }
+      return true;
+    }
+
+    if (current === 4) {
+      if (!aceitouTermos || !aceitouPrivacidade) {
+        window.alert('Você precisa aceitar os Termos e a Política de Privacidade para continuar.');
+        return false;
+      }
+      return true;
+    }
+
+    return true;
+  }
+
+  function handleNext() {
+    if (!validateStep(step)) return;
+    if (step < 4) setStep((step + 1) as SignupStep);
+  }
+
+  function handleBack() {
+    if (step > 1) setStep((step - 1) as SignupStep);
+  }
+
   async function handleSignup() {
-    if (!nome || !email || !senha || !confirmaSenha) { window.alert('Preencha todos os campos'); return; }
-    if (senha !== confirmaSenha) { window.alert('As senhas nao coincidem'); return; }
-    if (senha.length < 8) { window.alert('A senha deve ter pelo menos 8 caracteres'); return; }
-    if (!/[A-Z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra maiuscula'); return; }
-    if (!/[a-z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra minuscula'); return; }
-    if (!/[0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um numero'); return; }
-    if (!/[^A-Za-z0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um caractere especial'); return; }
-    const rawCpf = cpf.replace(/\D/g, '');
-    if (rawCpf && !isValidCpf(rawCpf)) { window.alert('CPF invalido. Verifique os digitos.'); return; }
-    if (tipo === 'MEDICO' && !rawCpf) { window.alert('Informe um CPF valido (11 digitos)'); return; }
-    if (!acceptedTerms) { window.alert('Você precisa aceitar os Termos de Uso e a Política de Privacidade.'); return; }
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
 
     setLoading(true);
     try {
-      const rawTelefone = telefone.replace(/\D/g, '');
+      const rawCpf = cpf.replace(/\D/g, '');
+      const rawTelefone = normalizePhone(telefone);
       const payload: Parameters<typeof registerRequest>[0] = {
-        nome,
-        email,
+        nome: nome.trim(),
+        email: email.trim(),
         cpf: rawCpf || undefined,
-        telefone: rawTelefone || undefined,
+        telefone: rawTelefone,
         senha,
         tipo,
+        aceitouTermos,
+        aceitouPrivacidade,
       };
-      // Note: CRM number/UF are NOT part of registration — validated separately via /medicos/me/crm/validar-cartao
+
       const response = await registerRequest(payload);
       await saveAuthSession(response.accessToken, response.usuario, response.refreshToken);
       setRegistered(true);
@@ -86,29 +164,33 @@ export default function SignupScreen() {
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: Space.lg, fontSize: Font.md,
-    color: Colors.textPrimary, backgroundColor: 'transparent',
-    border: 'none', outline: 'none',
+    width: '100%',
+    padding: Space.lg,
+    fontSize: Font.md,
+    color: Colors.textPrimary,
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
   };
+
   const wrapperStyle: React.CSSProperties = {
-    backgroundColor: Colors.inputBg, borderRadius: Radius.md,
-    marginBottom: Space.md + 2, border: `1px solid ${Colors.border}`,
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.md,
+    marginBottom: Space.md + 2,
+    border: `1px solid ${Colors.border}`,
   };
 
   if (registered) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <div style={{ backgroundColor: Colors.card, borderRadius: 24, padding: 36, textAlign: 'center', width: '100%', maxWidth: 380, boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}>&#128231;</div>
+          <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}>📨</div>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 8 }}>Conta Criada!</h2>
           <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>
             Enviamos um email de confirmacao para <strong>{email}</strong>. Verifique sua caixa de entrada e spam para ativar sua conta.
             {tipo === 'MEDICO' && ' Apos confirmar o email, valide sua carteirinha CRM na area de perfil.'}
           </p>
-          <button onClick={() => navigate('/login', { replace: true })} style={{
-            width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Space.lg,
-            border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D`,
-          }}>
+          <button onClick={() => navigate('/login', { replace: true })} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Space.lg, border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D` }}>
             <span style={{ color: '#fff', fontSize: Font.md, fontWeight: 700 }}>Ir para Login</span>
           </button>
         </div>
@@ -118,145 +200,180 @@ export default function SignupScreen() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ width: '100%', maxWidth: 420 }}>
+      <div style={{ width: '100%', maxWidth: 460 }}>
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <img
-            src={`${import.meta.env.BASE_URL}logo-oficial.png`}
-            alt="Seja Atendido"
-            style={{ width: '100%', maxHeight: 120, objectFit: 'contain', marginBottom: 8 }}
-          />
+          <img src={`${import.meta.env.BASE_URL}logo-oficial.png`} alt="Seja Atendido" style={{ width: '100%', maxHeight: 120, objectFit: 'contain', marginBottom: 8 }} />
           <h1 style={{ fontSize: Font.xl - 4, fontWeight: 800, color: Colors.textPrimary }}>Criar Conta</h1>
-          <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: Space.xl }}>Preencha seus dados para comecar</p>
+          <p style={{ fontSize: Font.sm, color: Colors.textSecondary, marginBottom: 8 }}>Etapa {step} de 4</p>
+          <div style={{ width: '100%', height: 8, backgroundColor: Colors.borderLight, borderRadius: Radius.full, overflow: 'hidden' }}>
+            <div style={{ width: `${progress}%`, height: '100%', backgroundColor: Colors.primary, transition: 'width 0.25s ease' }} />
+          </div>
         </div>
 
-        <div style={{
-          backgroundColor: Colors.card, borderRadius: Radius.xl, padding: Space.xl,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
-        }}>
-          <div style={wrapperStyle}>
-            <input placeholder="Nome completo" value={nome} onChange={e => setNome(e.target.value)} disabled={loading} style={inputStyle} />
-          </div>
-          <div style={wrapperStyle}>
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} style={inputStyle} />
-          </div>
-          <div style={wrapperStyle}>
-            <input
-              type="tel"
-              placeholder="WhatsApp / Telefone (ex: (11) 99999-9999)"
-              value={telefone}
-              onChange={e => setTelefone(maskPhone(e.target.value))}
-              disabled={loading}
-              style={inputStyle}
-            />
-          </div>
-          <div style={wrapperStyle}>
-            <input
-              type="tel"
-              inputMode="numeric"
-              placeholder="CPF"
-              value={cpf}
-              onChange={e => setCpf(applyCpfMask(e.target.value))}
-              disabled={loading}
-              style={inputStyle}
-            />
-          </div>
-          <div style={wrapperStyle}>
-            <input type="password" placeholder="Senha (min. 8, maiusc., minusc., numero, especial)" value={senha} onChange={e => setSenha(e.target.value)} disabled={loading} style={inputStyle} />
-          </div>
-          <div style={wrapperStyle}>
-            <input type="password" placeholder="Confirmar senha" value={confirmaSenha} onChange={e => setConfirmaSenha(e.target.value)} disabled={loading} style={inputStyle} />
-          </div>
+        <div style={{ backgroundColor: Colors.card, borderRadius: Radius.xl, padding: Space.xl, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}>
+          {step === 1 && (
+            <>
+              <h3 style={{ marginTop: 0, marginBottom: Space.md, color: Colors.textPrimary }}>Dados pessoais</h3>
+              <div style={wrapperStyle}><input placeholder="Nome completo" value={nome} onChange={e => setNome(e.target.value)} disabled={loading} style={inputStyle} /></div>
+              <div style={wrapperStyle}><input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} style={inputStyle} /></div>
+              <div style={wrapperStyle}><input type="tel" inputMode="numeric" placeholder="CPF" value={cpf} onChange={e => setCpf(applyCpfMask(e.target.value))} disabled={loading} style={inputStyle} /></div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: Space.lg }}>
-            <input
-              type="checkbox"
-              checked={acceptedTerms}
-              onChange={e => setAcceptedTerms(e.target.checked)}
-              disabled={loading}
-              style={{ marginTop: 4, width: 18, height: 18 }}
-            />
-            <div style={{ fontSize: Font.sm, color: Colors.textSecondary, lineHeight: '20px' }}>
-              Li e aceito os{' '}
-              <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>
-                Termos de Uso
-              </span>{' '}
-              e a{' '}
-              <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>
-                Política de Privacidade
-              </span>.
-            </div>
-          </div>
-
-          <div style={{ marginBottom: Space.lg }}>
-            <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Tipo de conta</label>
-            <div style={{ display: 'flex', gap: 10 }}>
-              {(['PACIENTE', 'MEDICO'] as const).map(t => (
-                <button key={t} onClick={() => setTipo(t)} disabled={loading}
-                  style={{
-                    flex: 1, padding: '12px 16px', borderRadius: Radius.md, border: `2px solid ${tipo === t ? Colors.primary : Colors.border}`,
-                    backgroundColor: tipo === t ? Colors.accent : Colors.inputBg, color: tipo === t ? Colors.primary : Colors.textSecondary,
-                    fontWeight: 700, fontSize: Font.sm, cursor: 'pointer',
-                  }}
-                >
-                  {t === 'PACIENTE' ? 'Paciente' : 'Medico'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {tipo === 'MEDICO' && (
-            <div>
-              <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Dados Profissionais</label>
-              <div style={{ display: 'flex', gap: 8, marginBottom: Space.md + 2 }}>
-                <div style={{ ...wrapperStyle, flex: 2, marginBottom: 0 }}>
-                  <input
-                    placeholder="Numero CRM"
-                    value={crm}
-                    onChange={e => setCrm(e.target.value.replace(/\D/g, ''))}
-                    disabled={loading}
-                    inputMode="numeric"
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ ...wrapperStyle, flex: 1, marginBottom: 0 }}>
-                  <input
-                    placeholder="UF"
-                    value={crmUf}
-                    onChange={e => setCrmUf(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))}
-                    disabled={loading}
-                    maxLength={2}
-                    style={inputStyle}
-                  />
+              <div style={{ marginBottom: Space.lg }}>
+                <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Tipo de conta</label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {(['PACIENTE', 'MEDICO'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setTipo(t)}
+                      disabled={loading}
+                      style={{
+                        flex: 1,
+                        padding: '12px 16px',
+                        borderRadius: Radius.md,
+                        border: `2px solid ${tipo === t ? Colors.primary : Colors.border}`,
+                        backgroundColor: tipo === t ? Colors.accent : Colors.inputBg,
+                        color: tipo === t ? Colors.primary : Colors.textSecondary,
+                        fontWeight: 700,
+                        fontSize: Font.sm,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {t === 'PACIENTE' ? 'Paciente' : 'Medico'}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <span style={{ fontSize: 12, color: Colors.textMuted, display: 'block', marginTop: -8, marginBottom: 12 }}>
-                Voce podera validar sua carteirinha CRM apos o cadastro.
-              </span>
-            </div>
+            </>
           )}
 
-          <button onClick={handleSignup} disabled={loading}
-            style={{
-              width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md,
-              padding: Space.lg, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginTop: Space.sm, opacity: loading ? 0.6 : 1,
-              boxShadow: `0 6px 12px ${Colors.primary}59`,
-            }}
-          >
-            {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: Font.md + 1, fontWeight: 700 }}>Cadastrar</span>}
-          </button>
+          {step === 2 && (
+            <>
+              <h3 style={{ marginTop: 0, marginBottom: Space.md, color: Colors.textPrimary }}>Telefone</h3>
+              <div style={wrapperStyle}>
+                <input
+                  type="tel"
+                  placeholder="WhatsApp / Telefone (ex: (11) 99999-9999)"
+                  value={telefone}
+                  onChange={e => setTelefone(maskPhone(e.target.value))}
+                  disabled={loading}
+                  style={inputStyle}
+                />
+              </div>
+              <span style={{ fontSize: 12, color: Colors.textMuted, display: 'block' }}>
+                Vamos usar este número para confirmação, lembrete e cancelamento de consultas.
+              </span>
+            </>
+          )}
 
-          <button
-            type="button"
-            onClick={() => navigate('/termos-e-condicoes')}
-            style={{
-              width: '100%', marginTop: 10, background: 'transparent', border: `1px solid ${Colors.border}`,
-              borderRadius: Radius.md, padding: Space.md, color: Colors.textSecondary, fontWeight: 700, cursor: 'pointer',
-            }}
-          >
-            Ler termos e condições
-          </button>
+          {step === 3 && (
+            <>
+              <h3 style={{ marginTop: 0, marginBottom: Space.md, color: Colors.textPrimary }}>Credenciais</h3>
+              <div style={wrapperStyle}><input type="password" placeholder="Senha (min. 8, maiusc., minusc., numero, especial)" value={senha} onChange={e => setSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
+              <div style={wrapperStyle}><input type="password" placeholder="Confirmar senha" value={confirmaSenha} onChange={e => setConfirmaSenha(e.target.value)} disabled={loading} style={inputStyle} /></div>
+
+              {tipo === 'MEDICO' && (
+                <>
+                  <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Dados Profissionais</label>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: Space.md + 2 }}>
+                    <div style={{ ...wrapperStyle, flex: 2, marginBottom: 0 }}>
+                      <input placeholder="Numero CRM" value={crm} onChange={e => setCrm(e.target.value.replace(/\D/g, ''))} disabled={loading} inputMode="numeric" style={inputStyle} />
+                    </div>
+                    <div style={{ ...wrapperStyle, flex: 1, marginBottom: 0 }}>
+                      <input placeholder="UF" value={crmUf} onChange={e => setCrmUf(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))} disabled={loading} maxLength={2} style={inputStyle} />
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12, color: Colors.textMuted, display: 'block', marginTop: -8, marginBottom: 12 }}>
+                    Voce podera validar sua carteirinha CRM apos o cadastro.
+                  </span>
+                </>
+              )}
+            </>
+          )}
+
+          {step === 4 && (
+            <>
+              <h3 style={{ marginTop: 0, marginBottom: Space.md, color: Colors.textPrimary }}>Termos e privacidade</h3>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: Space.md }}>
+                <input type="checkbox" checked={aceitouTermos} onChange={e => setAceitouTermos(e.target.checked)} disabled={loading} style={{ marginTop: 4, width: 18, height: 18 }} />
+                <div style={{ fontSize: Font.sm, color: Colors.textSecondary, lineHeight: '20px' }}>
+                  Li e aceito os <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>Termos de Uso</span>.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: Space.lg }}>
+                <input type="checkbox" checked={aceitouPrivacidade} onChange={e => setAceitouPrivacidade(e.target.checked)} disabled={loading} style={{ marginTop: 4, width: 18, height: 18 }} />
+                <div style={{ fontSize: Font.sm, color: Colors.textSecondary, lineHeight: '20px' }}>
+                  Li e aceito a <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>Política de Privacidade</span>.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => navigate('/termos-e-condicoes')}
+                style={{ width: '100%', marginBottom: Space.md, background: 'transparent', border: `1px solid ${Colors.border}`, borderRadius: Radius.md, padding: Space.md, color: Colors.textSecondary, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Ler termos e condições
+              </button>
+            </>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: Space.md }}>
+            <button
+              onClick={handleBack}
+              disabled={loading || step === 1}
+              style={{
+                flex: 1,
+                backgroundColor: Colors.inputBg,
+                borderRadius: Radius.md,
+                padding: Space.lg,
+                border: `1px solid ${Colors.border}`,
+                cursor: loading || step === 1 ? 'not-allowed' : 'pointer',
+                color: Colors.textSecondary,
+                fontWeight: 700,
+                opacity: step === 1 ? 0.5 : 1,
+              }}
+            >
+              Voltar
+            </button>
+
+            {step < 4 ? (
+              <button
+                onClick={handleNext}
+                disabled={loading}
+                style={{
+                  flex: 2,
+                  backgroundColor: Colors.primary,
+                  borderRadius: Radius.md,
+                  padding: Space.lg,
+                  border: 'none',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  color: '#fff',
+                  fontWeight: 700,
+                }}
+              >
+                Continuar
+              </button>
+            ) : (
+              <button
+                onClick={handleSignup}
+                disabled={loading}
+                style={{
+                  flex: 2,
+                  backgroundColor: Colors.primary,
+                  borderRadius: Radius.md,
+                  padding: Space.lg,
+                  border: 'none',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  color: '#fff',
+                  fontWeight: 700,
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                {loading ? 'Cadastrando...' : 'Finalizar cadastro'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: Space.xl }}>

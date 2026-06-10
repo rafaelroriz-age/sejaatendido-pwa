@@ -93,6 +93,8 @@ export interface RegisterRequest {
   email: string;
   cpf?: string;
   telefone?: string;
+  aceitouTermos?: boolean;
+  aceitouPrivacidade?: boolean;
   senha: string;
   tipo: 'PACIENTE' | 'MEDICO';
 }
@@ -169,6 +171,7 @@ export async function resendConfirmEmailRequest(): Promise<void> {
 // CRM
 export interface CrmStatusResponse {
   crmCartaoValidado: boolean;
+  status?: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | string;
   crmNumero?: string;
   crmUf?: string;
 }
@@ -663,6 +666,35 @@ export async function savePreferenciasNotificacao(_data: PreferenciasNotificacao
     window.localStorage.setItem('@notificationPreferences', JSON.stringify(_data));
   } catch {
     // ignore local persistence failures
+  }
+}
+
+export interface WhatsappTestResponse {
+  ok: boolean;
+  mensagem?: string;
+}
+
+export async function testarNotificacaoWhatsapp(): Promise<WhatsappTestResponse> {
+  const res = await api.post('/notificacoes/whatsapp-test');
+  return {
+    ok: Boolean(res.data?.ok ?? true),
+    mensagem: res.data?.mensagem ?? res.data?.message,
+  };
+}
+
+export interface Frontend404Telemetry {
+  route: string;
+  host: string;
+  expectedHost?: string;
+  userAgent: string;
+  occurredAt: string;
+}
+
+export async function sendFrontend404Telemetry(data: Frontend404Telemetry): Promise<void> {
+  try {
+    await api.post('/telemetria/frontend-404', data);
+  } catch {
+    // telemetry endpoint is optional; don't break UX
   }
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { cancelConsulta, fetchMinhasConsultas, Consulta } from '../services/api';
+import { cancelConsulta, fetchMinhasConsultas, Consulta, testarNotificacaoWhatsapp } from '../services/api';
 import { clearAuthSession, getUser } from '../storage/localStorage';
 import { handleApiError } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [testingWhatsapp, setTestingWhatsapp] = useState(false);
   const [userName, setUserName] = useState('');
 
   useEffect(() => { loadData(); loadUserName(); }, []);
@@ -72,6 +73,22 @@ export default function Dashboard() {
     navigate('/login', { replace: true });
   }
 
+  async function handleTestarWhatsapp() {
+    setTestingWhatsapp(true);
+    try {
+      const res = await testarNotificacaoWhatsapp();
+      if (res.ok) {
+        window.alert(res.mensagem || 'Mensagem de teste enviada no WhatsApp com sucesso.');
+      } else {
+        window.alert(res.mensagem || 'Não foi possível enviar a mensagem de teste agora. Tente novamente em instantes.');
+      }
+    } catch (error) {
+      window.alert(`Falha ao testar WhatsApp.\n${handleApiError(error)}`);
+    } finally {
+      setTestingWhatsapp(false);
+    }
+  }
+
   function formatDate(dateString: string | undefined) {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('pt-BR', {
@@ -86,6 +103,7 @@ export default function Dashboard() {
     { label: 'Agendar\nConsulta', icon: '+', bg: Colors.accent, path: '/book' },
     { label: 'Meu\nPerfil', icon: '👤', bg: Colors.adminLight, path: '/profile' },
     { label: 'Chat', icon: '💬', bg: Colors.infoLight, path: '/chat' },
+    { label: testingWhatsapp ? 'Enviando...' : 'Testar\nWhatsApp', icon: '🟢', bg: Colors.successLight, onClick: handleTestarWhatsapp },
   ];
 
   return (
@@ -134,11 +152,12 @@ export default function Dashboard() {
         <h3 style={{ fontSize: Font.lg - 2, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.md, letterSpacing: -0.3 }}>Ações Rápidas</h3>
         <div style={{ display: 'flex', gap: 10, marginBottom: Space.xl }}>
           {actions.map(a => (
-            <div key={a.path} onClick={() => navigate(a.path)}
+            <div key={a.path ?? a.label} onClick={() => (a as any).onClick ? (a as any).onClick() : navigate((a as any).path)}
               style={{
                 flex: 1, backgroundColor: Colors.card, borderRadius: Radius.lg,
                 padding: '18px 8px', textAlign: 'center', cursor: 'pointer',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+                opacity: testingWhatsapp && (a as any).onClick ? 0.7 : 1,
               }}
             >
               <div style={{ width: 48, height: 48, borderRadius: Radius.md, backgroundColor: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontSize: 24 }}>{a.icon}</div>

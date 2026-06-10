@@ -14,6 +14,15 @@ export default function DoctorDashboard() {
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
   const [crmValidado, setCrmValidado] = useState<boolean | null>(null);
+  const [statusAprovacao, setStatusAprovacao] = useState<'PENDENTE' | 'APROVADO' | 'REJEITADO' | null>(null);
+
+  function mapStatusAprovacao(crm: any): 'PENDENTE' | 'APROVADO' | 'REJEITADO' {
+    const explicitStatus = String(crm?.status ?? '').toUpperCase();
+    if (explicitStatus.includes('REJEIT')) return 'REJEITADO';
+    if (explicitStatus.includes('APROV') || explicitStatus.includes('ATIVO')) return 'APROVADO';
+    if (explicitStatus.includes('PEND')) return 'PENDENTE';
+    return crm?.crmCartaoValidado ? 'APROVADO' : 'PENDENTE';
+  }
 
   useEffect(() => {
     async function loadData() {
@@ -24,8 +33,15 @@ export default function DoctorDashboard() {
         setConsultas(consultasData);
         // Fetch CRM status independently (don't block main load on failure)
         fetchCrmStatus()
-          .then(s => setCrmValidado(s.crmCartaoValidado))
-          .catch(() => setCrmValidado(userData?.crmCartaoValidado ?? null));
+          .then(s => {
+            setCrmValidado(s.crmCartaoValidado);
+            setStatusAprovacao(mapStatusAprovacao(s));
+          })
+          .catch(() => {
+            const fallback = userData?.crmCartaoValidado ?? null;
+            setCrmValidado(fallback);
+            setStatusAprovacao(fallback ? 'APROVADO' : 'PENDENTE');
+          });
       } catch (error) {
         showErrorAlert(error, 'Erro ao carregar consultas do médico');
       } finally {
@@ -95,9 +111,16 @@ export default function DoctorDashboard() {
             padding: `${Space.sm}px ${Space.lg}px`, color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
           }}>Sair</button>
         </div>
+
+        <div style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: Radius.full, backgroundColor: statusAprovacao === 'APROVADO' ? Colors.successLight : statusAprovacao === 'REJEITADO' ? Colors.errorLight : Colors.warningLight }}>
+          <span style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusAprovacao === 'APROVADO' ? Colors.success : statusAprovacao === 'REJEITADO' ? Colors.error : Colors.warning }} />
+          <span style={{ fontSize: 12, fontWeight: 800, color: statusAprovacao === 'APROVADO' ? Colors.success : statusAprovacao === 'REJEITADO' ? Colors.error : Colors.warning }}>
+            Status: {statusAprovacao ?? 'PENDENTE'}
+          </span>
+        </div>
       </div>
 
-      {crmValidado === false && (
+      {(statusAprovacao === 'PENDENTE' || crmValidado === false) && (
         <div
           onClick={() => navigate('/crm-validation')}
           style={{
@@ -118,6 +141,13 @@ export default function DoctorDashboard() {
             <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Valide sua carteirinha para receber pacientes. Toque aqui.</div>
           </div>
           <span style={{ fontSize: 18, color: '#856404' }}>›</span>
+        </div>
+      )}
+
+      {statusAprovacao === 'REJEITADO' && (
+        <div style={{ margin: '12px 20px 0', backgroundColor: Colors.errorLight, border: `1px solid ${Colors.error}`, borderRadius: Radius.md, padding: '12px 16px' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: Colors.error }}>Seu CRM foi rejeitado</div>
+          <div style={{ fontSize: 12, color: Colors.error, marginTop: 4 }}>Revise seus dados e envie uma nova validação.</div>
         </div>
       )}
 

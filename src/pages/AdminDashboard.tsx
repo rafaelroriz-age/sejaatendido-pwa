@@ -114,6 +114,50 @@ export default function AdminDashboard() {
     window.alert(`${aprovados} médico(s) aprovado(s) com sucesso!`);
   }
 
+  function hasCrmValidado(m: AdminMedico): boolean {
+    const anyM = m as any;
+    const status = String(anyM?.status ?? '').toUpperCase();
+    if (anyM?.crmCartaoValidado === true) return true;
+    if (anyM?.crmValidado === true) return true;
+    if (anyM?.usuario?.crmCartaoValidado === true) return true;
+    if (status.includes('CRM_VALIDADO') || status.includes('VALIDADO')) return true;
+    return false;
+  }
+
+  async function handleAutoAprovarCrmValidado() {
+    const candidatos = pendentes.filter(hasCrmValidado);
+    if (candidatos.length === 0) {
+      window.alert('Nenhum médico pendente com CRM validado encontrado.');
+      return;
+    }
+    if (!window.confirm(`Autoaprovar ${candidatos.length} médico(s) com CRM validado?`)) return;
+
+    setActionId('__crm__');
+    let aprovados = 0;
+    for (const m of candidatos) {
+      try {
+        await aprovarMedico(m.id);
+        aprovados++;
+      } catch {
+        // ignore individual failures and continue
+      }
+    }
+
+    if (aprovados > 0) {
+      setPendentes(prev => prev.filter(m => !candidatos.some(c => c.id === m.id)));
+      if (stats) {
+        setStats({
+          ...stats,
+          medicosPendentes: Math.max(0, stats.medicosPendentes - aprovados),
+          medicosAprovados: stats.medicosAprovados + aprovados,
+        });
+      }
+    }
+
+    setActionId(null);
+    window.alert(`${aprovados} médico(s) autoaprovado(s) por CRM validado.`);
+  }
+
   async function handleAprovar(id: string) {
     if (!window.confirm('Aprovar este médico? Um email será enviado automaticamente.')) return;
     setActionId(id);
@@ -240,6 +284,13 @@ export default function AdminDashboard() {
               pendentes.length === 0
                 ? <EmptyState title="Nenhum pendente" subtitle="Nenhum médico aguardando aprovação" />
                 : <>
+                  <button
+                    disabled={actionId === '__crm__'}
+                    onClick={handleAutoAprovarCrmValidado}
+                    style={{ width: '100%', backgroundColor: Colors.info, borderRadius: Radius.md, padding: 14, border: 'none', color: '#fff', fontSize: 15, fontWeight: 800, cursor: actionId === '__crm__' ? 'not-allowed' : 'pointer', marginBottom: Space.sm, opacity: actionId === '__crm__' ? 0.6 : 1 }}
+                  >
+                    {actionId === '__crm__' ? 'Processando...' : 'Autoaprovar CRM validado'}
+                  </button>
                   {pendentes.length > 1 && (
                     <button
                       disabled={actionId === '__all__'}

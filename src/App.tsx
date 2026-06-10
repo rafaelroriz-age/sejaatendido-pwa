@@ -27,6 +27,7 @@ import PaymentPending from './pages/PaymentPending';
 import PaymentFailure from './pages/PaymentFailure';
 import DoctorSchedule from './pages/DoctorSchedule';
 import TermsConditions from './pages/TermsConditions';
+import NotFound from './pages/NotFound';
 
 type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
 
@@ -148,8 +149,8 @@ export default function App() {
         <Route path="/crm-validation" element={<ProtectedRoute allow={['MEDICO']}><CrmValidation /></ProtectedRoute>} />
         <Route path="/doctor/schedule" element={<ProtectedRoute allow={['MEDICO']}><DoctorSchedule /></ProtectedRoute>} />
 
-        {/* Default redirect */}
-        <Route path="*" element={<Navigate to={initialRoute} replace />} />
+        {/* 404 fallback with telemetry */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
