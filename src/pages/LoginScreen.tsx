@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginRequest, loginCpfRequest, loginGoogleRequest } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
@@ -12,7 +12,7 @@ declare global {
       accounts: {
         id: {
           initialize: (config: Record<string, unknown>) => void;
-          renderButton: (el: HTMLElement, config: Record<string, unknown>) => void;
+          prompt: () => void;
         };
       };
     };
@@ -21,7 +21,9 @@ declare global {
 
 const LOGO_URL = `${import.meta.env.BASE_URL}logo-oficial.png`;
 const _rawGoogleId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-const GOOGLE_CLIENT_ID = _rawGoogleId && _rawGoogleId.endsWith('.apps.googleusercontent.com') && !_rawGoogleId.startsWith('seu-') ? _rawGoogleId : undefined;
+const GOOGLE_CLIENT_ID = _rawGoogleId?.trim() && !_rawGoogleId.trim().toLowerCase().startsWith('seu-')
+  ? _rawGoogleId.trim()
+  : undefined;
 
 function applyCpfMask(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -55,7 +57,7 @@ export default function LoginScreen() {
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const googleBtnRef = useRef<HTMLDivElement>(null);
+  const [googleReady, setGoogleReady] = useState(false);
 
   const navigateByRole = useCallback((tipo: string) => {
     switch (tipo) {
@@ -138,10 +140,13 @@ export default function LoginScreen() {
   }
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || !googleBtnRef.current || mode !== 'paciente') return;
+    if (!GOOGLE_CLIENT_ID || mode !== 'paciente') {
+      setGoogleReady(false);
+      return;
+    }
 
     function tryRender() {
-      if (!window.google?.accounts?.id || !googleBtnRef.current) return false;
+      if (!window.google?.accounts?.id) return false;
 
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
@@ -159,15 +164,7 @@ export default function LoginScreen() {
         },
       });
 
-      window.google.accounts.id.renderButton(googleBtnRef.current, {
-        type: 'standard',
-        shape: 'rectangular',
-        theme: 'outline',
-        size: 'large',
-        text: 'continue_with',
-        width: googleBtnRef.current.offsetWidth,
-        locale: 'pt-BR',
-      });
+      setGoogleReady(true);
       return true;
     }
 
@@ -178,6 +175,15 @@ export default function LoginScreen() {
       return () => clearInterval(interval);
     }
   }, [navigateByRole, mode]);
+
+  function handleGoogleLogin() {
+    if (!googleReady || !window.google?.accounts?.id) {
+      setErrorMsg('Login com Google indisponivel no momento. Tente novamente em instantes.');
+      return;
+    }
+    setErrorMsg('');
+    window.google.accounts.id.prompt();
+  }
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: Space.lg, fontSize: Font.md,
@@ -310,7 +316,7 @@ export default function LoginScreen() {
             </span>
           </div>
 
-          {GOOGLE_CLIENT_ID && mode === 'paciente' && (
+          {mode === 'paciente' && (
             <>
               <div style={{
                 display: 'flex', alignItems: 'center', margin: `${Space.lg}px 0`,
@@ -320,7 +326,36 @@ export default function LoginScreen() {
                 <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>ou</span>
                 <div style={{ flex: 1, height: 1, backgroundColor: Colors.border }} />
               </div>
-              <div ref={googleBtnRef} style={{ width: '100%' }} />
+
+              <button
+                onClick={handleGoogleLogin}
+                disabled={loading || !GOOGLE_CLIENT_ID || !googleReady}
+                style={{
+                  width: '100%',
+                  borderRadius: Radius.md,
+                  padding: `${Space.md + 2}px ${Space.lg}px`,
+                  border: `1px solid ${Colors.border}`,
+                  backgroundColor: '#fff',
+                  color: '#1f1f1f',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  fontSize: Font.md,
+                  fontWeight: 700,
+                  cursor: loading || !GOOGLE_CLIENT_ID || !googleReady ? 'not-allowed' : 'pointer',
+                  opacity: loading || !GOOGLE_CLIENT_ID || !googleReady ? 0.6 : 1,
+                }}
+              >
+                <span style={{ fontSize: 18, lineHeight: 1 }}>G</span>
+                <span>Entrar com Google</span>
+              </button>
+
+              {!GOOGLE_CLIENT_ID && (
+                <span style={{ display: 'block', marginTop: Space.sm, color: Colors.textMuted, fontSize: Font.sm - 1, textAlign: 'center' }}>
+                  Configure o VITE_GOOGLE_CLIENT_ID para habilitar o login social.
+                </span>
+              )}
             </>
           )}
         </div>
