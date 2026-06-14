@@ -1,17 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { fetchMedicos, createConsulta, fetchDisponibilidadeMedico, Medico } from '../services/api';
+import { fetchMedicos, createConsulta, fetchDisponibilidadeMedico, fetchMinhasConsultas, Medico } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 
 // Fallback slots when doctor has no configured availability (backward compat)
-const FALLBACK_TIME_SLOTS = [
-  '08:00','08:30','09:00','09:30','10:00','10:30',
-  '11:00','11:30','13:00','13:30','14:00','14:30',
-  '15:00','15:30','16:00','16:30','17:00','17:30',
-];
+const FALLBACK_TIME_SLOTS = (() => {
+  const slots: string[] = [];
+  for (let hour = 6; hour <= 23; hour += 1) {
+    slots.push(`${String(hour).padStart(2, '0')}:00`);
+    slots.push(`${String(hour).padStart(2, '0')}:30`);
+  }
+  slots.push('00:00');
+  return slots;
+})();
 
 /** Format a slot for display. Slots from API are ISO timestamps; fallbacks are "HH:MM". */
 function formatSlotDisplay(slot: string): string {
@@ -50,6 +54,14 @@ function parseSlotDate(selectedDate: string, slot: string): Date {
   const [year, month, day] = selectedDate.split('-').map(Number);
   const [hour, minute] = slot.split(':').map(Number);
   return new Date(year, (month - 1), day, hour, minute, 0, 0);
+}
+
+function areDatesClose(a?: string, b?: string, toleranceMinutes = 3): boolean {
+  if (!a || !b) return false;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return false;
+  return Math.abs(ta - tb) <= toleranceMinutes * 60 * 1000;
 }
 
 export default function BookAppointment() {
@@ -97,6 +109,19 @@ export default function BookAppointment() {
     loadDisponibilidade();
   }, [selectedMedico, selectedDate]);
 
+  async function findRecentlyCreatedConsulta(expectedIso: string, medicoIds: string[]) {
+    try {
+      const consultas = await fetchMinhasConsultas();
+      return consultas.find((c) => {
+        const consultaMedicoId = String(c.medicoId ?? c.medico?.id ?? c.medico?.usuarioId ?? '');
+        return medicoIds.includes(consultaMedicoId)
+          && areDatesClose(c.dataHora ?? c.data, expectedIso);
+      }) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async function handleConfirm() {
     if (!selectedMedico || !selectedDate || !selectedTime) { window.alert('Selecione médico, data e horário'); return; }
     if (availableSlots.length > 0 && !availableSlots.includes(selectedTime)) { window.alert('Este horário não está mais disponível. Escolha outro.'); return; }
@@ -139,7 +164,12 @@ export default function BookAppointment() {
       }
 
       if (!consulta) {
-        throw lastError ?? new Error('Não foi possível criar consulta para o médico selecionado.');
+        const maybeCreated = await findRecentlyCreatedConsulta(dataHora, candidateIds);
+        if (maybeCreated) {
+          consulta = maybeCreated;
+        } else {
+          throw lastError ?? new Error('Não foi possível criar consulta para o médico selecionado.');
+        }
       }
 
       navigate('/payment', { state: { consultaId: consulta.id, valor: consulta.valor } });
@@ -154,6 +184,11 @@ export default function BookAppointment() {
           return;
         }
         if (status === 409) {
+          const maybeCreated = await findRecentlyCreatedConsulta(dataHora, getMedicoCandidateIds(selectedMedico));
+          if (maybeCreated) {
+            navigate('/payment', { state: { consultaId: maybeCreated.id, valor: maybeCreated.valor } });
+            return;
+          }
           window.alert('Conflito de agenda: o horário acabou de ser ocupado. Escolha outro slot.');
           setSelectedTime(null);
           if (selectedMedico && selectedDate) {

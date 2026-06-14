@@ -467,7 +467,7 @@ function extractConsultas(payload: any): Consulta[] {
 }
 
 export async function fetchMinhasConsultas(): Promise<Consulta[]> {
-  const endpoints = ['/consultas', '/pacientes/me/consultas'];
+  const endpoints = ['/pacientes/me/consultas', '/consultas'];
   let lastError: unknown;
   for (const endpoint of endpoints) {
     try {
@@ -475,7 +475,7 @@ export async function fetchMinhasConsultas(): Promise<Consulta[]> {
       return extractConsultas(r.data);
     } catch (error) {
       const status = (error as any)?.response?.status;
-      if (status === 404) {
+      if (status === 403 || status === 404 || status === 405) {
         lastError = error;
         continue;
       }
@@ -507,7 +507,7 @@ export async function fetchConsultasMedico(): Promise<Consulta[]> {
 }
 
 export async function createConsulta(data: CreateConsultaRequest): Promise<Consulta> {
-  const endpoints = ['/consultas', '/pacientes/consultas'];
+  const endpoints = ['/pacientes/consultas', '/consultas'];
   let lastError: unknown;
   for (const endpoint of endpoints) {
     try {
@@ -515,7 +515,7 @@ export async function createConsulta(data: CreateConsultaRequest): Promise<Consu
       return normalizeConsulta(r.data?.consulta ?? r.data);
     } catch (error) {
       const status = (error as any)?.response?.status;
-      if (status === 404) {
+      if (status === 403 || status === 404 || status === 405) {
         lastError = error;
         continue;
       }
