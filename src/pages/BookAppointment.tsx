@@ -38,6 +38,20 @@ function getMedicoCandidateIds(m: Medico): string[] {
   return [...new Set(candidates)];
 }
 
+function toLocalDateIso(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseSlotDate(selectedDate: string, slot: string): Date {
+  if (slot.includes('T')) return new Date(slot);
+  const [year, month, day] = selectedDate.split('-').map(Number);
+  const [hour, minute] = slot.split(':').map(Number);
+  return new Date(year, (month - 1), day, hour, minute, 0, 0);
+}
+
 export default function BookAppointment() {
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -50,7 +64,12 @@ export default function BookAppointment() {
   const [submitting, setSubmitting] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
-  const dates = Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i + 1); return d; });
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
 
   useEffect(() => {
     fetchMedicos().then(setMedicos).catch(e => showErrorAlert(e, 'Erro ao carregar médicos')).finally(() => setLoading(false));
@@ -82,14 +101,20 @@ export default function BookAppointment() {
     if (!selectedMedico || !selectedDate || !selectedTime) { window.alert('Selecione médico, data e horário'); return; }
     if (availableSlots.length > 0 && !availableSlots.includes(selectedTime)) { window.alert('Este horário não está mais disponível. Escolha outro.'); return; }
 
+    const selectedSlotDate = parseSlotDate(selectedDate, selectedTime);
+    if (selectedSlotDate.getTime() <= Date.now()) {
+      window.alert('Selecione um horário futuro para concluir o agendamento.');
+      return;
+    }
+
     // Build ISO dataHora: API slots are already ISO; fallback slots are "HH:MM"
     let dataHora: string;
     if (selectedTime.includes('T')) {
       dataHora = selectedTime;
     } else {
-      const dateObj = new Date(selectedDate);
       const [h, m] = selectedTime.split(':');
-      dateObj.setHours(parseInt(h), parseInt(m), 0, 0);
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const dateObj = new Date(year, (month - 1), day, parseInt(h), parseInt(m), 0, 0);
       dataHora = dateObj.toISOString();
     }
 
@@ -209,7 +234,7 @@ export default function BookAppointment() {
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
           {dates.map(d => {
             const f = formatDateShort(d);
-            const iso = d.toISOString().split('T')[0];
+            const iso = toLocalDateIso(d);
             const sel = selectedDate === iso;
             return (
               <div key={iso} onClick={() => setSelectedDate(iso)}
@@ -234,8 +259,10 @@ export default function BookAppointment() {
         ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {(availableSlots.length > 0 ? availableSlots : FALLBACK_TIME_SLOTS).map(slot => {
+            const slotDate = selectedDate ? parseSlotDate(selectedDate, slot) : null;
+            const isFutureSlot = slotDate ? slotDate.getTime() > Date.now() : false;
             const enabled = !selectedMedico || !selectedDate ? false
-              : availableSlots.length === 0 || availableSlots.includes(slot);
+              : (availableSlots.length === 0 || availableSlots.includes(slot)) && isFutureSlot;
             const sel = selectedTime === slot;
             return (
               <div key={slot} onClick={() => enabled && setSelectedTime(slot)}
