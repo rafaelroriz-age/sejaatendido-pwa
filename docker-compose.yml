@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     ports:
       - "3000:80"
     restart: unless-stopped

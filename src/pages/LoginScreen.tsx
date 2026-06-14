@@ -359,7 +359,7 @@ export default function LoginScreen() {
               {!GOOGLE_CLIENT_ID && (
                 <div style={{ marginTop: Space.sm }}>
                   <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>
-                    Login Google indisponível: configure o VITE_GOOGLE_CLIENT_ID.
+                    Login Google indisponível: configure VITE_GOOGLE_CLIENT_ID no build do frontend.
                   </span>
                 </div>
               )}
