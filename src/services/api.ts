@@ -733,20 +733,104 @@ export interface PreferenciasNotificacao {
   prescricoes?: boolean;
 }
 
+const NOTIFICATION_PREFS_STORAGE_KEY = '@notificationPreferences';
+
+function normalizePhoneDigits(value?: string): string | undefined {
+  if (!value) return undefined;
+  const digits = value.replace(/\D/g, '');
+  return digits.length >= 10 ? digits : undefined;
+}
+
+function normalizePreferenciasNotificacaoPayload(raw: any): PreferenciasNotificacao | null {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    pushEnabled: raw.pushEnabled ?? raw.push_enabled,
+    emailEnabled: raw.emailEnabled ?? raw.email_enabled,
+    whatsappEnabled: raw.whatsappEnabled ?? raw.whatsapp_enabled,
+    whatsappNumber: raw.whatsappNumber ?? raw.whatsapp_number ?? raw.whatsapp ?? raw.telefone,
+    confirmacaoAgendamento: raw.confirmacaoAgendamento ?? raw.confirmacao_agendamento,
+    lembrete24h: raw.lembrete24h ?? raw.lembrete_24h,
+    lembrete1h: raw.lembrete1h ?? raw.lembrete_1h,
+    cancelamentos: raw.cancelamentos,
+    prescricoes: raw.prescricoes,
+  };
+}
+
 export async function fetchPreferenciasNotificacao(): Promise<PreferenciasNotificacao | null> {
+  const endpoints = [
+    '/usuarios/me/preferencias-notificacao',
+    '/usuarios/me/notificacoes/preferencias',
+    '/notificacoes/preferencias',
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await api.get(endpoint, { timeout: 15000 });
+      const parsed = normalizePreferenciasNotificacaoPayload(res.data?.preferencias ?? res.data);
+      if (parsed && typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem(NOTIFICATION_PREFS_STORAGE_KEY, JSON.stringify(parsed));
+        } catch {
+          // ignore local persistence failures
+        }
+      }
+      if (parsed) return parsed;
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404 || status === 405) continue;
+      break;
+    }
+  }
+
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem('@notificationPreferences');
+    const raw = window.localStorage.getItem(NOTIFICATION_PREFS_STORAGE_KEY);
     return raw ? JSON.parse(raw) as PreferenciasNotificacao : null;
   } catch {
     return null;
   }
 }
 
-export async function savePreferenciasNotificacao(_data: PreferenciasNotificacao): Promise<void> {
+export async function savePreferenciasNotificacao(data: PreferenciasNotificacao): Promise<void> {
+  const payload = {
+    pushEnabled: data.pushEnabled,
+    emailEnabled: data.emailEnabled,
+    whatsappEnabled: data.whatsappEnabled,
+    whatsappNumber: normalizePhoneDigits(data.whatsappNumber),
+    confirmacaoAgendamento: data.confirmacaoAgendamento,
+    lembrete24h: data.lembrete24h,
+    lembrete1h: data.lembrete1h,
+    cancelamentos: data.cancelamentos,
+    prescricoes: data.prescricoes,
+  };
+
+  const endpoints = [
+    '/usuarios/me/preferencias-notificacao',
+    '/usuarios/me/notificacoes/preferencias',
+    '/notificacoes/preferencias',
+  ];
+
+  let shouldThrow = false;
+  for (const endpoint of endpoints) {
+    try {
+      await api.put(endpoint, payload, { timeout: 15000 });
+      shouldThrow = false;
+      break;
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404 || status === 405) continue;
+      shouldThrow = true;
+      break;
+    }
+  }
+
+  if (shouldThrow) {
+    throw new Error('Não foi possível salvar preferências de notificação no backend.');
+  }
+
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem('@notificationPreferences', JSON.stringify(_data));
+    window.localStorage.setItem(NOTIFICATION_PREFS_STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // ignore local persistence failures
   }
@@ -757,17 +841,26 @@ export interface WhatsappTestResponse {
   mensagem?: string;
 }
 
-export async function testarNotificacaoWhatsapp(): Promise<WhatsappTestResponse> {
+export async function testarNotificacaoWhatsapp(whatsappNumber?: string): Promise<WhatsappTestResponse> {
   const endpoints = [
     '/notificacoes/whatsapp-test',
     '/notificacoes/whatsapp/teste',
     '/usuarios/me/notificacoes/whatsapp/teste',
   ];
 
+  const normalizedPhone = normalizePhoneDigits(whatsappNumber);
+  const payload = normalizedPhone
+    ? {
+        whatsappNumber: normalizedPhone,
+        telefone: normalizedPhone,
+        numero: normalizedPhone,
+      }
+    : {};
+
   let lastError: unknown;
   for (const endpoint of endpoints) {
     try {
-      const res = await api.post(endpoint, {}, { timeout: 30000 });
+      const res = await api.post(endpoint, payload, { timeout: 30000 });
       return {
         ok: Boolean(res.data?.ok ?? true),
         mensagem: res.data?.mensagem ?? res.data?.message,

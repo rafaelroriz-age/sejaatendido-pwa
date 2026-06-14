@@ -113,10 +113,10 @@ export default function NotificationPreferences() {
     }
     setTestingWhatsapp(true);
     try {
-      const result = await testarNotificacaoWhatsapp();
+      const result = await testarNotificacaoWhatsapp(prefs.whatsappNumber);
       window.alert(result.mensagem ?? 'Mensagem de teste enviada! Verifique seu WhatsApp.');
     } catch {
-      window.alert('Não foi possível enviar a mensagem de teste. Verifique se o backend está ativo e tente novamente.');
+      window.alert('Não foi possível enviar a mensagem de teste. Verifique número, integração WhatsApp no backend e tente novamente.');
     } finally {
       setTestingWhatsapp(false);
     }
