@@ -58,6 +58,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [googleReady, setGoogleReady] = useState(false);
+  const allowedGoogleRoles = new Set(['PACIENTE', 'ADMIN']);
 
   const navigateByRole = useCallback((tipo: string) => {
     switch (tipo) {
@@ -154,6 +155,10 @@ export default function LoginScreen() {
           setLoading(true);
           try {
             const { accessToken, usuario, refreshToken } = await loginGoogleRequest(response.credential);
+            if (!allowedGoogleRoles.has(usuario.tipo)) {
+              setErrorMsg('Login com Google disponível apenas para Paciente/Admin.');
+              return;
+            }
             await saveAuthSession(accessToken, usuario, refreshToken);
             navigateByRole(usuario.tipo);
           } catch (error) {

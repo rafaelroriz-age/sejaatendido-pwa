@@ -253,7 +253,7 @@ export default function LandingPage() {
           </div>
           <div style={s.featGrid}>
             {[
-              { icon: <IconCalendar />, title: 'Agendamento inteligente', desc: 'Escolha o médico, selecione data e horário entre 18 slots diários (08h às 17h30) e confirme em poucos toques.' },
+              { icon: <IconCalendar />, title: 'Agendamento inteligente', desc: 'Escolha o médico, selecione data e horário entre 18 slots diários (06h a 00h) e confirme em poucos toques.' },
               { icon: <IconChat />, title: 'Chat em tempo real', desc: 'Converse diretamente com seu médico antes e depois da consulta. Tire dúvidas sem sair do app.' },
               { icon: <IconPayment />, title: 'Pagamento via PIX e Cartão', desc: 'Pague sua consulta com PIX (QR Code ou copia e cola) ou cartão de crédito, com confirmação instantânea.' },
               { icon: <IconUsers />, title: 'Perfis verificados', desc: 'Todos os médicos passam por verificação de registro no conselho de classe antes de atender.' },
