@@ -217,7 +217,7 @@ export default function LoginScreen() {
                 fontWeight: 700, fontSize: Font.sm, cursor: 'pointer',
               }}
             >
-              {m === 'paciente' ? '👤 Paciente / Admin' : '🩺 Médico (CPF)'}
+              {m === 'paciente' ? 'Paciente / Admin' : 'Médico (CPF)'}
             </button>
           ))}
         </div>
@@ -316,7 +316,7 @@ export default function LoginScreen() {
             </span>
           </div>
 
-          {mode === 'paciente' && (
+          {GOOGLE_CLIENT_ID && mode === 'paciente' && (
             <>
               <div style={{
                 display: 'flex', alignItems: 'center', margin: `${Space.lg}px 0`,
@@ -350,12 +350,6 @@ export default function LoginScreen() {
                 <span style={{ fontSize: 18, lineHeight: 1 }}>G</span>
                 <span>Entrar com Google</span>
               </button>
-
-              {!GOOGLE_CLIENT_ID && (
-                <span style={{ display: 'block', marginTop: Space.sm, color: Colors.textMuted, fontSize: Font.sm - 1, textAlign: 'center' }}>
-                  Configure o VITE_GOOGLE_CLIENT_ID para habilitar o login social.
-                </span>
-              )}
             </>
           )}
         </div>
