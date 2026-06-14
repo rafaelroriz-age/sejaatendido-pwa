@@ -200,7 +200,7 @@ export interface Medico {
   valorConsulta?: number;
   status?: string;
   aprovado?: boolean;
-  usuario: { id: string; nome: string; email: string };
+  usuario: { id: string; nome: string; email: string; telefone?: string };
 }
 
 export interface MedicoListResponse {
@@ -214,6 +214,7 @@ function normalizeMedico(raw: any): Medico {
   const usuarioRaw = raw?.usuario ?? medicoRaw?.usuario ?? {};
   const nome = usuarioRaw?.nome ?? medicoRaw?.nome ?? raw?.nome ?? medicoRaw?.usuarioNome ?? raw?.usuarioNome ?? 'Médico';
   const email = usuarioRaw?.email ?? medicoRaw?.email ?? raw?.email ?? '';
+  const telefone = usuarioRaw?.telefone ?? medicoRaw?.telefone ?? raw?.telefone;
   const especialidades = Array.isArray(medicoRaw?.especialidades)
     ? medicoRaw.especialidades
     : medicoRaw?.especialidade
@@ -237,6 +238,7 @@ function normalizeMedico(raw: any): Medico {
       id: String(usuarioRaw?.id ?? medicoRaw?.usuarioId ?? raw?.usuarioId ?? medicoRaw?.id ?? raw?.id ?? ''),
       nome,
       email,
+      telefone,
     },
   };
 }
@@ -590,18 +592,18 @@ function normalizePagamentoResponse(res: any): PagamentoResponse {
 
 export async function criarPagamento(data: CriarPagamentoRequest): Promise<PagamentoResponse> {
   const metodo = data.metodoPagamento === 'card' ? 'cartao' : (data.metodoPagamento || 'pix');
-    const endpoint = metodo === 'pix' ? '/pagamentos/pix' : '/pagamentos/cartao';
-    const body: Record<string, unknown> = { consultaId: data.consultaId };
-    const r = await api.post(endpoint, body);
-    return normalizePagamentoResponse(r.data);
+  const endpoint = metodo === 'pix' ? '/v1/pagamentos/pix' : '/v1/pagamentos/cartao';
+  const body: Record<string, unknown> = { consultaId: data.consultaId };
+  const r = await api.post(endpoint, body);
+  return normalizePagamentoResponse(r.data);
 }
 
 export async function fetchPagamentoById(id: string): Promise<PagamentoResponse> {
-  return (await api.get(`/pagamentos/${id}`)).data;
+  return (await api.get(`/v1/pagamentos/${id}`)).data;
 }
 
 export async function syncPagamento(consultaId: string): Promise<PagamentoResponse> {
-  const r = await api.get(`/pagamentos/sync/${consultaId}`);
+  const r = await api.get(`/v1/pagamentos/sync/${consultaId}`);
   return normalizePagamentoResponse(r.data);
 }
 

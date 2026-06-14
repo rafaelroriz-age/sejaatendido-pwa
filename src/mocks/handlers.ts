@@ -11,6 +11,7 @@ const MOCK_PACIENTE = {
   id: 'paciente-001',
   nome: 'João Silva (Mock)',
   email: 'joao@mock.com',
+  telefone: '+5511988888888',
   tipo: 'PACIENTE' as const,
 };
 
@@ -18,6 +19,7 @@ const MOCK_MEDICO_USER = {
   id: 'medico-001',
   nome: 'Dra. Maria Santos (Mock)',
   email: 'maria@mock.com',
+  telefone: '+5511999999999',
   tipo: 'MEDICO' as const,
 };
 
@@ -34,21 +36,21 @@ const MOCK_MEDICOS = [
     crm: 'CRM/SP 12345',
     especialidades: ['Clínico Geral'],
     aprovado: true,
-    usuario: { id: 'usr-001', nome: 'Dr. Carlos Oliveira', email: 'carlos@mock.com' },
+    usuario: { id: 'usr-001', nome: 'Dr. Carlos Oliveira', email: 'carlos@mock.com', telefone: '+5511999991111' },
   },
   {
     id: 'med-002',
     crm: 'CRM/RJ 54321',
     especialidades: ['Cardiologia'],
     aprovado: true,
-    usuario: { id: 'usr-002', nome: 'Dra. Ana Costa', email: 'ana@mock.com' },
+    usuario: { id: 'usr-002', nome: 'Dra. Ana Costa', email: 'ana@mock.com', telefone: '+5511999992222' },
   },
   {
     id: 'med-003',
     crm: 'CRM/MG 99999',
     especialidades: ['Dermatologia'],
     aprovado: true,
-    usuario: { id: 'usr-003', nome: 'Dr. Pedro Lima', email: 'pedro@mock.com' },
+    usuario: { id: 'usr-003', nome: 'Dr. Pedro Lima', email: 'pedro@mock.com', telefone: '+5511999993333' },
   },
 ];
 
@@ -106,7 +108,7 @@ const MOCK_CONSULTAS_MEDICO = [
     status: 'CONFIRMADA',
     valor: 15000,
     meetLink: 'https://meet.google.com/mock-link',
-    paciente: { usuario: { nome: 'Maria Teste' } },
+    paciente: { usuario: { nome: 'Maria Teste', email: 'maria.teste@mock.com', telefone: '+5511988880000' } },
   },
 ];
 
@@ -133,7 +135,7 @@ const MOCK_REPASSES = {
       consulta: {
         id: 'consulta-002',
         data: tomorrow,
-        paciente: { usuario: { nome: 'Maria Teste' } },
+        paciente: { usuario: { nome: 'Maria Teste', email: 'maria.teste@mock.com', telefone: '+5511988880000' } },
       },
     },
   ],
@@ -152,7 +154,7 @@ const MOCK_REPASSE_DETAIL = {
       consulta: {
         id: 'consulta-002',
         data: tomorrow,
-        paciente: { usuario: { nome: 'Maria Teste' } },
+        paciente: { usuario: { nome: 'Maria Teste', email: 'maria.teste@mock.com', telefone: '+5511988880000' } },
       },
     },
   ],
@@ -172,7 +174,7 @@ const MOCK_MEDICOS_PENDENTES = [
     crm: 'CRM/SP 88888',
     especialidades: ['Pediatria'],
     aprovado: false,
-    usuario: { id: 'usr-pending', nome: 'Dr. Lucas Fernandes', email: 'lucas@mock.com' },
+    usuario: { id: 'usr-pending', nome: 'Dr. Lucas Fernandes', email: 'lucas@mock.com', telefone: '+5511999994444' },
   },
 ];
 
@@ -351,7 +353,7 @@ export const handlers = [
 
   // ── PAGAMENTOS ────────────────────────────────────────────────────────────
 
-  http.post(`${BASE}/pagamentos/pix`, async ({ request }) => {
+  http.post(`${BASE}/v1/pagamentos/pix`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const pixCode = '00020126580014BR.GOV.BCB.PIX0136mock-pix-key-para-testes';
     const pagId = `pag-${Date.now()}`;
@@ -373,7 +375,7 @@ export const handlers = [
     });
   }),
 
-  http.post(`${BASE}/pagamentos/cartao`, async ({ request }) => {
+  http.post(`${BASE}/v1/pagamentos/cartao`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const pagId = `pag-mp-${Date.now()}`;
     return HttpResponse.json({
@@ -394,7 +396,7 @@ export const handlers = [
     });
   }),
 
-  http.get(`${BASE}/pagamentos/sync/:consultaId`, () =>
+  http.get(`${BASE}/v1/pagamentos/sync/:consultaId`, () =>
     HttpResponse.json({ status: 'PENDENTE', pagamento: { id: 'pag-001', status: 'PENDENTE' } }),
   ),
 
