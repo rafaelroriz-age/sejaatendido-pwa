@@ -27,6 +27,9 @@ import PaymentPending from './pages/PaymentPending';
 import PaymentFailure from './pages/PaymentFailure';
 import DoctorSchedule from './pages/DoctorSchedule';
 import TermsConditions from './pages/TermsConditions';
+import TermsOfUse from './pages/TermsOfUse';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import Lgpd from './pages/Lgpd';
 import NotFound from './pages/NotFound';
 
 type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
@@ -127,6 +130,9 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/confirmar-email" element={<ConfirmEmail />} />
         <Route path="/termos-e-condicoes" element={<TermsConditions />} />
+        <Route path="/termos-de-uso" element={<TermsOfUse />} />
+        <Route path="/politica-de-privacidade" element={<PrivacyPolicy />} />
+        <Route path="/lgpd" element={<Lgpd />} />
         <Route path="/resetar-senha" element={<ResetPassword />} />
         <Route path="/esqueci-senha" element={<ForgotPassword />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />

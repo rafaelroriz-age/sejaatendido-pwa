@@ -4,6 +4,8 @@ import { registerRequest } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
+import LegalConsent, { LegalConsentErrors } from '../components/LegalConsent';
+import { LEGAL_PRIVACY_VERSION, LEGAL_TERMS_VERSION } from '../config/legal';
 
 type SignupStep = 1 | 2 | 3 | 4;
 
@@ -69,6 +71,7 @@ export default function SignupScreen() {
 
   const [aceitouTermos, setAceitouTermos] = useState(false);
   const [aceitouPrivacidade, setAceitouPrivacidade] = useState(false);
+  const [legalErrors, setLegalErrors] = useState<LegalConsentErrors>({});
 
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -116,10 +119,12 @@ export default function SignupScreen() {
     }
 
     if (current === 4) {
-      if (!aceitouTermos || !aceitouPrivacidade) {
-        window.alert('Você precisa aceitar os Termos e a Política de Privacidade para continuar.');
-        return false;
-      }
+      const nextErrors: LegalConsentErrors = {
+        termos: aceitouTermos ? undefined : 'Voce precisa aceitar os Termos e Condicoes de Uso.',
+        privacidade: aceitouPrivacidade ? undefined : 'Voce precisa aceitar a Politica de Privacidade.',
+      };
+      setLegalErrors(nextErrors);
+      if (nextErrors.termos || nextErrors.privacidade) return false;
       return true;
     }
 
@@ -151,6 +156,8 @@ export default function SignupScreen() {
         tipo,
         aceitouTermos,
         aceitouPrivacidade,
+        termosVersao: LEGAL_TERMS_VERSION,
+        privacidadeVersao: LEGAL_PRIVACY_VERSION,
       };
 
       const response = await registerRequest(payload);
@@ -293,32 +300,26 @@ export default function SignupScreen() {
           {step === 4 && (
             <>
               <h3 style={{ marginTop: 0, marginBottom: Space.md, color: Colors.textPrimary }}>Termos e privacidade</h3>
-
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: Space.md }}>
-                <input type="checkbox" checked={aceitouTermos} onChange={e => setAceitouTermos(e.target.checked)} disabled={loading} style={{ marginTop: 4, width: 18, height: 18 }} />
-                <div style={{ fontSize: Font.sm, color: Colors.textSecondary, lineHeight: '20px' }}>
-                  Li e aceito os <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>Termos de Uso</span>.
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: Space.lg }}>
-                <input type="checkbox" checked={aceitouPrivacidade} onChange={e => setAceitouPrivacidade(e.target.checked)} disabled={loading} style={{ marginTop: 4, width: 18, height: 18 }} />
-                <div style={{ fontSize: Font.sm, color: Colors.textSecondary, lineHeight: '20px' }}>
-                  Li e aceito a <span onClick={() => navigate('/termos-e-condicoes')} style={{ color: Colors.primary, fontWeight: 700, cursor: 'pointer' }}>Política de Privacidade</span>.
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => navigate('/termos-e-condicoes')}
-                style={{ width: '100%', marginBottom: Space.md, background: 'transparent', border: `1px solid ${Colors.border}`, borderRadius: Radius.md, padding: Space.md, color: Colors.textSecondary, fontWeight: 700, cursor: 'pointer' }}
-              >
-                Ler termos e condições
-              </button>
+              <LegalConsent
+                aceitouTermos={aceitouTermos}
+                aceitouPrivacidade={aceitouPrivacidade}
+                loading={loading}
+                termosVersao={LEGAL_TERMS_VERSION}
+                privacidadeVersao={LEGAL_PRIVACY_VERSION}
+                errors={legalErrors}
+                onChangeTermos={(value) => {
+                  setAceitouTermos(value);
+                  setLegalErrors(prev => ({ ...prev, termos: undefined }));
+                }}
+                onChangePrivacidade={(value) => {
+                  setAceitouPrivacidade(value);
+                  setLegalErrors(prev => ({ ...prev, privacidade: undefined }));
+                }}
+              />
             </>
           )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: Space.md }}>
+          <div style={{ display: 'flex', gap: 10, marginTop: Space.md, position: 'sticky', bottom: 0, backgroundColor: Colors.card, paddingTop: 10, paddingBottom: 4 }}>
             <button
               onClick={handleBack}
               disabled={loading || step === 1}

@@ -95,6 +95,8 @@ export interface RegisterRequest {
   telefone?: string;
   aceitouTermos?: boolean;
   aceitouPrivacidade?: boolean;
+  termosVersao?: string;
+  privacidadeVersao?: string;
   senha: string;
   tipo: 'PACIENTE' | 'MEDICO';
 }
