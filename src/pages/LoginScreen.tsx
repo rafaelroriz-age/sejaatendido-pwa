@@ -1,29 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loginRequest, loginCpfRequest, loginGoogleRequest } from '../services/api';
+import { loginRequest, loginCpfRequest } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import axios from 'axios';
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: Record<string, unknown>) => void;
-          prompt: () => void;
-        };
-      };
-    };
-  }
-}
-
 const LOGO_URL = `${import.meta.env.BASE_URL}logo-oficial.png`;
-const _rawGoogleId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-const GOOGLE_CLIENT_ID = _rawGoogleId?.trim() && !_rawGoogleId.trim().toLowerCase().startsWith('seu-')
-  ? _rawGoogleId.trim()
-  : undefined;
 
 function applyCpfMask(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -57,8 +40,6 @@ export default function LoginScreen() {
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [googleReady, setGoogleReady] = useState(false);
-  const allowedGoogleRoles = new Set(['PACIENTE', 'ADMIN']);
 
   const navigateByRole = useCallback((tipo: string) => {
     switch (tipo) {
@@ -138,56 +119,6 @@ export default function LoginScreen() {
   function handleSubmit() {
     if (mode === 'medico') handleLoginMedico();
     else handleLoginPaciente();
-  }
-
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID || mode !== 'paciente') {
-      setGoogleReady(false);
-      return;
-    }
-
-    function tryRender() {
-      if (!window.google?.accounts?.id) return false;
-
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: async (response: { credential: string }) => {
-          setLoading(true);
-          try {
-            const { accessToken, usuario, refreshToken } = await loginGoogleRequest(response.credential);
-            if (!allowedGoogleRoles.has(usuario.tipo)) {
-              setErrorMsg('Login com Google disponível apenas para Paciente/Admin.');
-              return;
-            }
-            await saveAuthSession(accessToken, usuario, refreshToken);
-            navigateByRole(usuario.tipo);
-          } catch (error) {
-            showErrorAlert(error, 'Erro ao fazer login com Google');
-          } finally {
-            setLoading(false);
-          }
-        },
-      });
-
-      setGoogleReady(true);
-      return true;
-    }
-
-    if (!tryRender()) {
-      const interval = setInterval(() => {
-        if (tryRender()) clearInterval(interval);
-      }, 200);
-      return () => clearInterval(interval);
-    }
-  }, [navigateByRole, mode]);
-
-  function handleGoogleLogin() {
-    if (!googleReady || !window.google?.accounts?.id) {
-      setErrorMsg('Login com Google indisponivel no momento. Tente novamente em instantes.');
-      return;
-    }
-    setErrorMsg('');
-    window.google.accounts.id.prompt();
   }
 
   const inputStyle: React.CSSProperties = {
@@ -320,51 +251,6 @@ export default function LoginScreen() {
               Esqueceu sua senha?
             </span>
           </div>
-
-          {mode === 'paciente' && (
-            <>
-              <div style={{
-                display: 'flex', alignItems: 'center', margin: `${Space.lg}px 0`,
-                gap: 12,
-              }}>
-                <div style={{ flex: 1, height: 1, backgroundColor: Colors.border }} />
-                <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>ou</span>
-                <div style={{ flex: 1, height: 1, backgroundColor: Colors.border }} />
-              </div>
-
-              <button
-                onClick={handleGoogleLogin}
-                disabled={loading || !GOOGLE_CLIENT_ID || !googleReady}
-                style={{
-                  width: '100%',
-                  borderRadius: Radius.md,
-                  padding: `${Space.md + 2}px ${Space.lg}px`,
-                  border: `1px solid ${Colors.border}`,
-                  backgroundColor: '#fff',
-                  color: '#1f1f1f',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10,
-                  fontSize: Font.md,
-                  fontWeight: 700,
-                  cursor: loading || !GOOGLE_CLIENT_ID || !googleReady ? 'not-allowed' : 'pointer',
-                  opacity: loading || !GOOGLE_CLIENT_ID || !googleReady ? 0.6 : 1,
-                }}
-              >
-                <span style={{ fontSize: 18, lineHeight: 1 }}>G</span>
-                <span>Entrar com Google</span>
-              </button>
-
-              {!GOOGLE_CLIENT_ID && (
-                <div style={{ marginTop: Space.sm }}>
-                  <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>
-                    Login Google indisponível: configure VITE_GOOGLE_CLIENT_ID no build do frontend.
-                  </span>
-                </div>
-              )}
-            </>
-          )}
         </div>
 
         <div style={{ textAlign: 'center', marginTop: Space.xl }}>
