@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Colors, { Font, Radius, Space } from '../theme/colors';
 import { LEGAL_CONTROLLER, LEGAL_EFFECTIVE_DATE, LEGAL_TERMS_VERSION } from '../config/legal';
+import { sendFrontendTelemetryEvent } from '../services/api';
 
 const cardStyle: React.CSSProperties = {
   backgroundColor: Colors.card,
@@ -28,6 +29,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function TermsOfUse() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    void sendFrontendTelemetryEvent('legal_terms_view', { version: LEGAL_TERMS_VERSION });
+  }, []);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg }}>

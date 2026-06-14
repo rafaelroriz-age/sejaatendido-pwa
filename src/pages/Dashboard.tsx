@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { cancelConsulta, fetchMinhasConsultas, Consulta, testarNotificacaoWhatsapp } from '../services/api';
+import { cancelConsulta, fetchMinhasConsultas, Consulta, sendFrontendTelemetryEvent, testarNotificacaoWhatsapp } from '../services/api';
 import { clearAuthSession, getUser } from '../storage/localStorage';
 import { handleApiError } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
@@ -53,14 +53,32 @@ export default function Dashboard() {
     return true;
   }
 
+  function classifyCancelFailure(error: unknown) {
+    if (!axios.isAxiosError(error)) return 'unknown';
+    const status = error.response?.status;
+    const message = String((error.response?.data as any)?.message ?? (error.response?.data as any)?.erro ?? '').toLowerCase();
+
+    if (status === 403 || message.includes('sem permissao') || message.includes('não tem permissão')) return 'sem_permissao';
+    if (status === 409 || message.includes('ja cancel') || message.includes('já cancel')) return 'consulta_ja_cancelada';
+    if (status === 422 || message.includes('24h') || message.includes('24 horas')) return 'regra_24h';
+    if (status === 400 && (message.includes('conclu') || message.includes('finaliz'))) return 'consulta_concluida';
+    return `http_${status ?? 'erro'}`;
+  }
+
   async function handleCancelConsulta(id: string) {
     if (!window.confirm('Deseja realmente cancelar esta consulta?')) return;
     setCancelingId(id);
+    void sendFrontendTelemetryEvent('consulta_cancel_attempt', { consultaId: id });
     try {
       await cancelConsulta(id);
       setConsultas(prev => prev.filter(c => c.id !== id));
+      void sendFrontendTelemetryEvent('consulta_cancel_success', { consultaId: id });
       window.alert('Consulta cancelada com sucesso.');
     } catch (error) {
+      void sendFrontendTelemetryEvent('consulta_cancel_failure', {
+        consultaId: id,
+        reason: classifyCancelFailure(error),
+      });
       window.alert(`Erro ao cancelar consulta\n${handleApiError(error)}`);
     } finally {
       setCancelingId(null);

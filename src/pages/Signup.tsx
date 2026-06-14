@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { registerRequest } from '../services/api';
+import { registerRequest, sendFrontendTelemetryEvent } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
@@ -147,6 +147,11 @@ export default function SignupScreen() {
     try {
       const rawCpf = cpf.replace(/\D/g, '');
       const rawTelefone = normalizePhone(telefone);
+      void sendFrontendTelemetryEvent('signup_legal_accepted', {
+        termosVersao: LEGAL_TERMS_VERSION,
+        privacidadeVersao: LEGAL_PRIVACY_VERSION,
+        tipoConta: tipo,
+      });
       const payload: Parameters<typeof registerRequest>[0] = {
         nome: nome.trim(),
         email: email.trim(),

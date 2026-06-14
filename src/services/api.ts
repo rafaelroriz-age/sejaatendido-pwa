@@ -800,6 +800,59 @@ export async function sendFrontend404Telemetry(data: Frontend404Telemetry): Prom
   }
 }
 
+export type FrontendTelemetryEventName =
+  | 'legal_terms_view'
+  | 'legal_privacy_view'
+  | 'signup_legal_accepted'
+  | 'consulta_cancel_attempt'
+  | 'consulta_cancel_success'
+  | 'consulta_cancel_failure';
+
+export interface FrontendTelemetryEvent {
+  event: FrontendTelemetryEventName;
+  context?: Record<string, unknown>;
+  occurredAt: string;
+  route: string;
+  userAgent: string;
+}
+
+export async function sendFrontendTelemetryEvent(
+  event: FrontendTelemetryEventName,
+  context?: Record<string, unknown>,
+): Promise<void> {
+  const payload: FrontendTelemetryEvent = {
+    event,
+    context,
+    occurredAt: new Date().toISOString(),
+    route: typeof window !== 'undefined' ? window.location.pathname : '',
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+  };
+
+  // Keep last telemetry events locally for QA/debug even when backend endpoint is unavailable.
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem('@frontendTelemetryEvents');
+      const current = raw ? (JSON.parse(raw) as FrontendTelemetryEvent[]) : [];
+      const next = [...current.slice(-19), payload];
+      window.localStorage.setItem('@frontendTelemetryEvents', JSON.stringify(next));
+    } catch {
+      // ignore local storage failures
+    }
+  }
+
+  const endpoints = ['/telemetria/eventos-frontend', '/telemetria/eventos', '/telemetry/events'];
+  for (const endpoint of endpoints) {
+    try {
+      await api.post(endpoint, payload, { timeout: 5000 });
+      return;
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404 || status === 405) continue;
+      return;
+    }
+  }
+}
+
 export interface PushTokenPayload {
   endpoint: string;
   keys?: { p256dh?: string; auth?: string };
