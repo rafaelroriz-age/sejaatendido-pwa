@@ -321,7 +321,7 @@ export default function LoginScreen() {
             </span>
           </div>
 
-          {GOOGLE_CLIENT_ID && mode === 'paciente' && (
+          {mode === 'paciente' && (
             <>
               <div style={{
                 display: 'flex', alignItems: 'center', margin: `${Space.lg}px 0`,
@@ -355,6 +355,14 @@ export default function LoginScreen() {
                 <span style={{ fontSize: 18, lineHeight: 1 }}>G</span>
                 <span>Entrar com Google</span>
               </button>
+
+              {!GOOGLE_CLIENT_ID && (
+                <div style={{ marginTop: Space.sm }}>
+                  <span style={{ fontSize: Font.sm - 1, color: Colors.textSecondary }}>
+                    Login Google indisponível: configure o VITE_GOOGLE_CLIENT_ID.
+                  </span>
+                </div>
+              )}
             </>
           )}
         </div>
