@@ -202,6 +202,7 @@ export default function DoctorDashboard() {
             { l: 'Agenda', icon: '📅', bg: Colors.doctorLight, path: '/doctor/schedule' },
             { l: 'Mensagens', icon: '💬', bg: Colors.accent, path: '/chat' },
             { l: 'Ganhos', icon: '💰', bg: Colors.successLight, path: '/earnings' },
+            { l: 'Conta', icon: '🏦', bg: '#E3F2FD', path: '/bank-details' },
             { l: 'Perfil', icon: '👤', bg: Colors.warningLight, path: '/profile' },
           ].map(a => (
             <div key={a.l} onClick={() => a.path && navigate(a.path)}

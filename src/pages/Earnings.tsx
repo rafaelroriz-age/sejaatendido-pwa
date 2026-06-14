@@ -4,6 +4,7 @@ import {
   fetchSaldoMedico,
   fetchRepasses,
   fetchConsultasMedico,
+  fetchDadosBancarios,
   SaldoMedico,
   Repasse,
   Consulta,
@@ -67,18 +68,21 @@ export default function Earnings() {
   const [repasses, setRepasses] = useState<Repasse[]>([]);
   const [consultasSemana, setConsultasSemana] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [semDadosBancarios, setSemDadosBancarios] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     try {
-      const [saldoData, repassesData, consultasData] = await Promise.all([
+      const [saldoData, repassesData, consultasData, dadosBancarios] = await Promise.all([
         fetchSaldoMedico().catch(() => ({ saldo_a_liberar: 0, saldo_pendente: 0, ganhos_hoje: 0, proximo_repasse: '', ganhos_semana: [0, 0, 0, 0, 0, 0, 0] })),
         fetchRepasses().catch(() => []),
         fetchConsultasMedico().catch(() => []),
+        fetchDadosBancarios().catch(() => null),
       ]);
       setSaldo(saldoData);
       setRepasses(repassesData);
+      setSemDadosBancarios(!dadosBancarios?.chavePix);
       // Filter to current ISO week
       const now = new Date();
       const startOfWeek = new Date(now);
@@ -166,6 +170,24 @@ export default function Earnings() {
         <span style={{ color: '#fff', fontSize: Font.lg - 2, fontWeight: 800, letterSpacing: -0.3 }}>Meus Ganhos</span>
         <div style={{ width: 60 }} />
       </div>
+
+      {semDadosBancarios && !loading && (
+        <div
+          onClick={() => navigate('/bank-details')}
+          style={{
+            margin: '12px 20px 0', backgroundColor: '#FFF3CD', border: '1px solid #FFC107',
+            borderRadius: Radius.md, padding: '12px 16px', display: 'flex',
+            alignItems: 'center', gap: 10, cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 20 }}>🏦</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>Dados bancários não cadastrados</div>
+            <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Cadastre sua chave Pix para receber repasses. Toque aqui.</div>
+          </div>
+          <span style={{ fontSize: 18, color: '#856404' }}>›</span>
+        </div>
+      )}
 
       <div style={{ display: 'flex', margin: '16px 20px', backgroundColor: Colors.inputBg, borderRadius: Radius.md, padding: 4 }}>
         {(['semana', 'historico'] as Tab[]).map(t => (

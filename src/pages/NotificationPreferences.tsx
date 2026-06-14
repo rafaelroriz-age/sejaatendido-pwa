@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser } from '../storage/localStorage';
-import { fetchPreferenciasNotificacao, fetchPerfil, registerPushToken, savePreferenciasNotificacao } from '../services/api';
+import { fetchPreferenciasNotificacao, fetchPerfil, registerPushToken, savePreferenciasNotificacao, testarNotificacaoWhatsapp } from '../services/api';
 import Colors from '../theme/colors';
 
 interface Prefs {
@@ -60,6 +60,7 @@ export default function NotificationPreferences() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [testingWhatsapp, setTestingWhatsapp] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -104,6 +105,21 @@ export default function NotificationPreferences() {
       window.alert('Preferências de notificação salvas!');
     } catch { window.alert('Não foi possível salvar as preferências.'); }
     finally { setSaving(false); }
+  }
+
+  async function handleTestWhatsapp() {
+    if (prefs.whatsappNumber.replace(/\D/g, '').length < 10) {
+      window.alert('Informe um número de WhatsApp válido antes de testar.'); return;
+    }
+    setTestingWhatsapp(true);
+    try {
+      const result = await testarNotificacaoWhatsapp();
+      window.alert(result.mensagem ?? 'Mensagem de teste enviada! Verifique seu WhatsApp.');
+    } catch {
+      window.alert('Não foi possível enviar a mensagem de teste. Verifique se o backend está ativo e tente novamente.');
+    } finally {
+      setTestingWhatsapp(false);
+    }
   }
 
   async function ensurePushSubscription() {
@@ -197,6 +213,21 @@ export default function NotificationPreferences() {
               <p style={{ fontSize: 12, color: Colors.textMuted, marginTop: 8, lineHeight: '18px' }}>
                 Esta configuração salva sua preferência no app. O envio automático de mensagens de WhatsApp depende da integração operacional do backend.
               </p>
+              <button
+                onClick={handleTestWhatsapp}
+                disabled={testingWhatsapp}
+                style={{
+                  width: '100%', backgroundColor: '#25D366', borderRadius: 12, padding: '12px 16px',
+                  border: 'none', cursor: testingWhatsapp ? 'not-allowed' : 'pointer',
+                  opacity: testingWhatsapp ? 0.6 : 1, marginTop: 8,
+                  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8,
+                }}
+              >
+                {testingWhatsapp
+                  ? <div className="spinner" />
+                  : <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>📲 Enviar mensagem de teste</span>
+                }
+              </button>
             </div>
           )}
         </div>
