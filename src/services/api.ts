@@ -438,23 +438,101 @@ export interface CreateConsultaRequest {
   sintomas: string;
 }
 
+function normalizeConsulta(raw: any): Consulta {
+  const medicoRaw = raw?.medico && typeof raw.medico === 'object' ? normalizeMedico(raw.medico) : undefined;
+  const pacienteRaw = raw?.paciente && typeof raw.paciente === 'object' ? raw.paciente : undefined;
+  return {
+    id: String(raw?.id ?? raw?.consultaId ?? ''),
+    medicoId: String(raw?.medicoId ?? raw?.medico?.id ?? raw?.medico?.usuarioId ?? ''),
+    pacienteId: String(raw?.pacienteId ?? raw?.paciente?.id ?? raw?.paciente?.usuarioId ?? ''),
+    dataHora: raw?.dataHora ?? raw?.dataConsulta ?? raw?.inicio ?? raw?.data,
+    data: raw?.data ?? raw?.dataHora ?? raw?.dataConsulta,
+    sintomas: raw?.sintomas ?? raw?.motivo,
+    motivo: raw?.motivo ?? raw?.sintomas,
+    status: String(raw?.status ?? 'PENDENTE'),
+    valor: raw?.valor,
+    meetLink: raw?.meetLink,
+    medico: medicoRaw,
+    ...(pacienteRaw ? { paciente: pacienteRaw } : {}),
+  } as Consulta;
+}
+
+function extractConsultas(payload: any): Consulta[] {
+  const list =
+    (Array.isArray(payload?.consultas) ? payload.consultas : null)
+    ?? (Array.isArray(payload?.data?.consultas) ? payload.data.consultas : null)
+    ?? (Array.isArray(payload?.items) ? payload.items : null)
+    ?? (Array.isArray(payload) ? payload : []);
+  return list.map(normalizeConsulta);
+}
+
 export async function fetchMinhasConsultas(): Promise<Consulta[]> {
-  const r = await api.get('/pacientes/me/consultas');
-  return r.data?.consultas ?? r.data ?? [];
+  const endpoints = ['/consultas', '/pacientes/me/consultas'];
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    try {
+      const r = await api.get(endpoint);
+      return extractConsultas(r.data);
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404) {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
 }
 
 export async function fetchConsultasMedico(): Promise<Consulta[]> {
-  const r = await api.get('/medicos/me/consultas');
-  return r.data?.consultas ?? r.data ?? [];
+  const endpoints = ['/medicos/me/consultas', '/consultas/medico'];
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    try {
+      const r = await api.get(endpoint);
+      return extractConsultas(r.data);
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404) {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+  if (lastError) throw lastError;
+  return [];
 }
 
 export async function createConsulta(data: CreateConsultaRequest): Promise<Consulta> {
-  const r = await api.post('/pacientes/consultas', data);
-  return r.data?.consulta ?? r.data;
+  const endpoints = ['/consultas', '/pacientes/consultas'];
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    try {
+      const r = await api.post(endpoint, data, { timeout: 30000 });
+      return normalizeConsulta(r.data?.consulta ?? r.data);
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404) {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError ?? new Error('Não foi possível criar consulta.');
 }
 
 export async function cancelConsulta(id: string): Promise<void> {
-  await api.delete(`/pacientes/me/consultas/${id}`);
+  try {
+    await api.delete(`/consultas/${id}`);
+  } catch (error) {
+    const status = (error as any)?.response?.status;
+    if (status !== 404) throw error;
+    await api.delete(`/pacientes/me/consultas/${id}`);
+  }
 }
 
 export async function updateConsultaMedico(id: string, acao: 'ACEITA' | 'RECUSADA', motivoRecusa?: string): Promise<void> {
@@ -677,11 +755,31 @@ export interface WhatsappTestResponse {
 }
 
 export async function testarNotificacaoWhatsapp(): Promise<WhatsappTestResponse> {
-  const res = await api.post('/notificacoes/whatsapp-test');
-  return {
-    ok: Boolean(res.data?.ok ?? true),
-    mensagem: res.data?.mensagem ?? res.data?.message,
-  };
+  const endpoints = [
+    '/notificacoes/whatsapp-test',
+    '/notificacoes/whatsapp/teste',
+    '/usuarios/me/notificacoes/whatsapp/teste',
+  ];
+
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    try {
+      const res = await api.post(endpoint, {}, { timeout: 30000 });
+      return {
+        ok: Boolean(res.data?.ok ?? true),
+        mensagem: res.data?.mensagem ?? res.data?.message,
+      };
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404 || status === 405) {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError ?? new Error('Endpoint de teste de WhatsApp não encontrado.');
 }
 
 export interface Frontend404Telemetry {

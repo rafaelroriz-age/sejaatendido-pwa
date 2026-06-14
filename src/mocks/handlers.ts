@@ -328,6 +328,10 @@ export const handlers = [
     HttpResponse.json({ consultas: MOCK_CONSULTAS_PACIENTE, total: MOCK_CONSULTAS_PACIENTE.length }),
   ),
 
+  http.get(`${BASE}/consultas`, () =>
+    HttpResponse.json({ consultas: MOCK_CONSULTAS_PACIENTE, total: MOCK_CONSULTAS_PACIENTE.length }),
+  ),
+
   http.post(`${BASE}/pacientes/consultas`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const nova = {
@@ -345,7 +349,30 @@ export const handlers = [
     return HttpResponse.json({ consulta: nova }, { status: 201 });
   }),
 
+  http.post(`${BASE}/consultas`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    const nova = {
+      id: `consulta-${Date.now()}`,
+      medicoId: body.medicoId,
+      pacienteId: 'paciente-001',
+      dataHora: body.dataHora ?? body.data,
+      sintomas: body.sintomas ?? body.motivo ?? 'Consulta geral',
+      status: 'PENDENTE',
+      valor: 15000,
+      meetLink: null,
+      medico: MOCK_MEDICOS.find(m => m.id === body.medicoId) ?? MOCK_MEDICOS[0],
+    };
+    MOCK_CONSULTAS_PACIENTE.push(nova as typeof MOCK_CONSULTAS_PACIENTE[0]);
+    return HttpResponse.json({ consulta: nova }, { status: 201 });
+  }),
+
   http.delete(`${BASE}/pacientes/me/consultas/:id`, ({ params }) => {
+    const idx = MOCK_CONSULTAS_PACIENTE.findIndex(c => c.id === params.id);
+    if (idx !== -1) MOCK_CONSULTAS_PACIENTE.splice(idx, 1);
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.delete(`${BASE}/consultas/:id`, ({ params }) => {
     const idx = MOCK_CONSULTAS_PACIENTE.findIndex(c => c.id === params.id);
     if (idx !== -1) MOCK_CONSULTAS_PACIENTE.splice(idx, 1);
     return HttpResponse.json({ ok: true });
@@ -418,6 +445,9 @@ export const handlers = [
 
   // ── NOTIFICAÇÕES ──────────────────────────────────────────────────────────
 
+  http.post(`${BASE}/notificacoes/whatsapp-test`, () => HttpResponse.json({ ok: true, mensagem: 'Mensagem de teste enviada (mock).' })),
+  http.post(`${BASE}/notificacoes/whatsapp/teste`, () => HttpResponse.json({ ok: true, mensagem: 'Mensagem de teste enviada (mock).' })),
+  http.post(`${BASE}/usuarios/me/notificacoes/whatsapp/teste`, () => HttpResponse.json({ ok: true, mensagem: 'Mensagem de teste enviada (mock).' })),
   http.post(`${BASE}/usuarios/me/push-token`, () => HttpResponse.json({ ok: true })),
   http.delete(`${BASE}/usuarios/me/push-token`, () => HttpResponse.json({ ok: true })),
 
