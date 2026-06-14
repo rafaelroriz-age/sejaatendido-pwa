@@ -108,6 +108,7 @@ export interface AuthResponse {
     nome: string;
     email: string;
     cpf?: string;
+    telefone?: string;
     tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN';
     crmCartaoValidado?: boolean;
     crmNumero?: string;

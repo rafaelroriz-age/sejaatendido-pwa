@@ -68,6 +68,7 @@ export default function LoginScreen() {
         nome: usuario.nome,
         email: usuario.email,
         cpf: usuario.cpf,
+        telefone: usuario.telefone,
         tipo: usuario.tipo,
         crmCartaoValidado: usuario.crmCartaoValidado,
         crmNumero: usuario.crmNumero,
@@ -101,6 +102,7 @@ export default function LoginScreen() {
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
+        telefone: usuario.telefone,
         tipo: usuario.tipo,
       };
       await saveAuthSession(accessToken, user, refreshToken);

@@ -7,10 +7,29 @@ export interface User {
   nome: string;
   email: string;
   cpf?: string;
+  telefone?: string;
   tipo: 'PACIENTE' | 'MEDICO' | 'ADMIN';
   crmCartaoValidado?: boolean;
   crmNumero?: string;
   crmUf?: string;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function mergeUserPreservingOptionalFields(previous: User | null, next: User): User {
+  const sameUser = Boolean(previous && previous.id === next.id);
+  const nextCpf = normalizeOptionalString(next.cpf);
+  const nextTelefone = normalizeOptionalString(next.telefone);
+
+  return {
+    ...next,
+    cpf: nextCpf ?? (sameUser ? previous?.cpf : undefined),
+    telefone: nextTelefone ?? (sameUser ? previous?.telefone : undefined),
+  };
 }
 
 export async function saveToken(token: string): Promise<void> {
@@ -38,7 +57,9 @@ export async function removeRefreshToken(): Promise<void> {
 }
 
 export async function saveUser(user: User): Promise<void> {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  const previous = await getUser();
+  const merged = mergeUserPreservingOptionalFields(previous, user);
+  localStorage.setItem(USER_KEY, JSON.stringify(merged));
 }
 
 export async function getUser(): Promise<User | null> {

@@ -30,7 +30,12 @@ export default function Profile() {
   useEffect(() => {
     getUser().then(u => {
       setUser(u);
-      if (u) { setNome(u.nome); setEmail(u.email); if (u.cpf) setCpf(applyCpfMask(u.cpf)); }
+      if (u) {
+        setNome(u.nome);
+        setEmail(u.email);
+        setTelefone(u.telefone ?? '');
+        if (u.cpf) setCpf(applyCpfMask(u.cpf));
+      }
     }).finally(() => setLoading(false));
   }, []);
 
@@ -46,7 +51,8 @@ export default function Profile() {
         id: updated.id,
         nome: updated.nome,
         email: updated.email,
-        cpf: updated.cpf,
+        cpf: updated.cpf ?? user?.cpf,
+        telefone: updated.telefone ?? user?.telefone,
         tipo: updated.tipo,
         crmCartaoValidado: user?.crmCartaoValidado,
         crmNumero: user?.crmNumero,
@@ -56,6 +62,8 @@ export default function Profile() {
       setUser(updatedUser);
       setNome(updated.nome);
       setEmail(updated.email);
+      setTelefone(updatedUser.telefone ?? '');
+      setCpf(updatedUser.cpf ? applyCpfMask(updatedUser.cpf) : '');
       setEditing(false);
       window.alert('Perfil atualizado com sucesso!');
     } catch (error) {
