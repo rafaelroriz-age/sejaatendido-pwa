@@ -1,5 +1,5 @@
-import React, { CSSProperties } from 'react';
-import Colors, { Radius, Font, Space } from '../theme/colors';
+import { CSSProperties } from 'react';
+import Colors, { Radius, Font } from '../theme/colors';
 
 interface Props {
   title: string;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { cancelConsulta, fetchMinhasConsultas, Consulta, sendFrontendTelemetryEvent, testarNotificacaoWhatsapp } from '../services/api';
+import { cancelConsulta, fetchMinhasConsultas, Consulta, fetchPerfil, sendFrontendTelemetryEvent, testarNotificacaoWhatsapp } from '../services/api';
 import { clearAuthSession, getUser } from '../storage/localStorage';
 import { handleApiError } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
@@ -94,7 +94,10 @@ export default function Dashboard() {
   async function handleTestarWhatsapp() {
     setTestingWhatsapp(true);
     try {
-      const res = await testarNotificacaoWhatsapp();
+      const sessionUser = await getUser();
+      const profile = await fetchPerfil().catch(() => null);
+      const fallbackPhone = profile?.telefone ?? sessionUser?.telefone;
+      const res = await testarNotificacaoWhatsapp(fallbackPhone);
       if (res.ok) {
         window.alert(res.mensagem || 'Mensagem de teste enviada no WhatsApp com sucesso.');
       } else {

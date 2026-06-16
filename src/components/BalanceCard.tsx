@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Skeleton from './Skeleton';
 import { fetchSaldoMedico, SaldoMedico } from '../services/api';

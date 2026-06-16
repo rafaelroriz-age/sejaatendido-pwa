@@ -54,8 +54,6 @@ const MOCK_MEDICOS = [
   },
 ];
 
-const MOCK_SLOTS = ['09:00', '09:30', '10:00', '10:30', '14:00', '14:30', '15:00'];
-
 const tomorrow = (() => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -266,7 +264,7 @@ export const handlers = [
   }),
 
   // New slots endpoint — returns ISO timestamps
-  http.get(`${BASE}/medicos/:id/slots`, ({ request, params }) => {
+  http.get(`${BASE}/medicos/:id/slots`, ({ request }) => {
     const url = new URL(request.url);
     const data = url.searchParams.get('data') ?? new Date().toISOString().split('T')[0];
     return HttpResponse.json({
@@ -461,7 +459,7 @@ export const handlers = [
     HttpResponse.json([]),
   ),
 
-  http.post(`${BASE}/api/chats/:chatId/mensagens`, async ({ request, params }) => {
+  http.post(`${BASE}/api/chats/:chatId/mensagens`, async ({ request }) => {
     const body = await request.json() as { texto?: string };
     return HttpResponse.json({
       id: `msg-${Date.now()}`,
@@ -510,7 +508,7 @@ export const handlers = [
     }, { status: 201 });
   }),
 
-  http.get(`${BASE}/medicos/:id/avaliacoes`, ({ params }) => {
+  http.get(`${BASE}/medicos/:id/avaliacoes`, () => {
     return HttpResponse.json({
       avaliacoes: [
         { id: 'aval-mock-1', consultaId: 'consulta-001', nota: 5, comentario: 'Excelente atendimento!', criadoEm: new Date().toISOString() },

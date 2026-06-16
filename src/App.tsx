@@ -82,8 +82,6 @@ function ProtectedRoute({
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<Role | undefined>(undefined);
-  const [initialRoute, setInitialRoute] = useState('/login');
 
   useEffect(() => {
     checkAuth();
@@ -91,19 +89,7 @@ export default function App() {
 
   async function checkAuth() {
     try {
-      const { token, user } = await getAuthSession();
-      if (token && user) {
-        setUserRole(user.tipo);
-        switch (user.tipo) {
-          case 'ADMIN': setInitialRoute('/admin'); break;
-          case 'MEDICO': setInitialRoute('/doctor'); break;
-          case 'PACIENTE': setInitialRoute('/dashboard'); break;
-          default: setInitialRoute('/login');
-        }
-      } else {
-        setUserRole(undefined);
-        setInitialRoute('/login');
-      }
+      await getAuthSession();
     } catch (error) {
       console.error('Error checking auth:', error);
     } finally {

@@ -1,4 +1,4 @@
-import React, { CSSProperties, ReactNode } from 'react';
+import { CSSProperties, ReactNode } from 'react';
 import Colors, { Radius, Space } from '../theme/colors';
 
 interface Props { children: ReactNode; style?: CSSProperties; padded?: boolean; }

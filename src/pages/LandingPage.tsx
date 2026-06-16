@@ -1,45 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Colors from '../theme/colors';
 
 const ANDROID_APK_URL = 'https://expo.dev/accounts/rafaelroriz_dev/projects/sejaatendido-rn/builds/d5be9460-48c7-4829-be64-b386d0bf62c1';
 const OFFICIAL_LOGO = '/logo-oficial.png';
-
-/* ─── Inline SVG logo matching the provided brand image ─── */
-function Logo({ size = 48 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Monitor */}
-      <rect x="35" y="45" width="130" height="95" rx="8" stroke={Colors.primary} strokeWidth="7" fill="none" />
-      {/* Monitor stand */}
-      <rect x="82" y="140" width="36" height="14" rx="3" stroke={Colors.primary} strokeWidth="6" fill="none" />
-      <rect x="70" y="152" width="60" height="6" rx="3" fill={Colors.primary} />
-      {/* Doctor figure - head */}
-      <circle cx="100" cy="78" r="16" stroke={Colors.primary} strokeWidth="6" fill="none" />
-      {/* Hair */}
-      <path d="M84 72 C84 60 116 60 116 72" stroke={Colors.primary} strokeWidth="6" fill="none" strokeLinecap="round" />
-      {/* Shield/badge on head */}
-      <path d="M94 65 L100 60 L106 65 L106 72 C106 76 100 80 100 80 C100 80 94 76 94 72Z" stroke={Colors.primary} strokeWidth="3" fill="none" />
-      {/* Body / scrubs V-neck */}
-      <path d="M76 100 L92 100 L100 115 L108 100 L124 100" stroke={Colors.primary} strokeWidth="6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Stethoscope */}
-      <path d="M86 105 C86 125 95 128 100 128" stroke={Colors.primary} strokeWidth="4" fill="none" strokeLinecap="round" />
-      <path d="M114 105 C114 125 105 128 100 128" stroke={Colors.primary} strokeWidth="4" fill="none" strokeLinecap="round" />
-      <circle cx="86" cy="105" r="4" fill={Colors.primary} />
-      <circle cx="114" cy="105" r="4" fill={Colors.primary} />
-      <circle cx="100" cy="130" r="5" stroke={Colors.primary} strokeWidth="3" fill="none" />
-    </svg>
-  );
-}
-
-function SmallLogo() {
-  return (
-    <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="48" fill={Colors.primary} />
-      <text x="50" y="58" textAnchor="middle" fill="#fff" fontSize="32" fontWeight="800" fontFamily="system-ui,sans-serif">SA</text>
-    </svg>
-  );
-}
 
 /* ─── Feature icon components ─── */
 function IconCalendar() {

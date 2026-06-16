@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { saveDadosBancarios, fetchDadosBancarios } from '../services/api';
-import Colors, { Radius } from '../theme/colors';
+import Colors from '../theme/colors';
 
 type TipoChavePix = 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';
 

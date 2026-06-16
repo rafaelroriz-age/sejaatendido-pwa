@@ -1,4 +1,4 @@
-import React, { CSSProperties } from 'react';
+import { CSSProperties } from 'react';
 import Colors, { Radius, Font } from '../theme/colors';
 
 type BadgeVariant = 'agendada' | 'confirmada' | 'cancelada' | 'concluida' | 'pendente';

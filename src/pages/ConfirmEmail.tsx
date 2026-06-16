@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { confirmEmailRequest, resendConfirmEmailRequest } from '../services/api';
 import Colors from '../theme/colors';

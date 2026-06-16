@@ -1,4 +1,3 @@
-import React from 'react';
 import Colors, { Font, Space } from '../theme/colors';
 import Button from './Button';
 
