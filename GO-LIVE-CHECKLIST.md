@@ -27,6 +27,7 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 
 - [ ] Login social Google validado em produção
   - Critério: botão Google autentica via endpoint ativo de produção sem erro 404.
+  - **Pendência**: configurar `VITE_GOOGLE_CLIENT_ID` nas variáveis de ambiente de produção e validar OAuth Client ID no Google Cloud Console.
   - Risco: queda de conversão e suporte manual.
 
 - [ ] Médicos aprovados visíveis para agendamento
@@ -53,6 +54,13 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 - [x] Corrigir fluxo de agendamento até encaminhar para pagamento.
 - [x] Adicionar telemetria temporária DEV para diagnóstico.
 - [x] Rodar build, corrigir erros TS e publicar via commit/push.
+- [x] Sincronização automática de status no retorno de checkout (PaymentSuccess/Pending/Failure).
+- [x] Remover fallback mock silencioso em RepasseDetail — erros reais agora visíveis.
+- [x] Login com Google implementado no LoginScreen (requer VITE_GOOGLE_CLIENT_ID configurado).
+- [x] Push web-pwa: fallback graceful sem alert — não bloqueia save de preferências.
+- [x] window.alert removido dos fluxos críticos (Signup, ResetPassword, ForgotPassword, BankDetails, Profile, Payment, NotificationPreferences).
+- [x] Redesign visual da tela de Pagamento com branding consistente.
+- [x] Code splitting via lazy import — bundle principal reduzido de 549KB para 260KB (-53%).
 
 ## 4) O que VOCÊ precisa fazer (fora do código)
 

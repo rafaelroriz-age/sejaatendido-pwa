@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { criarPagamento, syncPagamento } from '../services/api';
+import Colors, { Radius } from '../theme/colors';
 
 type PaymentMethod = 'pix' | 'cartao';
 
@@ -208,7 +209,6 @@ export default function Payment() {
     } catch (error) {
       const message = getErrorMessage(error, 'Falha ao gerar pagamento PIX.');
       setErrorText(message);
-      window.alert(`Erro ao gerar pagamento PIX\n${message}`);
     } finally {
       setLoading(false);
     }
@@ -235,7 +235,6 @@ export default function Payment() {
     } catch (error) {
       const message = getErrorMessage(error, 'Falha ao iniciar pagamento com cartão.');
       setErrorText(message);
-      window.alert(`Erro ao iniciar pagamento\n${message}`);
     } finally {
       setLoading(false);
     }
@@ -244,100 +243,123 @@ export default function Payment() {
   const pix = paymentData?.pix;
   const validadeText = pix?.validade ? new Date(pix.validade).toLocaleString('pt-BR') : null;
 
+  const btnBase: React.CSSProperties = {
+    flex: 1, padding: '13px 0', border: 'none', cursor: 'pointer',
+    fontWeight: 700, fontSize: 15, borderRadius: Radius.md, transition: 'all 0.18s',
+  };
+
   return (
-    <main style={{ maxWidth: 760, margin: '0 auto', padding: 20 }}>
-      <h1>Pagamento</h1>
-      <p>
-        Consulta: <strong>{consultaId || 'não encontrada'}</strong>
-      </p>
-      {typeof state?.valor === 'number' ? (
-        <p>
-          Valor: <strong>R$ {(state.valor / 100).toFixed(2)}</strong>
-        </p>
-      ) : null}
+    <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ backgroundColor: Colors.primary, padding: '28px 16px 16px', borderRadius: '0 0 20px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={() => navigate(-1)} style={{ color: '#fff', fontSize: 15, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar</button>
+        <span style={{ color: '#fff', fontSize: 18, fontWeight: 800 }}>Pagamento</span>
+        <div style={{ width: 50 }} />
+      </div>
 
-      <section style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        <button type="button" onClick={() => setMethod('pix')} disabled={loading || method === 'pix'}>
-          PIX
-        </button>
-        <button type="button" onClick={() => setMethod('cartao')} disabled={loading || method === 'cartao'}>
-          Cartão
-        </button>
-      </section>
+      <div style={{ flex: 1, padding: 20, overflowY: 'auto' }}>
+        {/* Consulta info */}
+        {consultaId && (
+          <div style={{ backgroundColor: Colors.card, borderRadius: 16, padding: '14px 16px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: Colors.textMuted, fontWeight: 600 }}>Consulta</span>
+            <span style={{ fontSize: 13, color: Colors.textPrimary, fontFamily: 'monospace', fontWeight: 700 }}>{consultaId.slice(0, 12)}…</span>
+          </div>
+        )}
+        {typeof state?.valor === 'number' && (
+          <div style={{ backgroundColor: Colors.card, borderRadius: 16, padding: '14px 16px', marginBottom: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 15, color: Colors.textSecondary, fontWeight: 600 }}>Valor</span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: Colors.primary }}>R$ {(state.valor / 100).toFixed(2)}</span>
+          </div>
+        )}
 
-      {method === 'pix' ? (
-        <section>
-          <button type="button" onClick={createPixPayment} disabled={loading || !consultaId}>
-            {loading ? 'Gerando PIX...' : 'Pagar via PIX'}
-          </button>
+        {/* Method selector */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+          {(['pix', 'cartao'] as const).map(m => (
+            <button key={m} type="button" onClick={() => setMethod(m)} disabled={loading || method === m} style={{
+              ...btnBase,
+              backgroundColor: method === m ? Colors.primary : Colors.card,
+              color: method === m ? '#fff' : Colors.textSecondary,
+              boxShadow: method === m ? `0 4px 10px ${Colors.primary}59` : '0 2px 6px rgba(0,0,0,0.06)',
+            }}>
+              {m === 'pix' ? 'PIX' : 'Cartão'}
+            </button>
+          ))}
+        </div>
 
-          {errorText ? (
-            <p style={{ color: '#B00020', marginTop: 12 }} role="alert">
-              {errorText}
-            </p>
-          ) : null}
+        {/* Error banner */}
+        {errorText && (
+          <div style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: '12px 16px', marginBottom: 16, border: '1px solid #EF9A9A' }}>
+            <span style={{ fontSize: 14, color: '#C62828', fontWeight: 600 }} role="alert">{errorText}</span>
+          </div>
+        )}
 
-          {pix ? (
-            <div style={{ marginTop: 16, display: 'grid', gap: 10 }}>
-              <p>
-                Status: <strong>{status}</strong>
-              </p>
+        {method === 'pix' ? (
+          <>
+            {!paymentData && (
+              <button type="button" onClick={createPixPayment} disabled={loading || !consultaId} style={{
+                width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
+                border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
+                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId) ? 0.6 : 1,
+                boxShadow: `0 6px 12px ${Colors.primary}59`,
+              }}>
+                {loading ? 'Gerando PIX…' : 'Gerar código PIX'}
+              </button>
+            )}
 
-              {validadeText ? (
-                <p>
-                  Válido até: <strong>{validadeText}</strong>
-                </p>
-              ) : null}
+            {pix && (
+              <div style={{ backgroundColor: Colors.card, borderRadius: 20, padding: 24, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <span style={{ fontSize: 13, color: Colors.textMuted, fontWeight: 600 }}>Status</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: status === 'PAGO' ? Colors.success : Colors.primary }}>{status}</span>
+                </div>
+                {validadeText && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <span style={{ fontSize: 13, color: Colors.textMuted, fontWeight: 600 }}>Válido até</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: expired ? Colors.error : Colors.textPrimary }}>{validadeText}</span>
+                  </div>
+                )}
 
-              {pix.qrCodeBase64 ? (
-                <img
-                  src={`data:image/png;base64,${pix.qrCodeBase64}`}
-                  alt="QR Code PIX"
-                  style={{ width: 260, height: 260, objectFit: 'contain' }}
-                />
-              ) : null}
+                {pix.qrCodeBase64 && (
+                  <img src={`data:image/png;base64,${pix.qrCodeBase64}`} alt="QR Code PIX" style={{ width: 220, height: 220, objectFit: 'contain', borderRadius: 12 }} />
+                )}
 
-              {pix.qrCode ? (
-                <>
-                  <label htmlFor="pix-code">Código PIX copia e cola</label>
-                  <input
-                    id="pix-code"
-                    readOnly
-                    value={pix.qrCode}
-                    style={{ width: '100%', padding: 8 }}
-                  />
-                  <button type="button" onClick={handleCopyPixCode}>
-                    {copied ? 'Código copiado' : 'Copiar código PIX'}
+                {pix.qrCode && (
+                  <div style={{ width: '100%' }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, marginBottom: 8 }}>Código copia e cola</p>
+                    <div style={{ backgroundColor: Colors.inputBg, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${Colors.border}` }}>
+                      <span style={{ flex: 1, fontSize: 12, color: Colors.textPrimary, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pix.qrCode}</span>
+                      <button type="button" onClick={handleCopyPixCode} style={{ backgroundColor: copied ? Colors.success : Colors.primary, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+                        {copied ? '✓ Copiado' : 'Copiar'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {pix.ticketUrl && (
+                  <a href={pix.ticketUrl} target="_blank" rel="noreferrer" style={{ width: '100%', textAlign: 'center', backgroundColor: '#00B3FF22', color: '#0077AA', borderRadius: 12, padding: '14px 0', display: 'block', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
+                    Pagar pelo Mercado Pago ↗
+                  </a>
+                )}
+
+                {expired && (
+                  <button type="button" onClick={createPixPayment} disabled={loading} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 16, border: 'none', cursor: 'pointer', color: '#fff', fontWeight: 700, fontSize: 15 }}>
+                    Gerar novo código PIX
                   </button>
-                </>
-              ) : null}
-
-              {pix.ticketUrl ? (
-                <a href={pix.ticketUrl} target="_blank" rel="noreferrer">
-                  Pagar pelo Mercado Pago
-                </a>
-              ) : null}
-
-              {expired ? (
-                <button type="button" onClick={createPixPayment} disabled={loading}>
-                  Gerar novo código PIX
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-      ) : (
-        <section>
-          <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId}>
-            {loading ? 'Iniciando checkout...' : 'Pagar com cartão'}
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId} style={{
+            width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
+            border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
+            color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId) ? 0.6 : 1,
+            boxShadow: `0 6px 12px ${Colors.primary}59`,
+          }}>
+            {loading ? 'Iniciando checkout…' : 'Pagar com cartão'}
           </button>
-          {errorText ? (
-            <p style={{ color: '#B00020', marginTop: 12 }} role="alert">
-              {errorText}
-            </p>
-          ) : null}
-        </section>
-      )}
-    </main>
+        )}
+      </div>
+    </div>
   );
 }

@@ -9,9 +9,11 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   async function handleSubmit() {
-    if (!email.trim()) { window.alert('Informe seu email'); return; }
+    setEmailError('');
+    if (!email.trim()) { setEmailError('Informe seu email.'); return; }
     setLoading(true);
     try {
       await forgotPasswordRequest(email.trim());
@@ -60,6 +62,12 @@ export default function ForgotPassword() {
               Informe seu email e enviaremos um link para redefinir sua senha.
             </p>
           </div>
+
+          {emailError && (
+            <div style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: '10px 14px', marginBottom: 12, border: '1px solid #EF9A9A' }}>
+              <span style={{ fontSize: 14, color: '#C62828', fontWeight: 600 }} role="alert">{emailError}</span>
+            </div>
+          )}
 
           <div style={{
             backgroundColor: Colors.inputBg, borderRadius: Radius.md,

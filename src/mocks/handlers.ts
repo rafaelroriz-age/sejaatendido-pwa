@@ -220,6 +220,14 @@ export const handlers = [
     return authResponse(MOCK_MEDICO_USER);
   }),
 
+  http.post(`${BASE}/auth/apple`, async ({ request }) => {
+    const body = await request.json() as { identityToken?: string };
+    if (!body?.identityToken) return HttpResponse.json({ erro: 'identityToken obrigatório' }, { status: 400 });
+    return authResponse(MOCK_PACIENTE);
+  }),
+
+  http.post(`${BASE}/auth/logout`, () => HttpResponse.json({ ok: true })),
+
   http.post(`${BASE}/auth/refresh-token`, () =>
     HttpResponse.json({ accessToken: MOCK_TOKEN, refreshToken: MOCK_REFRESH }),
   ),
@@ -245,6 +253,11 @@ export const handlers = [
     HttpResponse.json({ message: 'Email reenviado.' }),
   ),
 
+  // Alias usado por resendConfirmEmailRequest() em services/api.ts
+  http.post(`${BASE}/emails/confirmar-email/enviar`, () =>
+    HttpResponse.json({ message: 'Email reenviado.' }),
+  ),
+
   // ── MÉDICOS ───────────────────────────────────────────────────────────────
 
   http.get(`${BASE}/medicos`, () => HttpResponse.json({ medicos: MOCK_MEDICOS, total: MOCK_MEDICOS.length, page: 1 })),
@@ -262,6 +275,14 @@ export const handlers = [
     const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({ medico: { ...MOCK_MEDICOS[0], ...body } });
   }),
+
+  // CRM
+  http.get(`${BASE}/medicos/me/crm/status`, () =>
+    HttpResponse.json({ crmCartaoValidado: false, status: 'PENDENTE', crmNumero: '12345', crmUf: 'SP' }),
+  ),
+  http.post(`${BASE}/medicos/me/crm/validar-cartao`, () =>
+    HttpResponse.json({ crmCartaoValidado: true, status: 'APROVADO', crmNumero: '12345', crmUf: 'SP' }),
+  ),
 
   // New slots endpoint — returns ISO timestamps
   http.get(`${BASE}/medicos/:id/slots`, ({ request }) => {
@@ -441,7 +462,82 @@ export const handlers = [
     return HttpResponse.json({ ok: true });
   }),
 
+  http.get(`${BASE}/admin/dashboard`, () =>
+    HttpResponse.json({
+      totalUsuarios: 42,
+      totalMedicos: 8,
+      medicosAprovados: 6,
+      medicosPendentes: 2,
+      totalPacientes: 34,
+      totalConsultas: 120,
+      consultasPendentes: 15,
+      consultasConcluidas: 95,
+      receitaTotal: 1800000,
+    }),
+  ),
+
+  http.get(`${BASE}/admin/medicos`, () =>
+    HttpResponse.json({ medicos: [...MOCK_MEDICOS, ...MOCK_MEDICOS_PENDENTES] }),
+  ),
+
+  http.get(`${BASE}/admin/consultas`, () =>
+    HttpResponse.json({ consultas: [...MOCK_CONSULTAS_PACIENTE, ...MOCK_CONSULTAS_MEDICO] }),
+  ),
+
+  http.get(`${BASE}/admin/usuarios`, () =>
+    HttpResponse.json({
+      usuarios: [
+        { id: 'paciente-001', nome: 'João Silva (Mock)', email: 'joao@mock.com', tipo: 'PACIENTE', criadoEm: new Date().toISOString() },
+        { id: 'medico-001', nome: 'Dra. Maria Santos (Mock)', email: 'maria@mock.com', tipo: 'MEDICO', criadoEm: new Date().toISOString() },
+        { id: 'admin-001', nome: 'Admin Mock', email: 'admin@mock.com', tipo: 'ADMIN', criadoEm: new Date().toISOString() },
+      ],
+    }),
+  ),
+
+  http.delete(`${BASE}/admin/usuarios/:id`, () => HttpResponse.json({ ok: true })),
+
   // ── NOTIFICAÇÕES ──────────────────────────────────────────────────────────
+
+  // Preferências de notificação — todos os aliases usados por fetchPreferenciasNotificacao / savePreferenciasNotificacao
+  http.get(`${BASE}/usuarios/me/preferencias-notificacao`, () =>
+    HttpResponse.json({
+      pushEnabled: false,
+      emailEnabled: true,
+      whatsappEnabled: false,
+      confirmacaoAgendamento: true,
+      lembrete24h: true,
+      lembrete1h: true,
+      cancelamentos: true,
+      prescricoes: false,
+    }),
+  ),
+  http.put(`${BASE}/usuarios/me/preferencias-notificacao`, () => HttpResponse.json({ ok: true })),
+  http.get(`${BASE}/usuarios/me/notificacoes/preferencias`, () =>
+    HttpResponse.json({
+      pushEnabled: false,
+      emailEnabled: true,
+      whatsappEnabled: false,
+      confirmacaoAgendamento: true,
+      lembrete24h: true,
+      lembrete1h: true,
+      cancelamentos: true,
+      prescricoes: false,
+    }),
+  ),
+  http.put(`${BASE}/usuarios/me/notificacoes/preferencias`, () => HttpResponse.json({ ok: true })),
+  http.get(`${BASE}/notificacoes/preferencias`, () =>
+    HttpResponse.json({
+      pushEnabled: false,
+      emailEnabled: true,
+      whatsappEnabled: false,
+      confirmacaoAgendamento: true,
+      lembrete24h: true,
+      lembrete1h: true,
+      cancelamentos: true,
+      prescricoes: false,
+    }),
+  ),
+  http.put(`${BASE}/notificacoes/preferencias`, () => HttpResponse.json({ ok: true })),
 
   http.post(`${BASE}/notificacoes/whatsapp-test`, () => HttpResponse.json({ ok: true, mensagem: 'Mensagem de teste enviada (mock).' })),
   http.post(`${BASE}/notificacoes/whatsapp/teste`, () => HttpResponse.json({ ok: true, mensagem: 'Mensagem de teste enviada (mock).' })),
@@ -475,6 +571,12 @@ export const handlers = [
   }),
 
   // ── PERFIL ────────────────────────────────────────────────────────────────
+
+  http.get(`${BASE}/usuarios/me`, async ({ request }) => {
+    const auth = request.headers.get('Authorization') ?? '';
+    // Retorna perfil baseado no token mock; em dev todos usam o mesmo token
+    return HttpResponse.json({ ...MOCK_PACIENTE });
+  }),
 
   http.put(`${BASE}/usuarios/me`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;

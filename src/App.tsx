@@ -1,36 +1,47 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getAuthSession } from './storage/localStorage';
 import Colors from './theme/colors';
 
+// Critical path — load eagerly
 import LoginScreen from './pages/LoginScreen';
-import Signup from './pages/Signup';
-import HomeScreen from './pages/HomeScreen';
-import Dashboard from './pages/Dashboard';
-import DoctorDashboard from './pages/DoctorDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import BookAppointment from './pages/BookAppointment';
-import Payment from './pages/Payment';
-import Profile from './pages/Profile';
-import Chat from './pages/Chat';
-import ConfirmEmail from './pages/ConfirmEmail';
-import ResetPassword from './pages/ResetPassword';
-import ForgotPassword from './pages/ForgotPassword';
-import BankDetails from './pages/BankDetails';
-import NotificationPreferences from './pages/NotificationPreferences';
-import Earnings from './pages/Earnings';
-import RepasseDetail from './pages/RepasseDetail';
 import LandingPage from './pages/LandingPage';
-import CrmValidation from './pages/CrmValidation';
-import PaymentSuccess from './pages/PaymentSuccess';
-import PaymentPending from './pages/PaymentPending';
-import PaymentFailure from './pages/PaymentFailure';
-import DoctorSchedule from './pages/DoctorSchedule';
-import TermsConditions from './pages/TermsConditions';
-import TermsOfUse from './pages/TermsOfUse';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import Lgpd from './pages/Lgpd';
 import NotFound from './pages/NotFound';
+
+// Secondary pages — lazy loaded to reduce initial bundle
+const Signup = lazy(() => import('./pages/Signup'));
+const HomeScreen = lazy(() => import('./pages/HomeScreen'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DoctorDashboard = lazy(() => import('./pages/DoctorDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const BookAppointment = lazy(() => import('./pages/BookAppointment'));
+const Payment = lazy(() => import('./pages/Payment'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Chat = lazy(() => import('./pages/Chat'));
+const ConfirmEmail = lazy(() => import('./pages/ConfirmEmail'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const BankDetails = lazy(() => import('./pages/BankDetails'));
+const NotificationPreferences = lazy(() => import('./pages/NotificationPreferences'));
+const Earnings = lazy(() => import('./pages/Earnings'));
+const RepasseDetail = lazy(() => import('./pages/RepasseDetail'));
+const CrmValidation = lazy(() => import('./pages/CrmValidation'));
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'));
+const PaymentPending = lazy(() => import('./pages/PaymentPending'));
+const PaymentFailure = lazy(() => import('./pages/PaymentFailure'));
+const DoctorSchedule = lazy(() => import('./pages/DoctorSchedule'));
+const TermsConditions = lazy(() => import('./pages/TermsConditions'));
+const TermsOfUse = lazy(() => import('./pages/TermsOfUse'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const Lgpd = lazy(() => import('./pages/Lgpd'));
+
+function PageLoader() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.bg }}>
+      <div className="spinner" />
+    </div>
+  );
+}
 
 type Role = 'PACIENTE' | 'MEDICO' | 'ADMIN';
 
@@ -107,7 +118,8 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
         {/* Landing page */}
         <Route path="/" element={<LandingPage />} />
 
@@ -144,6 +156,7 @@ export default function App() {
         {/* 404 fallback with telemetry */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

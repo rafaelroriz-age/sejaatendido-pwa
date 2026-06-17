@@ -61,6 +61,11 @@ export default function NotificationPreferences() {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [testingWhatsapp, setTestingWhatsapp] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [whatsappTestMsg, setWhatsappTestMsg] = useState('');
+  const [whatsappTestError, setWhatsappTestError] = useState('');
+  const [pushWebNote, setPushWebNote] = useState('');
 
   useEffect(() => { loadData(); }, []);
 
@@ -93,30 +98,42 @@ export default function NotificationPreferences() {
 
   async function handleSave() {
     if (prefs.whatsappEnabled && prefs.whatsappNumber.replace(/\D/g, '').length < 10) {
-      window.alert('Informe um número de WhatsApp válido.'); return;
+      setSaveError('Informe um número de WhatsApp válido.');
+      return;
     }
     setSaving(true);
+    setSaveMsg('');
+    setSaveError('');
     try {
       if (prefs.pushEnabled) {
         await ensurePushSubscription();
       }
       await savePreferenciasNotificacao(prefs);
       setHasChanges(false);
-      window.alert('Preferências de notificação salvas!');
-    } catch { window.alert('Não foi possível salvar as preferências.'); }
-    finally { setSaving(false); }
+      setSaveMsg('Preferências de notificação salvas!');
+      setTimeout(() => setSaveMsg(''), 3000);
+    } catch (err: unknown) {
+      const msg = (err as Error)?.message ?? '';
+      setSaveError(msg || 'Não foi possível salvar as preferências.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleTestWhatsapp() {
     if (prefs.whatsappNumber.replace(/\D/g, '').length < 10) {
-      window.alert('Informe um número de WhatsApp válido antes de testar.'); return;
+      setWhatsappTestError('Informe um número de WhatsApp válido antes de testar.');
+      return;
     }
     setTestingWhatsapp(true);
+    setWhatsappTestMsg('');
+    setWhatsappTestError('');
     try {
       const result = await testarNotificacaoWhatsapp(prefs.whatsappNumber);
-      window.alert(result.mensagem ?? 'Mensagem de teste enviada! Verifique seu WhatsApp.');
+      setWhatsappTestMsg(result.mensagem ?? 'Mensagem de teste enviada! Verifique seu WhatsApp.');
+      setTimeout(() => setWhatsappTestMsg(''), 4000);
     } catch {
-      window.alert('Não foi possível enviar a mensagem de teste. Verifique número, integração WhatsApp no backend e tente novamente.');
+      setWhatsappTestError('Não foi possível enviar a mensagem de teste. Verifique número, integração WhatsApp no backend e tente novamente.');
     } finally {
       setTestingWhatsapp(false);
     }
@@ -124,20 +141,25 @@ export default function NotificationPreferences() {
 
   async function ensurePushSubscription() {
     if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-      throw new Error('Push notifications não são suportadas neste navegador.');
+      // Browser doesn't support push — silently skip, don't block save
+      setPushWebNote('Notificações push não são suportadas neste navegador. Instale o app no celular para recebê-las.');
+      return;
     }
 
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      throw new Error('Permissão de notificação negada.');
+      throw new Error('Permissão de notificação negada. Habilite nas configurações do navegador.');
     }
 
-    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
     if (!vapidKey) {
-      throw new Error('VITE_VAPID_PUBLIC_KEY não configurada para push web.');
+      // VAPID key not configured — push won't be delivered, but don't fail the save
+      setPushWebNote('Chave VAPID não configurada. Push web requer configuração de servidor.');
+      return;
     }
 
-    const registration = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+    const registration = await navigator.serviceWorker.register(swUrl);
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
@@ -147,6 +169,7 @@ export default function NotificationPreferences() {
     }
 
     const json = subscription.toJSON();
+    // registerPushToken will silently skip if backend doesn't accept web-pwa
     await registerPushToken({
       endpoint: json.endpoint || subscription.endpoint,
       keys: json.keys,
@@ -154,6 +177,8 @@ export default function NotificationPreferences() {
       userAgent: navigator.userAgent,
       platform: 'web-pwa',
     });
+
+    setPushWebNote('Push web registrado localmente. A entrega depende de suporte no backend.');
   }
 
   const inputStyle: React.CSSProperties = { width: '100%', backgroundColor: Colors.inputBg, borderRadius: 14, padding: 16, fontSize: 16, border: `1px solid ${Colors.border}`, color: Colors.textPrimary, outline: 'none', boxSizing: 'border-box' };
@@ -206,7 +231,7 @@ export default function NotificationPreferences() {
             <Toggle value={prefs.whatsappEnabled} onChange={v => updatePref('whatsappEnabled', v)} color="#25D366" />
           </div>
 
-          {prefs.whatsappEnabled && (
+              {prefs.whatsappEnabled && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${Colors.borderLight}` }}>
               <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Número do WhatsApp</label>
               <input value={prefs.whatsappNumber} onChange={e => updatePref('whatsappNumber', maskPhone(e.target.value))} placeholder="(00) 90000-0000" style={inputStyle} />
@@ -228,6 +253,12 @@ export default function NotificationPreferences() {
                   : <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>📲 Enviar mensagem de teste</span>
                 }
               </button>
+              {whatsappTestMsg && (
+                <p style={{ fontSize: 13, color: Colors.success, fontWeight: 600, marginTop: 8 }}>{whatsappTestMsg}</p>
+              )}
+              {whatsappTestError && (
+                <p style={{ fontSize: 13, color: Colors.error, marginTop: 8 }} role="alert">{whatsappTestError}</p>
+              )}
             </div>
           )}
         </div>
@@ -273,6 +304,16 @@ export default function NotificationPreferences() {
         }}>
           {saving ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>{hasChanges ? 'Salvar Preferências' : 'Sem alterações'}</span>}
         </button>
+
+        {saveMsg && (
+          <p style={{ fontSize: 14, color: Colors.success, fontWeight: 700, textAlign: 'center', marginTop: 12 }}>{saveMsg}</p>
+        )}
+        {saveError && (
+          <p style={{ fontSize: 14, color: Colors.error, textAlign: 'center', marginTop: 12 }} role="alert">{saveError}</p>
+        )}
+        {pushWebNote && (
+          <p style={{ fontSize: 12, color: Colors.textMuted, textAlign: 'center', marginTop: 8, lineHeight: '18px' }}>{pushWebNote}</p>
+        )}
 
         <div style={{ height: 40 }} />
       </div>

@@ -9,14 +9,14 @@ related:
   - ../systems/api-backend-e-contratos.md
   - ../plans/divergencias.md
 tags: [pagamento, pix, cartao, mercadopago]
-last_updated: 2026-06-16
+last_updated: 2026-06-17
 ---
 
 <!-- ai-summary
 System: pagamento de consulta via PIX ou cartao usando endpoints /v1/pagamentos.
-Flow: criar pagamento -> exibir checkout/QR -> polling sync -> confirmar status final.
+Flow: criar pagamento -> exibir checkout/QR -> polling sync -> retorno checkout com sync imediato -> confirmar status final.
 Owner: frontend.
-Systems: src/pages/Payment.tsx, src/services/api.ts, src/pages/PaymentSuccess.tsx.
+Systems: src/pages/Payment.tsx, src/services/api.ts, src/pages/PaymentSuccess.tsx, src/pages/PaymentPending.tsx, src/pages/PaymentFailure.tsx.
 Status: review.
 -->
 
@@ -42,6 +42,8 @@ Status: review.
 
 1. criarPagamento({ consultaId, metodoPagamento: 'card' }) chama POST /v1/pagamentos/cartao.
 2. UI redireciona para initPoint/sandboxInitPoint do Mercado Pago.
+3. No retorno para /payment/success, /payment/pending ou /payment/failure, a tela executa syncPagamento(consultaId) uma vez para reconciliar status.
+4. Se o backend retornar status PAGO no retorno pending/failure, a UI redireciona automaticamente para /payment/success.
 
 ## Regras e contratos
 
@@ -49,7 +51,6 @@ Status: review.
 - Campo canonico de confirmacao e pagamento.status.
 - Polling para em status final nao pendente.
 
-## Gap conhecido
+## Nota de reconciliacao
 
-- Paginas de retorno (PaymentSuccess/Pending/Failure) mostram parametros da URL, mas nao executam syncPagamento automaticamente.
-- Gap registrado em ../plans/divergencias.md e ../plans/duvidas-abertas.md.
+- O gap de sincronizacao no retorno de checkout foi resolvido em 2026-06-17 com sync imediato nas telas de retorno.

@@ -1,10 +1,24 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loginRequest, loginCpfRequest } from '../services/api';
+import { loginRequest, loginCpfRequest, loginGoogleRequest } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import axios from 'axios';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (cfg: { client_id: string; callback: (r: { credential: string }) => void; auto_select?: boolean }) => void;
+          renderButton: (el: HTMLElement, opts: Record<string, unknown>) => void;
+          disableAutoSelect: () => void;
+        };
+      };
+    };
+  }
+}
 
 const LOGO_URL = `${import.meta.env.BASE_URL}logo-oficial.png`;
 
@@ -40,6 +54,9 @@ export default function LoginScreen() {
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   const navigateByRole = useCallback((tipo: string) => {
     switch (tipo) {
@@ -49,6 +66,68 @@ export default function LoginScreen() {
       default: navigate('/home', { replace: true });
     }
   }, [navigate]);
+
+  // Initialize Google Identity Services when mode is paciente and SDK is ready
+  useEffect(() => {
+    if (mode !== 'paciente' || !googleClientId || !googleBtnRef.current) return;
+
+    const tryRender = () => {
+      const g = window.google;
+      if (!g) return false;
+
+      g.accounts.id.initialize({
+        client_id: googleClientId,
+        auto_select: false,
+        callback: async ({ credential }) => {
+          setGoogleLoading(true);
+          setErrorMsg('');
+          try {
+            const { accessToken, usuario, refreshToken } = await loginGoogleRequest(credential);
+            if (usuario.tipo === 'MEDICO') {
+              setErrorMsg('Login com Google não está disponível para médicos. Use CPF e senha.');
+              return;
+            }
+            const user = {
+              id: usuario.id,
+              nome: usuario.nome,
+              email: usuario.email,
+              telefone: usuario.telefone,
+              tipo: usuario.tipo,
+            };
+            await saveAuthSession(accessToken, user, refreshToken);
+            navigateByRole(usuario.tipo);
+          } catch (error) {
+            if (axios.isAxiosError(error)) {
+              const status = error.response?.status;
+              if (status === 401 || status === 400) { setErrorMsg('Não foi possível autenticar com o Google. Tente novamente.'); return; }
+            }
+            showErrorAlert(error, 'Erro no login com Google');
+          } finally {
+            setGoogleLoading(false);
+          }
+        },
+      });
+
+      if (googleBtnRef.current) {
+        g.accounts.id.renderButton(googleBtnRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'signin_with',
+          shape: 'rectangular',
+          width: googleBtnRef.current.offsetWidth || 300,
+          logo_alignment: 'left',
+        });
+      }
+      return true;
+    };
+
+    if (!tryRender()) {
+      // SDK might still be loading; retry once after a short delay
+      const t = setTimeout(tryRender, 800);
+      return () => clearTimeout(t);
+    }
+  }, [mode, googleClientId, navigateByRole]);
 
   function handleCpfChange(e: React.ChangeEvent<HTMLInputElement>) {
     setCpf(applyCpfMask(e.target.value));
@@ -253,6 +332,24 @@ export default function LoginScreen() {
               Esqueceu sua senha?
             </span>
           </div>
+
+          {mode === 'paciente' && googleClientId && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0' }}>
+                <div style={{ flex: 1, height: 1, backgroundColor: Colors.borderLight }} />
+                <span style={{ fontSize: Font.xs, color: Colors.textMuted, fontWeight: 600 }}>ou</span>
+                <div style={{ flex: 1, height: 1, backgroundColor: Colors.borderLight }} />
+              </div>
+
+              {googleLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
+                  <div className="spinner" />
+                </div>
+              ) : (
+                <div ref={googleBtnRef} style={{ width: '100%', minHeight: 44 }} />
+              )}
+            </>
+          )}
         </div>
 
         <div style={{ textAlign: 'center', marginTop: Space.xl }}>

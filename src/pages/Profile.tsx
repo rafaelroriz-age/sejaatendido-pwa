@@ -14,6 +14,8 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [saveError, setSaveError] = useState('');
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -40,8 +42,10 @@ export default function Profile() {
   }, []);
 
   async function handleSave() {
+    setSaveMsg('');
+    setSaveError('');
     if (!nome.trim()) {
-      window.alert('Informe seu nome.');
+      setSaveError('Informe seu nome.');
       return;
     }
     setSaving(true);
@@ -65,7 +69,8 @@ export default function Profile() {
       setTelefone(updatedUser.telefone ?? '');
       setCpf(updatedUser.cpf ? applyCpfMask(updatedUser.cpf) : '');
       setEditing(false);
-      window.alert('Perfil atualizado com sucesso!');
+      setSaveMsg('Perfil atualizado com sucesso!');
+      setTimeout(() => setSaveMsg(''), 3000);;
     } catch (error) {
       showErrorAlert(error, 'Erro ao salvar perfil');
     } finally {
@@ -138,6 +143,8 @@ export default function Profile() {
           {editing && (
             <button onClick={handleSave} disabled={saving} style={{ width: '100%', backgroundColor: Colors.success, borderRadius: Radius.md, padding: Space.lg, border: 'none', color: '#fff', fontSize: 16, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, boxShadow: `0 6px 12px ${Colors.success}59` }}>{saving ? 'Salvando...' : 'Salvar Alterações'}</button>
           )}
+          {saveMsg && <p style={{ fontSize: 14, color: Colors.success, fontWeight: 700, marginTop: 12 }}>{saveMsg}</p>}
+          {saveError && <p style={{ fontSize: 14, color: Colors.error, marginTop: 12 }} role="alert">{saveError}</p>}
         </Card>
 
         <Card style={{ marginBottom: Space.lg }}>

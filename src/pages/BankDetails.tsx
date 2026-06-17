@@ -85,6 +85,8 @@ export default function BankDetails() {
   const [showBancoList, setShowBancoList] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => { loadDados(); }, []);
 
@@ -124,8 +126,12 @@ export default function BankDetails() {
         agencia: showBanco ? agencia : undefined,
         conta: showBanco ? conta : undefined,
       });
-      window.alert('Dados bancários salvos com sucesso!');
-    } catch { window.alert('Não foi possível salvar os dados bancários.'); }
+      setSaveMsg('Dados bancários salvos com sucesso!');
+      setSaveError('');
+      setTimeout(() => setSaveMsg(''), 3000);
+    } catch {
+      setSaveError('Não foi possível salvar os dados bancários.');
+    }
     finally { setLoading(false); }
   }
 
@@ -237,6 +243,9 @@ export default function BankDetails() {
         }}>
           {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Salvar Dados Bancários</span>}
         </button>
+
+        {saveMsg && <p style={{ fontSize: 14, color: Colors.success, fontWeight: 700, textAlign: 'center', marginTop: 12 }}>{saveMsg}</p>}
+        {saveError && <p style={{ fontSize: 14, color: Colors.error, textAlign: 'center', marginTop: 12 }} role="alert">{saveError}</p>}
 
         <div style={{ height: 40 }} />
       </div>

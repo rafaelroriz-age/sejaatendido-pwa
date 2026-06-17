@@ -23,7 +23,7 @@ Time for the minimum base: one afternoon. After that it becomes a daily habit.
 - [ ] Create a dedicated branch: `git checkout -b second-brain`.
 - [ ] Have an AI assistant with file access (Claude Code, Cursor, or equivalent) open
   at the project root.
-- [ ] Open `prompt_second_brain_existing_project.md` (the prompt for the agent) — I
+- [ ] Open `prompt_segundo_cerebro_projeto_existente.md` (the prompt for the agent) — I
   use it in Phase 2.
 
 > Why a separate branch: everything here is just text/markdown, reversible. The branch
@@ -63,7 +63,7 @@ automating".
 Here I use the ready-made prompt. It already assumes an existing project and does the
 consolidation.
 
-- [ ] Open `prompt_second_brain_existing_project.md`.
+- [ ] Open `prompt_segundo_cerebro_projeto_existente.md`.
 - [ ] Fill in the fields between `«»` in the `<user_input>` section with my project's
   data (path, name, domain, where the current docs live, folders to ignore, language).
 - [ ] Copy the whole ```` ```xml ```` block and paste it as the instruction for the

@@ -75,22 +75,24 @@ export default function SignupScreen() {
 
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [stepError, setStepError] = useState('');
 
   const progress = useMemo(() => (step / 4) * 100, [step]);
 
   function validateStep(current: SignupStep): boolean {
+    setStepError('');
     if (current === 1) {
       if (!nome.trim() || !email.trim()) {
-        window.alert('Preencha nome e email para continuar.');
+        setStepError('Preencha nome e email para continuar.');
         return false;
       }
       const rawCpf = cpf.replace(/\D/g, '');
       if (rawCpf && !isValidCpf(rawCpf)) {
-        window.alert('CPF invalido. Verifique os digitos.');
+        setStepError('CPF inválido. Verifique os dígitos.');
         return false;
       }
       if (tipo === 'MEDICO' && !rawCpf) {
-        window.alert('Informe um CPF valido (11 digitos).');
+        setStepError('Informe um CPF válido (11 dígitos).');
         return false;
       }
       return true;
@@ -99,7 +101,7 @@ export default function SignupScreen() {
     if (current === 2) {
       const normalized = normalizePhone(telefone);
       if (normalized.length < 10 || normalized.length > 11) {
-        window.alert('Informe um telefone/WhatsApp valido com DDD.');
+        setStepError('Informe um telefone/WhatsApp válido com DDD.');
         return false;
       }
       return true;
@@ -108,11 +110,11 @@ export default function SignupScreen() {
     if (current === 3) {
       const pwdError = validatePassword(senha);
       if (pwdError) {
-        window.alert(pwdError);
+        setStepError(pwdError);
         return false;
       }
       if (senha !== confirmaSenha) {
-        window.alert('As senhas nao coincidem.');
+        setStepError('As senhas não coincidem.');
         return false;
       }
       return true;
@@ -120,8 +122,8 @@ export default function SignupScreen() {
 
     if (current === 4) {
       const nextErrors: LegalConsentErrors = {
-        termos: aceitouTermos ? undefined : 'Voce precisa aceitar os Termos e Condicoes de Uso.',
-        privacidade: aceitouPrivacidade ? undefined : 'Voce precisa aceitar a Politica de Privacidade.',
+        termos: aceitouTermos ? undefined : 'Você precisa aceitar os Termos e Condições de Uso.',
+        privacidade: aceitouPrivacidade ? undefined : 'Você precisa aceitar a Política de Privacidade.',
       };
       setLegalErrors(nextErrors);
       if (nextErrors.termos || nextErrors.privacidade) return false;
@@ -380,6 +382,12 @@ export default function SignupScreen() {
               </button>
             )}
           </div>
+
+          {stepError && (
+            <div style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: '10px 14px', marginTop: 12, border: '1px solid #EF9A9A' }}>
+              <span style={{ fontSize: 14, color: '#C62828', fontWeight: 600 }} role="alert">{stepError}</span>
+            </div>
+          )}
         </div>
 
         <div style={{ textAlign: 'center', marginTop: Space.xl }}>

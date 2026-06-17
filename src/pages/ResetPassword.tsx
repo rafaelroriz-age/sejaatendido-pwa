@@ -11,26 +11,29 @@ export default function ResetPassword() {
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
     if (!token) navigate('/esqueci-senha', { replace: true });
   }, [token, navigate]);
 
   async function handleReset() {
-    if (!senha || !confirmarSenha) { window.alert('Preencha ambos os campos'); return; }
-    if (senha !== confirmarSenha) { window.alert('As senhas não coincidem'); return; }
-    if (senha.length < 8) { window.alert('A senha deve ter pelo menos 8 caracteres'); return; }
-    if (!/[A-Z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra maiúscula'); return; }
-    if (!/[a-z]/.test(senha)) { window.alert('A senha deve conter pelo menos uma letra minúscula'); return; }
-    if (!/[0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um número'); return; }
-    if (!/[^A-Za-z0-9]/.test(senha)) { window.alert('A senha deve conter pelo menos um caractere especial'); return; }
-    if (!token) { window.alert('Token de recuperação não encontrado. Use o link enviado por email.'); return; }
+    setErrorMsg('');
+    if (!senha || !confirmarSenha) { setErrorMsg('Preencha ambos os campos.'); return; }
+    if (senha !== confirmarSenha) { setErrorMsg('As senhas não coincidem.'); return; }
+    if (senha.length < 8) { setErrorMsg('A senha deve ter pelo menos 8 caracteres.'); return; }
+    if (!/[A-Z]/.test(senha)) { setErrorMsg('A senha deve conter pelo menos uma letra maiúscula.'); return; }
+    if (!/[a-z]/.test(senha)) { setErrorMsg('A senha deve conter pelo menos uma letra minúscula.'); return; }
+    if (!/[0-9]/.test(senha)) { setErrorMsg('A senha deve conter pelo menos um número.'); return; }
+    if (!/[^A-Za-z0-9]/.test(senha)) { setErrorMsg('A senha deve conter pelo menos um caractere especial.'); return; }
+    if (!token) { setErrorMsg('Token de recuperação não encontrado. Use o link enviado por email.'); return; }
 
     setLoading(true);
     try {
       await resetPasswordRequest(token, senha);
-      window.alert('Senha redefinida com sucesso!');
-      navigate('/login', { replace: true });
+      setSuccessMsg('Senha redefinida com sucesso!');
+      setTimeout(() => navigate('/login', { replace: true }), 1500);
     } catch (error) { showErrorAlert(error, 'Erro ao redefinir senha'); }
     finally { setLoading(false); }
   }
@@ -54,6 +57,17 @@ export default function ResetPassword() {
           <label style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 8 }}>Confirmar Senha</label>
           <input type="password" value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)} placeholder="Repita a senha" style={inputStyle} />
         </div>
+
+        {errorMsg && (
+          <div style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: '10px 14px', marginBottom: 16, border: '1px solid #EF9A9A' }}>
+            <span style={{ fontSize: 14, color: '#C62828', fontWeight: 600 }} role="alert">{errorMsg}</span>
+          </div>
+        )}
+        {successMsg && (
+          <div style={{ backgroundColor: '#E8F5E9', borderRadius: 12, padding: '10px 14px', marginBottom: 16, border: '1px solid #A5D6A7' }}>
+            <span style={{ fontSize: 14, color: '#2E7D32', fontWeight: 600 }}>{successMsg}</span>
+          </div>
+        )}
 
         <button onClick={handleReset} disabled={loading} style={{
           width: '100%', backgroundColor: Colors.primary, borderRadius: 14, padding: 16, border: 'none',

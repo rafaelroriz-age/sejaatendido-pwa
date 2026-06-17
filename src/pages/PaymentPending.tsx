@@ -1,4 +1,6 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { syncPagamento } from '../services/api';
 import Colors, { Radius } from '../theme/colors';
 
 export default function PaymentPending() {
@@ -8,6 +10,39 @@ export default function PaymentPending() {
   const paymentId = params.get('payment_id') ?? params.get('collection_id');
   const merchantOrderId = params.get('merchant_order_id');
   const externalReference = params.get('external_reference');
+  const queryString = params.toString();
+  const consultaIdFromQuery = params.get('consultaId') ?? params.get('consulta_id');
+  const consultaId = useMemo(() => consultaIdFromQuery ?? externalReference, [consultaIdFromQuery, externalReference]);
+
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string>('');
+
+  useEffect(() => {
+    let active = true;
+
+    async function reconcilePaymentStatus() {
+      if (!consultaId) return;
+      try {
+        const result = await syncPagamento(consultaId);
+        if (!active) return;
+        const nextStatus = (result?.status ?? '').toUpperCase();
+        setSyncStatus(result?.status ?? null);
+
+        if (nextStatus === 'PAGO') {
+          navigate(`/payment/success${queryString ? `?${queryString}` : ''}`, { replace: true });
+        }
+      } catch {
+        if (!active) return;
+        setSyncError('Não foi possível sincronizar o status do pagamento agora.');
+      }
+    }
+
+    reconcilePaymentStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [consultaId, navigate, queryString]);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', flexDirection: 'column' }}>
@@ -33,6 +68,18 @@ export default function PaymentPending() {
               Após realizar o pagamento no estabelecimento indicado, aguarde a confirmação automática. Você receberá uma notificação quando o status for atualizado.
             </p>
           </div>
+
+          {syncStatus && (
+            <p style={{ fontSize: 13, color: Colors.textSecondary, marginBottom: 12 }}>
+              Última sincronização: <strong>{syncStatus}</strong>
+            </p>
+          )}
+
+          {syncError && (
+            <p style={{ fontSize: 13, color: '#B00020', marginBottom: 12 }} role="alert">
+              {syncError}
+            </p>
+          )}
 
           {(paymentId || merchantOrderId || externalReference) && (
             <div style={{ backgroundColor: Colors.inputBg, borderRadius: 12, padding: 16, marginBottom: 24, textAlign: 'left' }}>

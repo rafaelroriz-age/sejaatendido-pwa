@@ -36,25 +36,30 @@ export default function RepasseDetail() {
   const { id } = useParams<{ id: string }>();
   const [repasse, setRepasse] = useState<Repasse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errorText, setErrorText] = useState('');
 
-  useEffect(() => { loadRepasse(); }, []);
+  useEffect(() => {
+    loadRepasse();
+  }, []);
 
   async function loadRepasse() {
+    if (!id) {
+      setErrorText('Repasse inválido.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setErrorText('');
     try {
-      const data = await fetchRepasseById(id!);
+      const data = await fetchRepasseById(id);
       setRepasse(data);
     } catch {
-      setRepasse({
-        id: id!, periodo: '10 mar - 16 mar', valor: 750, status: 'concluido',
-        data_repasse: '2026-03-16', chave_pix_destino: '***.***.***-00', comprovante_url: '',
-        consultas: [
-          { id: '1', paciente: 'Maria Santos', horario: '09:00', valor: 150, status: 'confirmado' },
-          { id: '2', paciente: 'Joao Oliveira', horario: '10:30', valor: 200, status: 'confirmado' },
-          { id: '3', paciente: 'Ana Costa', horario: '14:00', valor: 150, status: 'confirmado' },
-          { id: '4', paciente: 'Carlos Pereira', horario: '08:30', valor: 250, status: 'confirmado' },
-        ],
-      });
-    } finally { setLoading(false); }
+      setRepasse(null);
+      setErrorText('Nao foi possivel carregar os detalhes do repasse. Tente novamente em instantes.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const headerStyle: React.CSSProperties = {
@@ -76,6 +81,40 @@ export default function RepasseDetail() {
           <Skeleton height={80} radius={Radius.lg} style={{ marginBottom: Space.md }} />
           <Skeleton height={60} radius={Radius.md} style={{ marginBottom: Space.md }} />
           <Skeleton height={60} radius={Radius.md} />
+        </div>
+      </div>
+    );
+  }
+
+  if (errorText) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: Colors.bg }}>
+        <div style={headerStyle}>
+          <button onClick={() => navigate(-1)} style={{ color: '#fff', fontSize: Font.sm, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar</button>
+          <span style={{ color: '#fff', fontSize: Font.lg - 2, fontWeight: 800, letterSpacing: -0.3 }}>Detalhe do Repasse</span>
+          <div style={{ width: 60 }} />
+        </div>
+
+        <div style={{ padding: 20, paddingTop: Space.lg }}>
+          <Card>
+            <p style={{ margin: 0, fontSize: Font.sm, color: Colors.error, fontWeight: 700 }}>{errorText}</p>
+            <div style={{ display: 'flex', gap: Space.sm, marginTop: Space.md }}>
+              <button
+                type="button"
+                onClick={loadRepasse}
+                style={{ backgroundColor: Colors.primary, color: '#fff', border: 'none', borderRadius: Radius.md, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Tentar novamente
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                style={{ backgroundColor: 'transparent', color: Colors.textSecondary, border: `1px solid ${Colors.border}`, borderRadius: Radius.md, padding: '10px 14px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Voltar
+              </button>
+            </div>
+          </Card>
         </div>
       </div>
     );
