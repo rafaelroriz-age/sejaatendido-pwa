@@ -30,6 +30,9 @@ const MOCK_ADMIN_USER = {
   tipo: 'ADMIN' as const,
 };
 
+const LOW_COST_MEDICO_ID = 'med-002';
+const LOW_COST_CONSULTA_VALOR_CENTAVOS = 10; // R$ 0,10
+
 const MOCK_MEDICOS = [
   {
     id: 'med-001',
@@ -42,6 +45,7 @@ const MOCK_MEDICOS = [
     id: 'med-002',
     crm: 'CRM/RJ 54321',
     especialidades: ['Cardiologia'],
+    valorConsulta: LOW_COST_CONSULTA_VALOR_CENTAVOS,
     aprovado: true,
     usuario: { id: 'usr-002', nome: 'Dra. Ana Costa', email: 'ana@mock.com', telefone: '+5511999992222' },
   },
@@ -85,44 +89,44 @@ const MOCK_HORARIOS_BLOQUEADOS: Array<{ id: string; dataHora: string; duracao: n
 const MOCK_CONSULTAS_PACIENTE = [
   {
     id: 'consulta-001',
-    medicoId: 'med-001',
+    medicoId: LOW_COST_MEDICO_ID,
     pacienteId: 'paciente-001',
     dataHora: tomorrow,
     sintomas: 'Consulta de rotina',
     status: 'PENDENTE',
-    valor: 15000,
+    valor: LOW_COST_CONSULTA_VALOR_CENTAVOS,
     meetLink: null,
-    medico: MOCK_MEDICOS[0],
+    medico: MOCK_MEDICOS[1],
   },
 ];
 
 const MOCK_CONSULTAS_MEDICO = [
   {
     id: 'consulta-002',
-    medicoId: 'med-001',
+    medicoId: LOW_COST_MEDICO_ID,
     pacienteId: 'paciente-001',
     dataHora: tomorrow,
     sintomas: 'Dor de cabeça frequente',
     status: 'CONFIRMADA',
-    valor: 15000,
+    valor: LOW_COST_CONSULTA_VALOR_CENTAVOS,
     meetLink: 'https://meet.google.com/mock-link',
     paciente: { usuario: { nome: 'Maria Teste', email: 'maria.teste@mock.com', telefone: '+5511988880000' } },
   },
 ];
 
 const MOCK_SALDO = {
-  saldoALiberarCentavos: 35000,
-  saldoPendenteCentavos: 15000,
-  ganhosHojeCentavos: 15000,
+  saldoALiberarCentavos: LOW_COST_CONSULTA_VALOR_CENTAVOS,
+  saldoPendenteCentavos: LOW_COST_CONSULTA_VALOR_CENTAVOS,
+  ganhosHojeCentavos: LOW_COST_CONSULTA_VALOR_CENTAVOS,
   proximoRepasse: '2026-05-15',
-  ganhosSemana: [5000, 10000, 15000, 0, 20000, 8000, 0],
+  ganhosSemana: [0, 0, LOW_COST_CONSULTA_VALOR_CENTAVOS, 0, 0, 0, 0],
 };
 
 const MOCK_REPASSES = {
   repasses: [
     {
       id: 'repasse-001',
-      valorRepasse: 35000,
+      valorRepasse: LOW_COST_CONSULTA_VALOR_CENTAVOS,
       status: 'PENDENTE',
       dataRepasse: null,
       criadoEm: new Date().toISOString(),
@@ -147,7 +151,7 @@ const MOCK_REPASSE_DETAIL = {
   repasses: [
     {
       id: 'repasse-001',
-      valorRepasse: 35000,
+      valorRepasse: LOW_COST_CONSULTA_VALOR_CENTAVOS,
       status: 'PENDENTE',
       consulta: {
         id: 'consulta-002',
@@ -157,6 +161,13 @@ const MOCK_REPASSE_DETAIL = {
     },
   ],
 };
+
+function getConsultaValorCentavos(consultaId: unknown): number {
+  if (typeof consultaId !== 'string') return 15000;
+  const allConsultas = [...MOCK_CONSULTAS_PACIENTE, ...MOCK_CONSULTAS_MEDICO];
+  const found = allConsultas.find(c => c.id === consultaId);
+  return found?.valor ?? 15000;
+}
 
 const MOCK_DADOS_BANCARIOS = {
   tipoChavePix: 'CPF',
@@ -192,9 +203,11 @@ export const handlers = [
   // ── AUTH ──────────────────────────────────────────────────────────────────
 
   http.post(`${BASE}/auth/login`, async ({ request }) => {
-    const body = await request.json() as { email?: string };
+    const body = await request.json() as { email?: string; cpf?: string };
     const email = body?.email ?? '';
+    const cpf = body?.cpf ?? '';
     // Roteamento por email para testar diferentes papéis
+    if (cpf.replace(/\D/g, '').length === 11) return authResponse(MOCK_MEDICO_USER);
     if (email.includes('admin')) return authResponse(MOCK_ADMIN_USER);
     if (email.includes('medico') || email.includes('doctor') || email.includes('med')) return authResponse(MOCK_MEDICO_USER);
     return authResponse(MOCK_PACIENTE);
@@ -353,6 +366,7 @@ export const handlers = [
 
   http.post(`${BASE}/pacientes/consultas`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const medico = MOCK_MEDICOS.find(m => m.id === body.medicoId) ?? MOCK_MEDICOS[0];
     const nova = {
       id: `consulta-${Date.now()}`,
       medicoId: body.medicoId,
@@ -360,9 +374,9 @@ export const handlers = [
       dataHora: body.dataHora ?? body.data,
       sintomas: body.sintomas ?? body.motivo ?? 'Consulta geral',
       status: 'PENDENTE',
-      valor: 15000,
+      valor: medico.valorConsulta ?? 15000,
       meetLink: null,
-      medico: MOCK_MEDICOS.find(m => m.id === body.medicoId) ?? MOCK_MEDICOS[0],
+      medico,
     };
     MOCK_CONSULTAS_PACIENTE.push(nova as typeof MOCK_CONSULTAS_PACIENTE[0]);
     return HttpResponse.json({ consulta: nova }, { status: 201 });
@@ -370,6 +384,7 @@ export const handlers = [
 
   http.post(`${BASE}/consultas`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const medico = MOCK_MEDICOS.find(m => m.id === body.medicoId) ?? MOCK_MEDICOS[0];
     const nova = {
       id: `consulta-${Date.now()}`,
       medicoId: body.medicoId,
@@ -377,9 +392,9 @@ export const handlers = [
       dataHora: body.dataHora ?? body.data,
       sintomas: body.sintomas ?? body.motivo ?? 'Consulta geral',
       status: 'PENDENTE',
-      valor: 15000,
+      valor: medico.valorConsulta ?? 15000,
       meetLink: null,
-      medico: MOCK_MEDICOS.find(m => m.id === body.medicoId) ?? MOCK_MEDICOS[0],
+      medico,
     };
     MOCK_CONSULTAS_PACIENTE.push(nova as typeof MOCK_CONSULTAS_PACIENTE[0]);
     return HttpResponse.json({ consulta: nova }, { status: 201 });
@@ -401,13 +416,14 @@ export const handlers = [
 
   http.post(`${BASE}/v1/pagamentos/pix`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const valor = getConsultaValorCentavos(body.consultaId);
     const pixCode = '00020126580014BR.GOV.BCB.PIX0136mock-pix-key-para-testes';
     const pagId = `pag-${Date.now()}`;
     return HttpResponse.json({
       pagamento: {
         id: pagId,
         consultaId: body.consultaId,
-        valor: 15000,
+        valor,
         status: 'PENDENTE',
         metodo: 'PIX',
         criadoEm: new Date().toISOString(),
@@ -423,12 +439,13 @@ export const handlers = [
 
   http.post(`${BASE}/v1/pagamentos/cartao`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const valor = getConsultaValorCentavos(body.consultaId);
     const pagId = `pag-mp-${Date.now()}`;
     return HttpResponse.json({
       pagamento: {
         id: pagId,
         consultaId: body.consultaId,
-        valor: 15000,
+        valor,
         status: 'PENDENTE',
         metodo: 'CARTAO',
         criadoEm: new Date().toISOString(),

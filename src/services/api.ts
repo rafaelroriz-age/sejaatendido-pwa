@@ -741,6 +741,15 @@ function normalizePhoneDigits(value?: string): string | undefined {
   return digits.length >= 10 ? digits : undefined;
 }
 
+function normalizePhoneE164Br(value?: string): string | undefined {
+  const digits = normalizePhoneDigits(value);
+  if (!digits) return undefined;
+  if (digits.length === 11) return `+55${digits}`;
+  if (digits.length === 12 && digits.startsWith('55')) return `+${digits}`;
+  if (digits.length === 13 && digits.startsWith('55')) return `+${digits}`;
+  return undefined;
+}
+
 function normalizePreferenciasNotificacaoPayload(raw: any): PreferenciasNotificacao | null {
   if (!raw || typeof raw !== 'object') return null;
   return {
@@ -849,29 +858,52 @@ export async function testarNotificacaoWhatsapp(whatsappNumber?: string): Promis
   ];
 
   const normalizedPhone = normalizePhoneDigits(whatsappNumber);
-  const payload = normalizedPhone
-    ? {
-        whatsappNumber: normalizedPhone,
-        telefone: normalizedPhone,
-        numero: normalizedPhone,
-      }
-    : {};
+  const normalizedPhoneE164 = normalizePhoneE164Br(whatsappNumber);
+  const payloadCandidates: Array<Record<string, string>> = [];
+
+  if (normalizedPhone) {
+    payloadCandidates.push({
+      whatsappNumber: normalizedPhone,
+      telefone: normalizedPhone,
+      numero: normalizedPhone,
+    });
+  }
+
+  if (normalizedPhoneE164) {
+    payloadCandidates.push({
+      whatsappNumber: normalizedPhoneE164,
+      telefone: normalizedPhoneE164,
+      numero: normalizedPhoneE164,
+    });
+    payloadCandidates.push({
+      whatsappNumber: normalizedPhoneE164.replace('+', ''),
+      telefone: normalizedPhoneE164.replace('+', ''),
+      numero: normalizedPhoneE164.replace('+', ''),
+    });
+  }
+
+  if (payloadCandidates.length === 0) payloadCandidates.push({});
 
   let lastError: unknown;
   for (const endpoint of endpoints) {
-    try {
-      const res = await api.post(endpoint, payload, { timeout: 30000 });
-      return {
-        ok: Boolean(res.data?.ok ?? true),
-        mensagem: res.data?.mensagem ?? res.data?.message,
-      };
-    } catch (error) {
-      const status = (error as any)?.response?.status;
-      if (status === 404 || status === 405) {
+    for (const payload of payloadCandidates) {
+      try {
+        const res = await api.post(endpoint, payload, { timeout: 30000 });
+        return {
+          ok: Boolean(res.data?.ok ?? true),
+          mensagem: res.data?.mensagem ?? res.data?.message,
+        };
+      } catch (error) {
+        const status = (error as any)?.response?.status;
         lastError = error;
-        continue;
+        if (status === 404 || status === 405) {
+          break;
+        }
+        if ((status === 400 || status === 422) && payloadCandidates.length > 1) {
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
   }
 

@@ -9,7 +9,7 @@ related:
   - ../decisions/adr-0001-fallback-endpoints-notificacao.md
   - ../plans/duvidas-abertas.md
 tags: [notificacao, push, whatsapp, preferencia]
-last_updated: 2026-06-16
+last_updated: 2026-06-17
 ---
 
 <!-- ai-summary
@@ -34,6 +34,25 @@ Status: review.
 3. savePreferenciasNotificacao tenta salvar em tres endpoints alternativos.
 4. Em indisponibilidade dos endpoints de notificacao (404/405), frontend usa fallback localStorage.
 5. Teste de WhatsApp tenta multiplos endpoints em sequencia (testarNotificacaoWhatsapp).
+
+## Diagnostico rapido (SALVY)
+
+- Frontend nao integra Twilio diretamente; o envio real depende do backend/integrador SALVY.
+- Endpoints de teste de WhatsApp exigem autenticacao Bearer valida.
+- O frontend tenta variacoes de formato de numero no teste (nacional e E.164 BR) para reduzir falsos negativos de contrato.
+
+### Evidencia operacional (2026-06-17)
+
+- POST /notificacoes/whatsapp-test sem token -> 401 `{"erro":"Token não fornecido"}`
+- POST /notificacoes/whatsapp/teste sem token -> 401 `{"erro":"Token não fornecido"}`
+- POST /usuarios/me/notificacoes/whatsapp/teste sem token -> 401 `{"erro":"Token não fornecido"}`
+
+## Validacao recomendada no backend
+
+1. Logar payload recebido no endpoint de teste (sanitizado, sem dados sensiveis).
+2. Logar chamada ao SALVY com status HTTP, body resumido e codigo de erro.
+3. Confirmar formato aceito para destino WhatsApp: local (11 digitos) vs E.164 (+55...).
+4. Definir endpoint canonico unico para teste WhatsApp e manter aliases apenas durante transicao.
 
 ## Push web
 

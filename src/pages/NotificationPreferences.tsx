@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser } from '../storage/localStorage';
 import { fetchPreferenciasNotificacao, fetchPerfil, registerPushToken, savePreferenciasNotificacao, testarNotificacaoWhatsapp } from '../services/api';
+import { handleApiError } from '../utils/errorHandler';
 import Colors from '../theme/colors';
 
 interface Prefs {
@@ -132,8 +133,8 @@ export default function NotificationPreferences() {
       const result = await testarNotificacaoWhatsapp(prefs.whatsappNumber);
       setWhatsappTestMsg(result.mensagem ?? 'Mensagem de teste enviada! Verifique seu WhatsApp.');
       setTimeout(() => setWhatsappTestMsg(''), 4000);
-    } catch {
-      setWhatsappTestError('Não foi possível enviar a mensagem de teste. Verifique número, integração WhatsApp no backend e tente novamente.');
+    } catch (error) {
+      setWhatsappTestError(`Não foi possível enviar a mensagem de teste. ${handleApiError(error)}. Verifique sessão ativa, formato do número e integração SALVY no backend.`);
     } finally {
       setTestingWhatsapp(false);
     }

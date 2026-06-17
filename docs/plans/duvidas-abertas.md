@@ -27,3 +27,4 @@ Status: draft.
 1. O fluxo de login social Google deve ser reativado na UI ou removido do checklist operacional?
 2. O service worker de push deve registrar em sw.js ou usar diretamente o worker gerado pelo vite-plugin-pwa?
 3. Quais dados legais reais substituem os placeholders em src/config/legal.ts (razao social, CNPJ, DPO, canal LGPD)?
+4. Qual sera o contrato canonico do backend para envio WhatsApp via SALVY (endpoint unico, payload oficial e formato de numero: local vs E.164)?
