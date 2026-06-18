@@ -1,12 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearAuthSession, saveUser, User } from '../storage/localStorage';
-import { savePerfil } from '../services/api';
+import { fetchMedicoPerfil, savePerfil, updateMedicoPerfil } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Card from '../components/Card';
 import BalanceCard from '../components/BalanceCard';
+
+function formatCentavosToBrlInput(value?: number): string {
+  if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) return '';
+  return (value / 100).toFixed(2).replace('.', ',');
+}
+
+function parseBrlInputToCentavos(value: string): number | null {
+  const normalized = value.trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed * 100);
+}
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -20,6 +33,7 @@ export default function Profile() {
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
   const [cpf, setCpf] = useState('');
+  const [valorConsultaInput, setValorConsultaInput] = useState('');
 
   function applyCpfMask(value: string): string {
     const d = value.replace(/\D/g, '').slice(0, 11);
@@ -30,15 +44,31 @@ export default function Profile() {
   }
 
   useEffect(() => {
-    getUser().then(u => {
-      setUser(u);
-      if (u) {
-        setNome(u.nome);
-        setEmail(u.email);
-        setTelefone(u.telefone ?? '');
-        if (u.cpf) setCpf(applyCpfMask(u.cpf));
+    async function loadProfile() {
+      try {
+        const u = await getUser();
+        setUser(u);
+        if (u) {
+          setNome(u.nome);
+          setEmail(u.email);
+          setTelefone(u.telefone ?? '');
+          if (u.cpf) setCpf(applyCpfMask(u.cpf));
+
+          if (u.tipo === 'MEDICO') {
+            try {
+              const medico = await fetchMedicoPerfil();
+              setValorConsultaInput(formatCentavosToBrlInput(medico.valorConsulta));
+            } catch {
+              setValorConsultaInput('');
+            }
+          }
+        }
+      } finally {
+        setLoading(false);
       }
-    }).finally(() => setLoading(false));
+    }
+
+    loadProfile();
   }, []);
 
   async function handleSave() {
@@ -48,9 +78,23 @@ export default function Profile() {
       setSaveError('Informe seu nome.');
       return;
     }
+
+    let valorConsultaCentavos: number | undefined;
+    if (user?.tipo === 'MEDICO') {
+      const parsed = parseBrlInputToCentavos(valorConsultaInput);
+      if (parsed === null) {
+        setSaveError('Informe um valor de consulta valido. Exemplo: 150,00');
+        return;
+      }
+      valorConsultaCentavos = parsed;
+    }
+
     setSaving(true);
     try {
       const updated = await savePerfil({ nome: nome.trim(), cpf: user?.tipo === 'PACIENTE' ? cpf.replace(/\D/g, '') || undefined : undefined, telefone: telefone.trim() || undefined });
+      if (user?.tipo === 'MEDICO' && valorConsultaCentavos !== undefined) {
+        await updateMedicoPerfil({ valorConsulta: valorConsultaCentavos });
+      }
       const updatedUser: User = {
         id: updated.id,
         nome: updated.nome,
@@ -69,7 +113,7 @@ export default function Profile() {
       setTelefone(updatedUser.telefone ?? '');
       setCpf(updatedUser.cpf ? applyCpfMask(updatedUser.cpf) : '');
       setEditing(false);
-      setSaveMsg('Perfil atualizado com sucesso!');
+      setSaveMsg(user?.tipo === 'MEDICO' ? 'Perfil e valor da consulta atualizados com sucesso!' : 'Perfil atualizado com sucesso!');
       setTimeout(() => setSaveMsg(''), 3000);;
     } catch (error) {
       showErrorAlert(error, 'Erro ao salvar perfil');
@@ -138,6 +182,22 @@ export default function Profile() {
               {!editing && !cpf && (
                 <span style={{ fontSize: 12, color: Colors.textMuted, marginTop: 6, display: 'block' }}>CPF não cadastrado</span>
               )}
+            </div>
+          )}
+          {user?.tipo === 'MEDICO' && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Valor da consulta (R$)</label>
+              <input
+                value={valorConsultaInput}
+                onChange={e => setValorConsultaInput(e.target.value)}
+                disabled={!editing}
+                placeholder="Ex: 150,00"
+                inputMode="decimal"
+                style={{ ...inputStyle, color: editing ? Colors.textPrimary : Colors.textSecondary }}
+              />
+              <span style={{ fontSize: 12, color: Colors.textMuted, marginTop: 6, display: 'block' }}>
+                Esse valor sera usado no agendamento e no pagamento das consultas.
+              </span>
             </div>
           )}
           {editing && (

@@ -9,7 +9,7 @@ related:
   - pagamentos-consulta.md
   - ../knowledge/dominio-e-papeis.md
 tags: [agendamento, consulta, disponibilidade]
-last_updated: 2026-06-16
+last_updated: 2026-06-18
 ---
 
 <!-- ai-summary
@@ -36,6 +36,13 @@ Status: review.
 5. Frontend bloqueia horarios passados comparando slot selecionado com Date.now().
 6. Ao confirmar, chama createConsulta com medicoId candidato + dataHora.
 7. Em sucesso, redireciona para /payment com consultaId e valor.
+
+## Valor da consulta no frontend
+
+- O medico configura seu valor de consulta no frontend em `src/pages/Profile.tsx` (campo "Valor da consulta (R$)").
+- O salvamento do valor usa `updateMedicoPerfil({ valorConsulta })` em `src/services/api.ts`.
+- A tela de agendamento (`src/pages/BookAppointment.tsx`) exibe o valor por medico no card de selecao, facilitando a comparacao pelo paciente.
+- Quando o backend ainda nao retorna valor para um medico, a UI mostra "A combinar" como fallback visual.
 
 ## Tratamento de falhas observado
 

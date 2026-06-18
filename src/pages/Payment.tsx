@@ -194,7 +194,7 @@ export default function Payment() {
     setErrorText('');
 
     try {
-      const data = (await criarPagamento({ consultaId, metodoPagamento: 'pix' })) as PaymentResponse;
+      const data = (await criarPagamento({ consultaId, metodoPagamento: 'pix', valorCentavos: state?.valor })) as PaymentResponse;
 
       const hasPixFields = Boolean(data?.pix?.qrCode || data?.pix?.qrCodeBase64 || data?.pix?.ticketUrl);
       if (!hasPixFields) {
@@ -223,7 +223,7 @@ export default function Payment() {
     setLoading(true);
     setErrorText('');
     try {
-      const data = (await criarPagamento({ consultaId, metodoPagamento: 'card' })) as PaymentResponse;
+      const data = (await criarPagamento({ consultaId, metodoPagamento: 'card', valorCentavos: state?.valor })) as PaymentResponse;
       const checkoutUrl = import.meta.env.PROD
         ? data?.mercadopago?.initPoint
         : data?.mercadopago?.sandboxInitPoint || data?.mercadopago?.initPoint;

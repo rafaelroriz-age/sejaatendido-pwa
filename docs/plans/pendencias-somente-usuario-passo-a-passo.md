@@ -9,7 +9,7 @@ related:
   - divergencias.md
   - ../../GO-LIVE-CHECKLIST.md
 tags: [pendencias-humanas, go-live, decisoes]
-last_updated: 2026-06-17
+last_updated: 2026-06-18
 ---
 
 <!-- ai-summary
@@ -24,10 +24,30 @@ Status: draft.
 
 Este documento lista apenas itens que nao posso fechar sozinho por envolver decisao de negocio, credenciais, aprovacao juridica ou acesso de conta externa.
 
-## Status atual (2026-06-17)
+## Status atual (2026-06-18)
 
 O ciclo de codigo foi executado ate o limite do que e implementavel sem entrada humana.
-Build: aprovado. Bundle principal: 260KB (era 549KB). Sem erros TypeScript.
+Nova entrega no front: medico agora pode definir o valor da consulta no perfil, e o agendamento exibe esse valor para o paciente.
+Proximo passo depende de decisoes de negocio e operacao abaixo.
+
+---
+
+## 0) Definir regra oficial de preco da consulta (novo)
+
+A funcionalidade de editar valor ja esta no front. Falta decidir as regras de negocio oficiais para evitar inconsistencias entre operacao, financeiro e suporte.
+
+1. Definir faixa permitida por consulta:
+   - valor minimo em reais (ex: R$ 30,00)
+   - valor maximo em reais (ex: R$ 1.500,00)
+2. Definir granularidade de preco:
+   - permite qualquer centavo
+   - ou arredonda para multiplos (ex: R$ 5,00)
+3. Definir politica para medicos sem preco definido:
+   - bloquear agendamento
+   - ou manter "A combinar" como esta hoje
+4. Definir se medico com CRM pendente/rejeitado pode alterar preco ou nao.
+5. Confirmar com backend/financeiro se existe teto por convenio/plano que precise ser aplicado no servidor.
+6. Registrar decisao final em docs/plans/duvidas-abertas.md para virar regra de produto.
 
 ---
 

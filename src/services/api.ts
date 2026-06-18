@@ -675,6 +675,7 @@ export async function criarPagamento(data: CriarPagamentoRequest): Promise<Pagam
   const metodo = data.metodoPagamento === 'card' ? 'cartao' : (data.metodoPagamento || 'pix');
   const endpoint = metodo === 'pix' ? '/v1/pagamentos/pix' : '/v1/pagamentos/cartao';
   const body: Record<string, unknown> = { consultaId: data.consultaId };
+  if (typeof data.valorCentavos === 'number') body.valorCentavos = data.valorCentavos;
   const r = await api.post(endpoint, body);
   return normalizePagamentoResponse(r.data);
 }

@@ -65,7 +65,8 @@ function areDatesClose(a?: string, b?: string, toleranceMinutes = 3): boolean {
 }
 
 function formatCurrencyCentavos(value?: number): string {
-  return `R$ ${(Math.max(0, value ?? 0) / 100).toFixed(2).replace('.', ',')}`;
+  if (typeof value !== 'number' || Number.isNaN(value)) return 'A combinar';
+  return `R$ ${(Math.max(0, value) / 100).toFixed(2).replace('.', ',')}`;
 }
 
 export default function BookAppointment() {
@@ -288,6 +289,9 @@ export default function BookAppointment() {
                 <Avatar name={nomeMedico} size={52} color={sel ? Colors.primary : Colors.textMuted} style={{ margin: '0 auto' }} />
                 <div style={{ fontSize: Font.xs + 1, fontWeight: 700, color: sel ? Colors.primary : Colors.textPrimary, marginTop: Space.sm, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr(a). {nomeMedico}</div>
                 <div style={{ fontSize: 11, color: sel ? Colors.primaryDark : Colors.textSecondary, marginTop: 2 }}>{m.especialidades?.[0] || m.especialidade || 'Clínico Geral'}</div>
+                <div style={{ fontSize: 11, color: sel ? Colors.primaryDark : Colors.textSecondary, marginTop: 2, fontWeight: 700 }}>
+                  Consulta: {formatCurrencyCentavos(m.valorConsulta)}
+                </div>
                 {isTestMedico && (
                   <div style={{
                     display: 'inline-flex',
