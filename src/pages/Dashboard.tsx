@@ -97,6 +97,12 @@ export default function Dashboard() {
       const sessionUser = await getUser();
       const profile = await fetchPerfil().catch(() => null);
       const fallbackPhone = profile?.telefone ?? sessionUser?.telefone;
+
+      if (!fallbackPhone) {
+        window.alert('Não foi possível testar o WhatsApp porque o seu perfil não possui telefone cadastrado. Atualize seu perfil e tente novamente.');
+        return;
+      }
+
       const res = await testarNotificacaoWhatsapp(fallbackPhone);
       if (res.ok) {
         window.alert(res.mensagem || 'Mensagem de teste enviada no WhatsApp com sucesso.');
@@ -104,7 +110,14 @@ export default function Dashboard() {
         window.alert(res.mensagem || 'Não foi possível enviar a mensagem de teste agora. Tente novamente em instantes.');
       }
     } catch (error) {
-      window.alert(`Falha ao testar WhatsApp.\n${handleApiError(error)}`);
+      const rawMessage = handleApiError(error);
+      const normalized = rawMessage.toLowerCase();
+
+      if (normalized.includes('401') || normalized.includes('unauthorized') || normalized.includes('token')) {
+        window.alert('Falha ao testar WhatsApp. Sua sessão expirou ou o token está inválido. Faça login novamente e tente de novo.');
+      } else {
+        window.alert(`Falha ao testar WhatsApp.\n${rawMessage}\n\nSe o erro persistir, o problema provavelmente está na integração SALVY do backend, no número cadastrado ou no endpoint canônico de envio.`);
+      }
     } finally {
       setTestingWhatsapp(false);
     }
