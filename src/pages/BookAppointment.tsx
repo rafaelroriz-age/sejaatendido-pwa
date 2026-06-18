@@ -64,6 +64,10 @@ function areDatesClose(a?: string, b?: string, toleranceMinutes = 3): boolean {
   return Math.abs(ta - tb) <= toleranceMinutes * 60 * 1000;
 }
 
+function formatCurrencyCentavos(value?: number): string {
+  return `R$ ${(Math.max(0, value ?? 0) / 100).toFixed(2).replace('.', ',')}`;
+}
+
 export default function BookAppointment() {
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -211,6 +215,7 @@ export default function BookAppointment() {
   if (loading) return <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: Colors.bg }}><div className="spinner--primary spinner" /><p style={{ marginTop: 12, color: Colors.textSecondary }}>Carregando médicos...</p></div>;
 
   const currentStep = selectedMedico ? (selectedDate && selectedTime ? 3 : 2) : 1;
+  const testMedico = medicos.find(m => m.valorConsulta === 10);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg }}>
@@ -223,6 +228,28 @@ export default function BookAppointment() {
         <span style={{ color: '#fff', fontSize: Font.lg - 2, fontWeight: 800, letterSpacing: -0.3 }}>Agendar Consulta</span>
         <div style={{ width: 60 }} />
       </div>
+
+      {testMedico && (
+        <div style={{ padding: '14px 20px 0' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #fff6da 0%, #ffe7b8 100%)',
+            border: '1px solid #e7b35a',
+            borderRadius: Radius.lg,
+            padding: '14px 16px',
+            boxShadow: '0 8px 18px rgba(0, 0, 0, 0.06)',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0.6, color: '#8b5e00', textTransform: 'uppercase' }}>
+              Consulta teste
+            </div>
+            <div style={{ fontSize: Font.md + 1, fontWeight: 900, color: Colors.textPrimary, marginTop: 4 }}>
+              {formatCurrencyCentavos(testMedico.valorConsulta)}
+            </div>
+            <div style={{ fontSize: Font.sm, color: Colors.textSecondary, marginTop: 4 }}>
+              Use o médico de teste {testMedico.usuario.nome} para validar pagamento, WhatsApp e repasse sem confundir com valores reais.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stepper */}
       <div style={{
@@ -253,6 +280,7 @@ export default function BookAppointment() {
           {medicos.map(m => {
             const sel = selectedMedico?.id === m.id;
             const nomeMedico = getMedicoNome(m);
+            const isTestMedico = m.valorConsulta === 10;
             return (
               <div key={m.id} onClick={() => setSelectedMedico(m)}
                 style={{ minWidth: 130, backgroundColor: sel ? Colors.accent : Colors.card, borderRadius: Radius.lg, padding: Space.lg, textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', flexShrink: 0 }}
@@ -260,6 +288,24 @@ export default function BookAppointment() {
                 <Avatar name={nomeMedico} size={52} color={sel ? Colors.primary : Colors.textMuted} style={{ margin: '0 auto' }} />
                 <div style={{ fontSize: Font.xs + 1, fontWeight: 700, color: sel ? Colors.primary : Colors.textPrimary, marginTop: Space.sm, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr(a). {nomeMedico}</div>
                 <div style={{ fontSize: 11, color: sel ? Colors.primaryDark : Colors.textSecondary, marginTop: 2 }}>{m.especialidades?.[0] || m.especialidade || 'Clínico Geral'}</div>
+                {isTestMedico && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    backgroundColor: '#fff6da',
+                    color: '#8b5e00',
+                    fontSize: 10,
+                    fontWeight: 900,
+                    letterSpacing: 0.4,
+                    textTransform: 'uppercase',
+                  }}>
+                    Teste {formatCurrencyCentavos(m.valorConsulta)}
+                  </div>
+                )}
               </div>
             );
           })}
