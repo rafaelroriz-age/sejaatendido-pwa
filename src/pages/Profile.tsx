@@ -8,6 +8,9 @@ import Avatar from '../components/Avatar';
 import Card from '../components/Card';
 import BalanceCard from '../components/BalanceCard';
 
+const MIN_VALOR_CONSULTA_CENTAVOS = 3000; // R$ 30,00
+const MAX_VALOR_CONSULTA_CENTAVOS = 150000; // R$ 1.500,00
+
 function formatCentavosToBrlInput(value?: number): string {
   if (typeof value !== 'number' || Number.isNaN(value) || value <= 0) return '';
   return (value / 100).toFixed(2).replace('.', ',');
@@ -84,6 +87,10 @@ export default function Profile() {
       const parsed = parseBrlInputToCentavos(valorConsultaInput);
       if (parsed === null) {
         setSaveError('Informe um valor de consulta valido. Exemplo: 150,00');
+        return;
+      }
+      if (parsed < MIN_VALOR_CONSULTA_CENTAVOS || parsed > MAX_VALOR_CONSULTA_CENTAVOS) {
+        setSaveError('Informe um valor entre R$ 30,00 e R$ 1.500,00.');
         return;
       }
       valorConsultaCentavos = parsed;
@@ -197,6 +204,9 @@ export default function Profile() {
               />
               <span style={{ fontSize: 12, color: Colors.textMuted, marginTop: 6, display: 'block' }}>
                 Esse valor sera usado no agendamento e no pagamento das consultas.
+              </span>
+              <span style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4, display: 'block' }}>
+                Faixa permitida: R$ 30,00 a R$ 1.500,00.
               </span>
             </div>
           )}

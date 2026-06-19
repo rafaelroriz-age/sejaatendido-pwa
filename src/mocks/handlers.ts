@@ -30,6 +30,8 @@ const MOCK_ADMIN_USER = {
   tipo: 'ADMIN' as const,
 };
 
+let MOCK_CURRENT_USER: typeof MOCK_PACIENTE | typeof MOCK_MEDICO_USER | typeof MOCK_ADMIN_USER = MOCK_PACIENTE;
+
 const LOW_COST_MEDICO_ID = 'med-002';
 const LOW_COST_CONSULTA_VALOR_CENTAVOS = 10; // R$ 0,10
 
@@ -190,6 +192,7 @@ const MOCK_MEDICOS_PENDENTES = [
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function authResponse(user: typeof MOCK_PACIENTE | typeof MOCK_MEDICO_USER | typeof MOCK_ADMIN_USER) {
+  MOCK_CURRENT_USER = user;
   return HttpResponse.json({
     accessToken: MOCK_TOKEN,
     refreshToken: MOCK_REFRESH,
@@ -592,12 +595,13 @@ export const handlers = [
   http.get(`${BASE}/usuarios/me`, async ({ request }) => {
     const auth = request.headers.get('Authorization') ?? '';
     // Retorna perfil baseado no token mock; em dev todos usam o mesmo token
-    return HttpResponse.json({ ...MOCK_PACIENTE });
+    return HttpResponse.json({ ...MOCK_CURRENT_USER });
   }),
 
   http.put(`${BASE}/usuarios/me`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
-    return HttpResponse.json({ ...MOCK_PACIENTE, ...body });
+    MOCK_CURRENT_USER = { ...MOCK_CURRENT_USER, ...body };
+    return HttpResponse.json({ ...MOCK_CURRENT_USER });
   }),
 
   http.put(`${BASE}/usuarios/me/senha`, () => HttpResponse.json({ ok: true })),

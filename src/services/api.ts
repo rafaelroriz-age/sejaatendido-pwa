@@ -323,17 +323,34 @@ export interface SlotsResponse {
 export async function fetchDisponibilidadeMedico(medicoId: string | string[], data: string): Promise<string[]> {
   const ids = Array.isArray(medicoId) ? medicoId : [medicoId];
   const uniqueIds = [...new Set(ids.filter(Boolean))];
+  let lastError: unknown = null;
 
   for (const id of uniqueIds) {
     try {
       const response = await api.get(`/medicos/${id}/slots`, { params: { data } });
       const payload = response.data as SlotsResponse;
       return payload?.slots ?? [];
-    } catch {
-      // Try next candidate ID.
+    } catch (error) {
+      lastError = error;
+
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const msg = String((error.response?.data as Record<string, string> | undefined)?.erro
+          ?? (error.response?.data as Record<string, string> | undefined)?.message
+          ?? '').toLowerCase();
+        const doctorIdMismatch = status === 404
+          || (status === 400 && msg.includes('médico') && msg.includes('não encontrado'))
+          || (status === 400 && msg.includes('medico') && msg.includes('nao encontrado'));
+        if (doctorIdMismatch) {
+          continue;
+        }
+      }
+
+      throw error;
     }
   }
 
+  if (lastError) throw lastError;
   return [];
 }
 

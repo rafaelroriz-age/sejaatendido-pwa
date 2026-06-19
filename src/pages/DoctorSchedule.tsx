@@ -30,6 +30,12 @@ function mergeDisponibilidade(saved: DisponibilidadeItem[]): DisponibilidadeItem
   });
 }
 
+function toMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.NaN;
+  return (h * 60) + m;
+}
+
 export default function DoctorSchedule() {
   const navigate = useNavigate();
 
@@ -69,6 +75,16 @@ export default function DoctorSchedule() {
   }
 
   async function handleSaveDisponibilidade() {
+    for (const d of disponibilidade) {
+      if (!d.ativo) continue;
+      const inicio = toMinutes(d.horaInicio);
+      const fim = toMinutes(d.horaFim);
+      if (!Number.isFinite(inicio) || !Number.isFinite(fim) || fim <= inicio) {
+        window.alert(`No dia ${DIAS[d.diaSemana]}, o horário de fim deve ser maior que o horário de início.`);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const result = await saveMinhaDisponibilidade(disponibilidade);

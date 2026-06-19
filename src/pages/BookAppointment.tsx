@@ -80,6 +80,7 @@ export default function BookAppointment() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState(false);
 
   const dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
@@ -96,15 +97,18 @@ export default function BookAppointment() {
     async function loadDisponibilidade() {
       if (!selectedMedico || !selectedDate) {
         setAvailableSlots([]);
+        setAvailabilityError(false);
         return;
       }
       setAvailabilityLoading(true);
+      setAvailabilityError(false);
       try {
         const slots = await fetchDisponibilidadeMedico(getMedicoCandidateIds(selectedMedico), selectedDate);
         setAvailableSlots(slots);
         if (selectedTime && !slots.includes(selectedTime)) setSelectedTime(null);
       } catch (error) {
         setAvailableSlots([]);
+        setAvailabilityError(true);
         showErrorAlert(error, 'Erro ao consultar disponibilidade');
       } finally {
         setAvailabilityLoading(false);
@@ -129,6 +133,10 @@ export default function BookAppointment() {
 
   async function handleConfirm() {
     if (!selectedMedico || !selectedDate || !selectedTime) { window.alert('Selecione médico, data e horário'); return; }
+    if (availabilityError) {
+      window.alert('Não foi possível validar a disponibilidade do médico. Tente novamente em instantes.');
+      return;
+    }
     if (availableSlots.length > 0 && !availableSlots.includes(selectedTime)) { window.alert('Este horário não está mais disponível. Escolha outro.'); return; }
 
     const selectedSlotDate = parseSlotDate(selectedDate, selectedTime);
@@ -341,13 +349,17 @@ export default function BookAppointment() {
             <div className="spinner--primary spinner" style={{ width: 18, height: 18 }} />
             <span style={{ fontSize: 13, color: Colors.textSecondary }}>Carregando disponibilidade...</span>
           </div>
+        ) : availabilityError ? (
+          <div style={{ fontSize: 13, color: Colors.error, marginBottom: 12 }}>
+            Não foi possível carregar os horários da agenda no momento. Aguarde e tente novamente.
+          </div>
         ) : null}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-          {(availableSlots.length > 0 ? availableSlots : FALLBACK_TIME_SLOTS).map(slot => {
+          {(availabilityError ? [] : (availableSlots.length > 0 ? availableSlots : FALLBACK_TIME_SLOTS)).map(slot => {
             const slotDate = selectedDate ? parseSlotDate(selectedDate, slot) : null;
             const isFutureSlot = slotDate ? slotDate.getTime() > Date.now() : false;
             const enabled = !selectedMedico || !selectedDate ? false
-              : (availableSlots.length === 0 || availableSlots.includes(slot)) && isFutureSlot;
+              : !availabilityError && (availableSlots.length === 0 || availableSlots.includes(slot)) && isFutureSlot;
             const sel = selectedTime === slot;
             return (
               <div key={slot} onClick={() => enabled && setSelectedTime(slot)}
