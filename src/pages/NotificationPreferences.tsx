@@ -122,16 +122,20 @@ export default function NotificationPreferences() {
   }
 
   async function handleTestWhatsapp() {
-    if (prefs.whatsappNumber.replace(/\D/g, '').length < 10) {
-      setWhatsappTestError('Informe um número de WhatsApp válido antes de testar.');
-      return;
-    }
     setTestingWhatsapp(true);
     setWhatsappTestMsg('');
     setWhatsappTestError('');
     try {
-      const result = await testarNotificacaoWhatsapp(prefs.whatsappNumber);
-      setWhatsappTestMsg(result.mensagem ?? 'Mensagem de teste enviada! Verifique seu WhatsApp.');
+      const perfil = await fetchPerfil().catch(() => null);
+      const profilePhone = perfil?.telefone?.replace(/\D/g, '') ?? '';
+
+      if (profilePhone.length < 10) {
+        setWhatsappTestError('Não foi possível testar: o telefone do seu perfil está ausente ou inválido. Atualize seu perfil e tente novamente.');
+        return;
+      }
+
+      const result = await testarNotificacaoWhatsapp(profilePhone);
+      setWhatsappTestMsg(result.mensagem ?? `Mensagem de teste enviada para o telefone do perfil ${maskPhone(profilePhone)}.`);
       setTimeout(() => setWhatsappTestMsg(''), 4000);
     } catch (error) {
       setWhatsappTestError(`Não foi possível enviar a mensagem de teste. ${handleApiError(error)}. Verifique sessão ativa, formato do número e integração SALVY no backend.`);
@@ -238,6 +242,9 @@ export default function NotificationPreferences() {
               <input value={prefs.whatsappNumber} onChange={e => updatePref('whatsappNumber', maskPhone(e.target.value))} placeholder="(00) 90000-0000" style={inputStyle} />
               <p style={{ fontSize: 12, color: Colors.textMuted, marginTop: 8, lineHeight: '18px' }}>
                 Esta configuração salva sua preferência no app. O envio automático de mensagens de WhatsApp depende da integração operacional do backend.
+              </p>
+              <p style={{ fontSize: 12, color: Colors.textMuted, marginTop: 4, lineHeight: '18px' }}>
+                O botão de teste usa o telefone salvo no seu perfil para refletir o comportamento de produção.
               </p>
               <button
                 onClick={handleTestWhatsapp}

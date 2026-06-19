@@ -94,18 +94,17 @@ export default function Dashboard() {
   async function handleTestarWhatsapp() {
     setTestingWhatsapp(true);
     try {
-      const sessionUser = await getUser();
       const profile = await fetchPerfil().catch(() => null);
-      const fallbackPhone = profile?.telefone ?? sessionUser?.telefone;
+      const profilePhone = profile?.telefone?.replace(/\D/g, '') ?? '';
 
-      if (!fallbackPhone) {
-        window.alert('Não foi possível testar o WhatsApp porque o seu perfil não possui telefone cadastrado. Atualize seu perfil e tente novamente.');
+      if (profilePhone.length < 10) {
+        window.alert('Não foi possível testar o WhatsApp porque o telefone do seu perfil está ausente ou inválido. Atualize seu perfil e tente novamente.');
         return;
       }
 
-      const res = await testarNotificacaoWhatsapp(fallbackPhone);
+      const res = await testarNotificacaoWhatsapp(profilePhone);
       if (res.ok) {
-        window.alert(res.mensagem || 'Mensagem de teste enviada no WhatsApp com sucesso.');
+        window.alert(res.mensagem || `Mensagem de teste enviada para o telefone do perfil ${profilePhone}.`);
       } else {
         window.alert(res.mensagem || 'Não foi possível enviar a mensagem de teste agora. Tente novamente em instantes.');
       }
