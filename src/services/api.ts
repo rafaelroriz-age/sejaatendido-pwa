@@ -18,6 +18,31 @@ type RetriableAxiosRequestConfig = {
   _retry?: boolean;
 } & Parameters<typeof api.request>[0];
 
+async function refreshAccessToken(refreshToken: string): Promise<{ accessToken?: string; refreshToken?: string }> {
+  const refreshEndpoints = ['/auth/refresh-token', '/auth/refresh'];
+
+  for (const endpoint of refreshEndpoints) {
+    try {
+      const response = await axios.post(
+        `${API_URL}${endpoint}`,
+        { refreshToken },
+        { timeout: 10000, headers: { 'Content-Type': 'application/json' } },
+      );
+
+      return {
+        accessToken: response.data?.accessToken ?? response.data?.token,
+        refreshToken: response.data?.refreshToken,
+      };
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404 || status === 405) continue;
+      throw error;
+    }
+  }
+
+  return {};
+}
+
 api.interceptors.request.use(
   async (config) => {
     const token = await getToken();
@@ -49,15 +74,9 @@ api.interceptors.response.use(
           return Promise.reject(error);
         }
 
-        const refreshResponse = await axios.post(
-          `${API_URL}/auth/refresh-token`,
-          { refreshToken },
-          { timeout: 10000, headers: { 'Content-Type': 'application/json' } },
-        );
-
-        const accessToken: string | undefined =
-          refreshResponse.data?.accessToken ?? refreshResponse.data?.token;
-        const newRefreshToken: string | undefined = refreshResponse.data?.refreshToken;
+        const refreshResult = await refreshAccessToken(refreshToken);
+        const accessToken: string | undefined = refreshResult.accessToken;
+        const newRefreshToken: string | undefined = refreshResult.refreshToken;
 
         if (!accessToken) {
           await clearAuthSession();
@@ -144,8 +163,19 @@ export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthRespon
 }
 
 export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
-  const r = await api.post('/auth/google', { idToken });
-  return r.data;
+  try {
+    const r = await api.post('/auth/google', { idToken });
+    return r.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      if (status === 404 || status === 405) {
+        const fallback = await api.post('/auth/login-google', { idToken });
+        return fallback.data;
+      }
+    }
+    throw error;
+  }
 }
 
 export async function loginAppleRequest(identityToken: string, firstName?: string, lastName?: string): Promise<AuthResponse> {
@@ -185,7 +215,22 @@ export async function forgotPasswordRequest(email: string): Promise<void> {
 }
 
 export async function resendConfirmEmailRequest(): Promise<void> {
-  await api.post('/emails/confirmar-email/enviar');
+  const endpoints = ['/emails/confirmar-email/enviar', '/emails/reenviar-confirmacao'];
+  let lastError: unknown = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      await api.post(endpoint);
+      return;
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      lastError = error;
+      if (status === 404 || status === 405) continue;
+      throw error;
+    }
+  }
+
+  throw lastError ?? new Error('Não foi possível reenviar o email de confirmação.');
 }
 
 // CRM
@@ -229,6 +274,21 @@ export interface MedicoListResponse {
   page: number;
 }
 
+function normalizeValorConsultaCentavos(raw: any): number | undefined {
+  const candidates = [
+    raw?.valorConsulta,
+    raw?.valorConsultaCentavos,
+    raw?.valor_consulta,
+    raw?.valor_consulta_centavos,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+
+  return undefined;
+}
+
 function normalizeMedico(raw: any): Medico {
   const medicoRaw = raw?.medico && typeof raw.medico === 'object' ? raw.medico : raw;
   const usuarioRaw = raw?.usuario ?? medicoRaw?.usuario ?? {};
@@ -251,7 +311,7 @@ function normalizeMedico(raw: any): Medico {
     crm: medicoRaw?.crm ?? raw?.crm,
     fotoPerfil: medicoRaw?.fotoPerfil ?? raw?.fotoPerfil,
     bio: medicoRaw?.bio ?? raw?.bio,
-    valorConsulta: medicoRaw?.valorConsulta ?? raw?.valorConsulta,
+    valorConsulta: normalizeValorConsultaCentavos(medicoRaw) ?? normalizeValorConsultaCentavos(raw),
     status: medicoRaw?.status ?? raw?.status,
     aprovado: medicoRaw?.aprovado ?? raw?.aprovado,
     usuario: {
