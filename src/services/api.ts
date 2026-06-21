@@ -93,6 +93,12 @@ export interface RegisterRequest {
   email: string;
   cpf?: string;
   telefone?: string;
+  crmNumero?: string;
+  crmUf?: string;
+  crm?: string;
+  crmCartaoPdfNome?: string;
+  crmCartaoPdfBase64?: string;
+  crmCartaoPdfMimeType?: 'application/pdf' | string;
   aceitouTermos?: boolean;
   aceitouPrivacidade?: boolean;
   termosVersao?: string;
@@ -122,8 +128,19 @@ export async function loginRequest(data: LoginRequest): Promise<AuthResponse> {
 }
 
 export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthResponse> {
-  const r = await api.post('/auth/login', data);
-  return r.data;
+  try {
+    const r = await api.post('/auth/login', data);
+    return r.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      if (status === 404 || status === 405) {
+        const fallback = await api.post('/auth/medicos/login', data);
+        return fallback.data;
+      }
+    }
+    throw error;
+  }
 }
 
 export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
@@ -715,8 +732,14 @@ export interface DadosBancarios {
   conta?: string;
 }
 
-export async function fetchDadosBancarios(): Promise<DadosBancarios | null> {
-  const raw = (await api.get('/medicos/me/dados-bancarios')).data;
+export type DadosBancariosPerfil = 'MEDICO' | 'PACIENTE';
+
+function dadosBancariosPath(perfil: DadosBancariosPerfil): string {
+  return perfil === 'PACIENTE' ? '/pacientes/me/dados-bancarios' : '/medicos/me/dados-bancarios';
+}
+
+export async function fetchDadosBancarios(perfil: DadosBancariosPerfil = 'MEDICO'): Promise<DadosBancarios | null> {
+  const raw = (await api.get(dadosBancariosPath(perfil))).data;
   return raw
     ? {
         tipoChavePix: raw.tipoChavePix,
@@ -728,8 +751,8 @@ export async function fetchDadosBancarios(): Promise<DadosBancarios | null> {
     : null;
 }
 
-export async function saveDadosBancarios(data: DadosBancarios): Promise<void> {
-  await api.put('/medicos/me/dados-bancarios', {
+export async function saveDadosBancarios(data: DadosBancarios, perfil: DadosBancariosPerfil = 'MEDICO'): Promise<void> {
+  await api.put(dadosBancariosPath(perfil), {
     tipoChavePix: data.tipoChavePix,
     valorChavePix: data.chavePix,
     banco: data.banco,

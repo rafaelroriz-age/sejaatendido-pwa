@@ -272,6 +272,16 @@ export default function Profile() {
           </Card>
         )}
 
+        {user?.tipo === 'PACIENTE' && (
+          <Card style={{ marginBottom: Space.lg }}>
+            <h4 style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.lg }}>Pagamentos</h4>
+            <div onClick={() => navigate('/bank-details')} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', cursor: 'pointer' }}>
+              <span style={{ fontSize: 15, color: Colors.textPrimary, fontWeight: 500 }}>Dados para Pagamento</span>
+              <span style={{ fontSize: 22, color: Colors.textMuted }}>›</span>
+            </div>
+          </Card>
+        )}
+
         <Card style={{ marginBottom: Space.lg }}>
           <h4 style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.lg }}>Preferências</h4>
           {[

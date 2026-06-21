@@ -28,6 +28,27 @@ function normalizePhone(v: string): string {
   return v.replace(/\D/g, '');
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Falha ao ler arquivo PDF.'));
+        return;
+      }
+      const base64 = result.split(',')[1] ?? '';
+      if (!base64) {
+        reject(new Error('Falha ao converter arquivo PDF.'));
+        return;
+      }
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Falha ao ler arquivo PDF.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function isValidCpf(cpf: string): boolean {
   const d = cpf.replace(/\D/g, '');
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
@@ -68,6 +89,8 @@ export default function SignupScreen() {
   const [confirmaSenha, setConfirmaSenha] = useState('');
   const [crm, setCrm] = useState('');
   const [crmUf, setCrmUf] = useState('');
+  const [crmPdfNome, setCrmPdfNome] = useState('');
+  const [crmPdfBase64, setCrmPdfBase64] = useState('');
 
   const [aceitouTermos, setAceitouTermos] = useState(false);
   const [aceitouPrivacidade, setAceitouPrivacidade] = useState(false);
@@ -117,6 +140,20 @@ export default function SignupScreen() {
         setStepError('As senhas não coincidem.');
         return false;
       }
+      if (tipo === 'MEDICO') {
+        if (!crm.trim()) {
+          setStepError('Informe o numero do CRM para continuar.');
+          return false;
+        }
+        if (crmUf.trim().length !== 2) {
+          setStepError('Informe a UF do CRM com 2 letras.');
+          return false;
+        }
+        if (!crmPdfBase64 || !crmPdfNome) {
+          setStepError('Anexe a carteirinha CRM em PDF para continuar.');
+          return false;
+        }
+      }
       return true;
     }
 
@@ -142,6 +179,43 @@ export default function SignupScreen() {
     if (step > 1) setStep((step - 1) as SignupStep);
   }
 
+  async function handleCrmPdfChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setCrmPdfNome('');
+      setCrmPdfBase64('');
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      setCrmPdfNome('');
+      setCrmPdfBase64('');
+      event.target.value = '';
+      setStepError('Envie a carteirinha em formato PDF.');
+      return;
+    }
+
+    const maxBytes = 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setCrmPdfNome('');
+      setCrmPdfBase64('');
+      event.target.value = '';
+      setStepError('O PDF deve ter no máximo 5MB.');
+      return;
+    }
+
+    try {
+      const base64 = await fileToBase64(file);
+      setCrmPdfNome(file.name);
+      setCrmPdfBase64(base64);
+      setStepError('');
+    } catch {
+      setCrmPdfNome('');
+      setCrmPdfBase64('');
+      setStepError('Não foi possível processar o PDF da carteirinha. Tente novamente.');
+    }
+  }
+
   async function handleSignup() {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
 
@@ -159,6 +233,14 @@ export default function SignupScreen() {
         email: email.trim(),
         cpf: rawCpf || undefined,
         telefone: rawTelefone,
+        crmNumero: tipo === 'MEDICO' ? crm.trim() || undefined : undefined,
+        crmUf: tipo === 'MEDICO' ? crmUf.trim().toUpperCase() || undefined : undefined,
+        crm: tipo === 'MEDICO' && crm.trim() && crmUf.trim()
+          ? `CRM/${crmUf.trim().toUpperCase()} ${crm.trim()}`
+          : undefined,
+        crmCartaoPdfNome: tipo === 'MEDICO' ? crmPdfNome || undefined : undefined,
+        crmCartaoPdfBase64: tipo === 'MEDICO' ? crmPdfBase64 || undefined : undefined,
+        crmCartaoPdfMimeType: tipo === 'MEDICO' ? 'application/pdf' : undefined,
         senha,
         tipo,
         aceitouTermos,
@@ -202,7 +284,7 @@ export default function SignupScreen() {
           <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 8 }}>Conta Criada!</h2>
           <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>
             Enviamos um email de confirmacao para <strong>{email}</strong>. Verifique sua caixa de entrada e spam para ativar sua conta.
-            {tipo === 'MEDICO' && ' Apos confirmar o email, valide sua carteirinha CRM na area de perfil.'}
+            {tipo === 'MEDICO' && ' Seu CRM foi enviado para validacao automatica no cadastro.'}
           </p>
           <button onClick={() => navigate('/login', { replace: true })} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Space.lg, border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D` }}>
             <span style={{ color: '#fff', fontSize: Font.md, fontWeight: 700 }}>Ir para Login</span>
@@ -296,8 +378,19 @@ export default function SignupScreen() {
                       <input placeholder="UF" value={crmUf} onChange={e => setCrmUf(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 2))} disabled={loading} maxLength={2} style={inputStyle} />
                     </div>
                   </div>
+                  <label style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, display: 'block', marginBottom: Space.sm }}>Carteirinha CRM (PDF)</label>
+                  <div style={{ ...wrapperStyle, padding: `${Space.md}px ${Space.lg}px` }}>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleCrmPdfChange}
+                      disabled={loading}
+                      style={{ width: '100%', fontSize: Font.sm, color: Colors.textPrimary }}
+                    />
+                  </div>
                   <span style={{ fontSize: 12, color: Colors.textMuted, display: 'block', marginTop: -8, marginBottom: 12 }}>
-                    Voce podera validar sua carteirinha CRM apos o cadastro.
+                    Envie um PDF de ate 5MB. A validacao do CRM sera automatica.
+                    {crmPdfNome ? ` Arquivo selecionado: ${crmPdfNome}` : ''}
                   </span>
                 </>
               )}

@@ -146,7 +146,7 @@ export default function App() {
         <Route path="/payment" element={<ProtectedRoute allow={['PACIENTE']}><Payment /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-        <Route path="/bank-details" element={<ProtectedRoute allow={['MEDICO']}><BankDetails /></ProtectedRoute>} />
+        <Route path="/bank-details" element={<ProtectedRoute allow={['MEDICO', 'PACIENTE']}><BankDetails /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationPreferences /></ProtectedRoute>} />
         <Route path="/earnings" element={<ProtectedRoute allow={['MEDICO']}><Earnings /></ProtectedRoute>} />
         <Route path="/repasse/:id" element={<ProtectedRoute allow={['MEDICO']}><RepasseDetail /></ProtectedRoute>} />

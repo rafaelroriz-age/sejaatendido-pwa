@@ -21,6 +21,10 @@ const MOCK_MEDICO_USER = {
   email: 'maria@mock.com',
   telefone: '+5511999999999',
   tipo: 'MEDICO' as const,
+  cpf: undefined as string | undefined,
+  crmNumero: '12345',
+  crmUf: 'SP',
+  crmCartaoValidado: false,
 };
 
 const MOCK_ADMIN_USER = {
@@ -171,12 +175,20 @@ function getConsultaValorCentavos(consultaId: unknown): number {
   return found?.valor ?? 15000;
 }
 
-const MOCK_DADOS_BANCARIOS = {
+let MOCK_DADOS_BANCARIOS_MEDICO = {
   tipoChavePix: 'CPF',
   valorChavePix: '000.000.000-00',
   banco: 'Nubank',
   agencia: '0001',
   conta: '12345-6',
+};
+
+let MOCK_DADOS_BANCARIOS_PACIENTE = {
+  tipoChavePix: 'EMAIL',
+  valorChavePix: 'paciente@mock.com',
+  banco: 'Banco do Brasil',
+  agencia: '1234',
+  conta: '99887-6',
 };
 
 const MOCK_MEDICOS_PENDENTES = [
@@ -200,6 +212,41 @@ function authResponse(user: typeof MOCK_PACIENTE | typeof MOCK_MEDICO_USER | typ
   });
 }
 
+function buildRegisteredUser(body: {
+  nome?: string;
+  email?: string;
+  cpf?: string;
+  telefone?: string;
+  tipo?: 'PACIENTE' | 'MEDICO';
+  crmNumero?: string;
+  crmUf?: string;
+  crmCartaoPdfNome?: string;
+  crmCartaoPdfBase64?: string;
+}): typeof MOCK_PACIENTE | typeof MOCK_MEDICO_USER {
+  if (body.tipo === 'MEDICO') {
+    const crmCartaoValidado = Boolean(body.crmCartaoPdfNome && body.crmCartaoPdfBase64);
+    return {
+      id: `medico-${Date.now()}`,
+      nome: body.nome ?? 'Médico Mock',
+      email: body.email ?? 'medico@mock.com',
+      telefone: body.telefone ? `+55${body.telefone}` : '+5511999999999',
+      tipo: 'MEDICO' as const,
+      cpf: body.cpf,
+      crmNumero: body.crmNumero ?? '12345',
+      crmUf: body.crmUf ?? 'SP',
+      crmCartaoValidado,
+    };
+  }
+
+  return {
+    id: `paciente-${Date.now()}`,
+    nome: body.nome ?? MOCK_PACIENTE.nome,
+    email: body.email ?? MOCK_PACIENTE.email,
+    telefone: body.telefone ? `+55${body.telefone}` : MOCK_PACIENTE.telefone,
+    tipo: 'PACIENTE' as const,
+  };
+}
+
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 export const handlers = [
@@ -219,13 +266,26 @@ export const handlers = [
   http.post(`${BASE}/auth/google`, () => authResponse(MOCK_PACIENTE)),
   http.post(`${BASE}/auth/login-google`, () => authResponse(MOCK_PACIENTE)),
 
-  http.post(`${BASE}/auth/registro`, async () => {
+  http.post(`${BASE}/auth/registro`, async ({ request }) => {
+    const body = await request.json() as {
+      nome?: string;
+      email?: string;
+      cpf?: string;
+      telefone?: string;
+      tipo?: 'PACIENTE' | 'MEDICO';
+      crmNumero?: string;
+      crmUf?: string;
+      crmCartaoPdfNome?: string;
+      crmCartaoPdfBase64?: string;
+    };
     await new Promise(r => setTimeout(r, 800)); // simula latência
+    const usuario = buildRegisteredUser(body);
+    MOCK_CURRENT_USER = usuario;
     return HttpResponse.json({
       id: 'novo-usuario-mock',
       accessToken: MOCK_TOKEN,
       refreshToken: MOCK_REFRESH,
-      usuario: MOCK_PACIENTE,
+      usuario,
       mensagem: 'Cadastro realizado. Verifique seu email.',
     }, { status: 201 });
   }),
@@ -293,12 +353,28 @@ export const handlers = [
   }),
 
   // CRM
-  http.get(`${BASE}/medicos/me/crm/status`, () =>
-    HttpResponse.json({ crmCartaoValidado: false, status: 'PENDENTE', crmNumero: '12345', crmUf: 'SP' }),
-  ),
-  http.post(`${BASE}/medicos/me/crm/validar-cartao`, () =>
-    HttpResponse.json({ crmCartaoValidado: true, status: 'APROVADO', crmNumero: '12345', crmUf: 'SP' }),
-  ),
+  http.get(`${BASE}/medicos/me/crm/status`, () => {
+    const current = MOCK_CURRENT_USER as any;
+    const validado = Boolean(current?.crmCartaoValidado);
+    return HttpResponse.json({
+      crmCartaoValidado: validado,
+      status: validado ? 'APROVADO' : 'PENDENTE',
+      crmNumero: current?.crmNumero ?? '12345',
+      crmUf: current?.crmUf ?? 'SP',
+    });
+  }),
+  http.post(`${BASE}/medicos/me/crm/validar-cartao`, () => {
+    const current = MOCK_CURRENT_USER as any;
+    if (current && current.tipo === 'MEDICO') {
+      current.crmCartaoValidado = true;
+    }
+    return HttpResponse.json({
+      crmCartaoValidado: true,
+      status: 'APROVADO',
+      crmNumero: current?.crmNumero ?? '12345',
+      crmUf: current?.crmUf ?? 'SP',
+    });
+  }),
 
   // New slots endpoint — returns ISO timestamps
   http.get(`${BASE}/medicos/:id/slots`, ({ request }) => {
@@ -354,8 +430,32 @@ export const handlers = [
   http.get(`${BASE}/medicos/me/saldo`, () => HttpResponse.json(MOCK_SALDO)),
   http.get(`${BASE}/medicos/me/repasses`, () => HttpResponse.json(MOCK_REPASSES)),
   http.get(`${BASE}/medicos/me/ciclos-repasse/:id`, () => HttpResponse.json(MOCK_REPASSE_DETAIL)),
-  http.get(`${BASE}/medicos/me/dados-bancarios`, () => HttpResponse.json(MOCK_DADOS_BANCARIOS)),
-  http.put(`${BASE}/medicos/me/dados-bancarios`, () => HttpResponse.json({ ok: true })),
+  http.get(`${BASE}/medicos/me/dados-bancarios`, () => HttpResponse.json(MOCK_DADOS_BANCARIOS_MEDICO)),
+  http.put(`${BASE}/medicos/me/dados-bancarios`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    MOCK_DADOS_BANCARIOS_MEDICO = {
+      ...MOCK_DADOS_BANCARIOS_MEDICO,
+      tipoChavePix: String(body.tipoChavePix ?? MOCK_DADOS_BANCARIOS_MEDICO.tipoChavePix),
+      valorChavePix: String(body.valorChavePix ?? MOCK_DADOS_BANCARIOS_MEDICO.valorChavePix),
+      banco: String(body.banco ?? MOCK_DADOS_BANCARIOS_MEDICO.banco),
+      agencia: String(body.agencia ?? MOCK_DADOS_BANCARIOS_MEDICO.agencia),
+      conta: String(body.conta ?? MOCK_DADOS_BANCARIOS_MEDICO.conta),
+    };
+    return HttpResponse.json({ ok: true });
+  }),
+  http.get(`${BASE}/pacientes/me/dados-bancarios`, () => HttpResponse.json(MOCK_DADOS_BANCARIOS_PACIENTE)),
+  http.put(`${BASE}/pacientes/me/dados-bancarios`, async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    MOCK_DADOS_BANCARIOS_PACIENTE = {
+      ...MOCK_DADOS_BANCARIOS_PACIENTE,
+      tipoChavePix: String(body.tipoChavePix ?? MOCK_DADOS_BANCARIOS_PACIENTE.tipoChavePix),
+      valorChavePix: String(body.valorChavePix ?? MOCK_DADOS_BANCARIOS_PACIENTE.valorChavePix),
+      banco: String(body.banco ?? MOCK_DADOS_BANCARIOS_PACIENTE.banco),
+      agencia: String(body.agencia ?? MOCK_DADOS_BANCARIOS_PACIENTE.agencia),
+      conta: String(body.conta ?? MOCK_DADOS_BANCARIOS_PACIENTE.conta),
+    };
+    return HttpResponse.json({ ok: true });
+  }),
 
   // ── CONSULTAS (PACIENTE) ──────────────────────────────────────────────────
 

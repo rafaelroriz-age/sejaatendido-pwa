@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { saveDadosBancarios, fetchDadosBancarios } from '../services/api';
+import { saveDadosBancarios, fetchDadosBancarios, DadosBancariosPerfil } from '../services/api';
+import { getUser } from '../storage/localStorage';
 import Colors from '../theme/colors';
 
 type TipoChavePix = 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';
@@ -75,6 +76,7 @@ function validateChave(tipo: TipoChavePix, value: string): string | null {
 
 export default function BankDetails() {
   const navigate = useNavigate();
+  const [perfil, setPerfil] = useState<DadosBancariosPerfil>('MEDICO');
   const [tipoChave, setTipoChave] = useState<TipoChavePix>('CPF');
   const [chavePix, setChavePix] = useState('');
   const [chaveError, setChaveError] = useState<string | null>(null);
@@ -88,11 +90,29 @@ export default function BankDetails() {
   const [saveMsg, setSaveMsg] = useState('');
   const [saveError, setSaveError] = useState('');
 
-  useEffect(() => { loadDados(); }, []);
+  useEffect(() => {
+    let active = true;
 
-  async function loadDados() {
+    async function bootstrap() {
+      try {
+        const user = await getUser();
+        if (!active) return;
+
+        const nextPerfil: DadosBancariosPerfil = user?.tipo === 'PACIENTE' ? 'PACIENTE' : 'MEDICO';
+        setPerfil(nextPerfil);
+        await loadDados(nextPerfil);
+      } catch {
+        if (active) setLoadingData(false);
+      }
+    }
+
+    void bootstrap();
+    return () => { active = false; };
+  }, []);
+
+  async function loadDados(nextPerfil: DadosBancariosPerfil) {
     try {
-      const data = await fetchDadosBancarios();
+      const data = await fetchDadosBancarios(nextPerfil);
       if (data) {
         if (data.tipoChavePix) setTipoChave(data.tipoChavePix as TipoChavePix);
         if (data.chavePix) setChavePix(data.chavePix);
@@ -119,13 +139,15 @@ export default function BankDetails() {
     const error = validateChave(tipoChave, chavePix);
     if (error) { setChaveError(error); return; }
     setLoading(true);
+    setSaveError('');
+    setSaveMsg('');
     try {
       await saveDadosBancarios({
         tipoChavePix: tipoChave, chavePix: chavePix.trim(),
         banco: showBanco ? bancoSelecionado : undefined,
         agencia: showBanco ? agencia : undefined,
         conta: showBanco ? conta : undefined,
-      });
+      }, perfil);
       setSaveMsg('Dados bancários salvos com sucesso!');
       setSaveError('');
       setTimeout(() => setSaveMsg(''), 3000);
@@ -136,6 +158,7 @@ export default function BankDetails() {
   }
 
   const inputStyle: React.CSSProperties = { width: '100%', backgroundColor: Colors.inputBg, borderRadius: 14, padding: 16, fontSize: 16, border: `1px solid ${Colors.border}`, color: Colors.textPrimary, outline: 'none', boxSizing: 'border-box' };
+  const isPaciente = perfil === 'PACIENTE';
 
   if (loadingData) {
     return (
@@ -149,7 +172,7 @@ export default function BankDetails() {
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg }}>
       <div style={{ backgroundColor: Colors.doctor, padding: '28px 16px 16px', borderRadius: '0 0 20px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={() => navigate(-1)} style={{ color: '#fff', fontSize: 15, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar</button>
-        <span style={{ color: '#fff', fontSize: 18, fontWeight: 800, letterSpacing: -0.3 }}>Dados para Recebimento</span>
+        <span style={{ color: '#fff', fontSize: 18, fontWeight: 800, letterSpacing: -0.3 }}>{isPaciente ? 'Dados para Pagamento' : 'Dados para Recebimento'}</span>
         <div style={{ width: 50 }} />
       </div>
 
@@ -159,7 +182,9 @@ export default function BankDetails() {
           <div style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.doctor }} />
           <div>
             <span style={{ fontSize: 15, fontWeight: 700, color: Colors.doctor, display: 'block' }}>Recebimento via Pix</span>
-            <span style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 2, display: 'block' }}>Configure sua chave para receber pagamentos</span>
+            <span style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 2, display: 'block' }}>
+              {isPaciente ? 'Configure seus dados para realizar pagamentos' : 'Configure sua chave para receber pagamentos'}
+            </span>
           </div>
         </div>
 
@@ -223,7 +248,7 @@ export default function BankDetails() {
         </div>
 
         {/* Mercado Pago */}
-        <div onClick={() => window.alert('A integração com Mercado Pago estará disponível em breve.')} style={{ display: 'flex', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 20, padding: 20, marginBottom: 20, gap: 14, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
+        <div onClick={() => setSaveError('A integração com Mercado Pago estará disponível em breve.')} style={{ display: 'flex', alignItems: 'center', backgroundColor: Colors.card, borderRadius: 20, padding: 20, marginBottom: 20, gap: 14, cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
           <div style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#009EE3', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <span style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>MP</span>
           </div>
@@ -241,7 +266,7 @@ export default function BankDetails() {
           display: 'flex', justifyContent: 'center', alignItems: 'center',
           boxShadow: `0 6px 12px ${Colors.doctor}59`,
         }}>
-          {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Salvar Dados Bancários</span>}
+          {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>{isPaciente ? 'Salvar Dados de Pagamento' : 'Salvar Dados Bancários'}</span>}
         </button>
 
         {saveMsg && <p style={{ fontSize: 14, color: Colors.success, fontWeight: 700, textAlign: 'center', marginTop: 12 }}>{saveMsg}</p>}
