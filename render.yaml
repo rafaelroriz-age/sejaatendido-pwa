@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: sejaatendido-pwa
+    runtime: docker
+    plan: standard
+    healthCheckPath: /
+    envVars:
+      - key: VITE_API_URL
+        value: https://sejaatendido-backend.onrender.com
+        scope: build
