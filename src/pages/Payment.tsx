@@ -1,10 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { criarPagamento, syncPagamento, fetchDadosBancarios } from '../services/api';
-import { getUser } from '../storage/localStorage';
+import { criarPagamento, syncPagamento } from '../services/api';
 import Colors, { Radius } from '../theme/colors';
 
 type PaymentMethod = 'pix' | 'cartao';
+
+type SavedCard = {
+  brand: string;
+  last4: string;
+  holder: string;
+  exp: string;
+};
+
+type PaymentPrefs = {
+  useSavedCard?: boolean;
+  savedCard?: SavedCard;
+};
+
+const PAYMENT_PREFS_KEY = '@payment:preferences';
 
 type PixData = {
   qrCode?: string;
@@ -57,13 +70,6 @@ function isPendingStatus(status: PaymentStatus): boolean {
   return normalized === 'AGUARDANDO' || normalized === 'PENDENTE';
 }
 
-function hasValidBankDetails(data: { chavePix?: string; banco?: string; agencia?: string; conta?: string } | null | undefined): boolean {
-  if (!data) return false;
-  const hasPix = Boolean(data.chavePix?.trim());
-  const hasBankAccount = Boolean(data.banco?.trim() && data.agencia?.trim() && data.conta?.trim());
-  return hasPix || hasBankAccount;
-}
-
 export default function Payment() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -88,8 +94,9 @@ export default function Payment() {
   const [errorText, setErrorText] = useState('');
   const [copied, setCopied] = useState(false);
   const [expired, setExpired] = useState(false);
-  const [bankCheckLoading, setBankCheckLoading] = useState(true);
-  const [hasBankData, setHasBankData] = useState(false);
+  const [useSavedCardPreference, setUseSavedCardPreference] = useState(true);
+  const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
+  const [useSavedCard, setUseSavedCard] = useState(true);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartedAt = useRef<number | null>(null);
@@ -101,31 +108,20 @@ export default function Payment() {
   }, [consultaId]);
 
   useEffect(() => {
-    let active = true;
-
-    async function checkBankData() {
-      try {
-        const user = await getUser();
-        if (!active) return;
-
-        if (user?.tipo !== 'PACIENTE') {
-          setHasBankData(true);
-          return;
-        }
-
-        const dados = await fetchDadosBancarios('PACIENTE');
-        if (!active) return;
-        setHasBankData(hasValidBankDetails(dados));
-      } catch {
-        if (!active) return;
-        setHasBankData(false);
-      } finally {
-        if (active) setBankCheckLoading(false);
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(PAYMENT_PREFS_KEY);
+      if (!raw) return;
+      const prefs = JSON.parse(raw) as PaymentPrefs;
+      const nextUseSavedCard = prefs.useSavedCard !== false;
+      setUseSavedCardPreference(nextUseSavedCard);
+      if (prefs.savedCard) {
+        setSavedCard(prefs.savedCard);
+        setUseSavedCard(nextUseSavedCard);
       }
+    } catch {
+      // ignore invalid local preferences
     }
-
-    void checkBankData();
-    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -227,10 +223,6 @@ export default function Payment() {
       setErrorText('ID da consulta não encontrado.');
       return;
     }
-    if (!hasBankData) {
-      setErrorText('Cadastre seus dados bancários antes de gerar o pagamento.');
-      return;
-    }
 
     setLoading(true);
     setErrorText('');
@@ -259,10 +251,6 @@ export default function Payment() {
   async function handleCardPayment() {
     if (!consultaId) {
       setErrorText('ID da consulta não encontrado.');
-      return;
-    }
-    if (!hasBankData) {
-      setErrorText('Cadastre seus dados bancários antes de iniciar o pagamento.');
       return;
     }
 
@@ -339,28 +327,13 @@ export default function Payment() {
           </div>
         )}
 
-        {!bankCheckLoading && !hasBankData && (
-          <div style={{ backgroundColor: '#FFF8E1', borderRadius: 12, padding: '12px 16px', marginBottom: 16, border: '1px solid #FFCC80' }}>
-            <span style={{ display: 'block', fontSize: 14, color: '#8A4B00', fontWeight: 700 }}>
-              Cadastre seus dados bancários para continuar.
-            </span>
-            <button
-              type="button"
-              onClick={() => navigate('/bank-details')}
-              style={{ marginTop: 10, backgroundColor: Colors.primary, color: '#fff', border: 'none', borderRadius: 10, padding: '10px 14px', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Ir para dados bancários
-            </button>
-          </div>
-        )}
-
         {method === 'pix' ? (
           <>
             {!paymentData && (
-              <button type="button" onClick={createPixPayment} disabled={loading || !consultaId || bankCheckLoading || !hasBankData} style={{
+              <button type="button" onClick={createPixPayment} disabled={loading || !consultaId} style={{
                 width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
-                border: 'none', cursor: (loading || !consultaId || bankCheckLoading || !hasBankData) ? 'not-allowed' : 'pointer',
-                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId || bankCheckLoading || !hasBankData) ? 0.6 : 1,
+                border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
+                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId) ? 0.6 : 1,
                 boxShadow: `0 6px 12px ${Colors.primary}59`,
               }}>
                 {loading ? 'Gerando PIX…' : 'Gerar código PIX'}
@@ -411,14 +384,34 @@ export default function Payment() {
             )}
           </>
         ) : (
-            <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId || bankCheckLoading || !hasBankData} style={{
+            <>
+              {savedCard && useSavedCardPreference && (
+                <div style={{ backgroundColor: Colors.card, borderRadius: 14, border: `1px solid ${Colors.border}`, padding: 14, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: Colors.textPrimary }}>
+                      {savedCard.brand} •••• {savedCard.last4}
+                    </span>
+                    <span style={{ fontSize: 12, color: Colors.textMuted }}>{savedCard.exp}</span>
+                  </div>
+                  <span style={{ fontSize: 12, color: Colors.textSecondary, display: 'block', marginBottom: 10 }}>
+                    {savedCard.holder}
+                  </span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: Colors.textSecondary, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={useSavedCard} onChange={e => setUseSavedCard(e.target.checked)} />
+                    Usar cartao salvo neste pagamento
+                  </label>
+                </div>
+              )}
+
+              <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId} style={{
             width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
-              border: 'none', cursor: (loading || !consultaId || bankCheckLoading || !hasBankData) ? 'not-allowed' : 'pointer',
-              color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId || bankCheckLoading || !hasBankData) ? 0.6 : 1,
+                border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
+                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId) ? 0.6 : 1,
             boxShadow: `0 6px 12px ${Colors.primary}59`,
           }}>
-            {loading ? 'Iniciando checkout…' : 'Pagar com cartão'}
-          </button>
+                {loading ? 'Iniciando checkout…' : useSavedCard && savedCard ? 'Pagar com cartao salvo' : 'Pagar com cartao'}
+              </button>
+            </>
         )}
       </div>
     </div>
