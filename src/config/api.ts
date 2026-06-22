@@ -6,14 +6,18 @@ const DEFAULT_API_URL = 'https://sejaatendido-backend.onrender.com';
 const apiUrlFromEnv = import.meta.env.VITE_API_URL || import.meta.env.NEXT_PUBLIC_API_URL || '';
 const frontendUrlFromEnv = import.meta.env.VITE_FRONTEND_URL || import.meta.env.NEXT_PUBLIC_FRONTEND_URL || '';
 
-// Em desenvolvimento, permite fallback local para facilitar setup inicial.
-// Em producao, exige VITE_API_URL para evitar deploy apontando para ambiente errado.
+// Em desenvolvimento, permite fallback local.
+// Em producao, usa default ou variavel de ambiente se configurada.
 const devFallbackApiUrl = 'http://localhost:3000';
-const configuredApiUrl = (apiUrlFromEnv || devFallbackApiUrl).replace(/\/+$/, '');
+const prodFallbackApiUrl = DEFAULT_API_URL; // Fallback seguro para produção
+const fallbackApiUrl = import.meta.env.PROD ? prodFallbackApiUrl : devFallbackApiUrl;
+
+const configuredApiUrl = (apiUrlFromEnv || fallbackApiUrl).replace(/\/+$/, '');
 const configuredFrontendUrl = frontendUrlFromEnv.replace(/\/+$/, '');
 
+// Log de debug para verificar qual URL está sendo usada
 if (import.meta.env.PROD && !apiUrlFromEnv) {
-	throw new Error('[config] VITE_API_URL e obrigatoria em producao.');
+	console.warn(`[config] VITE_API_URL não configurada em produção. Usando fallback: ${prodFallbackApiUrl}`);
 }
 
 if (import.meta.env.PROD && !configuredApiUrl.startsWith('https://')) {
