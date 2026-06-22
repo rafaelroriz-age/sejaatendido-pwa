@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
+import { API_URL } from '../config/api';
 
-const BASE = 'https://sejaatendido-backend.onrender.com';
+const BASE = API_URL;
 
 // ─── Dados fake reutilizáveis ────────────────────────────────────────────────
 

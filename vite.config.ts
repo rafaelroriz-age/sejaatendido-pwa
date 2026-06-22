@@ -2,11 +2,20 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
-  base: '/',
-  plugins: [
-    react(),
-    VitePWA({
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export default defineConfig(({ mode }) => {
+  const apiUrl = process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://sejaatendido-backend.onrender.com';
+  const apiOrigin = new URL(apiUrl).origin;
+  const apiOriginRegex = new RegExp(`^${escapeRegex(apiOrigin)}\/.*`, 'i');
+
+  return {
+    base: '/',
+    plugins: [
+      react(),
+      VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'logo192.png', 'logo512.png'],
       manifest: {
@@ -30,7 +39,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/sejaatendido-backend\.onrender\.com\/.*/i,
+            urlPattern: apiOriginRegex,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
@@ -41,9 +50,10 @@ export default defineConfig({
         ],
       },
     }),
-  ],
-  server: {
-    port: 3000,
-    host: true,
-  },
+    ],
+    server: {
+      port: 3000,
+      host: true,
+    },
+  };
 });
