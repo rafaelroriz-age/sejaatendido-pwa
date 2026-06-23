@@ -39,6 +39,7 @@ let MOCK_CURRENT_USER: typeof MOCK_PACIENTE | typeof MOCK_MEDICO_USER | typeof M
 
 const LOW_COST_MEDICO_ID = 'med-002';
 const LOW_COST_CONSULTA_VALOR_CENTAVOS = 10; // R$ 0,10
+const DEFAULT_CONSULTA_VALOR_CENTAVOS = 10000; // R$ 100,00
 
 const MOCK_MEDICOS = [
   {
@@ -170,10 +171,10 @@ const MOCK_REPASSE_DETAIL = {
 };
 
 function getConsultaValorCentavos(consultaId: unknown): number {
-  if (typeof consultaId !== 'string') return 15000;
+  if (typeof consultaId !== 'string') return DEFAULT_CONSULTA_VALOR_CENTAVOS;
   const allConsultas = [...MOCK_CONSULTAS_PACIENTE, ...MOCK_CONSULTAS_MEDICO];
   const found = allConsultas.find(c => c.id === consultaId);
-  return found?.valor ?? 15000;
+  return found?.valor ?? DEFAULT_CONSULTA_VALOR_CENTAVOS;
 }
 
 let MOCK_DADOS_BANCARIOS_MEDICO = {
@@ -347,7 +348,7 @@ export const handlers = [
   }),
 
   // Doctor own profile
-  http.get(`${BASE}/medicos/me`, () => HttpResponse.json({ medico: { ...MOCK_MEDICOS[0], bio: 'Médico de demonstração.', valorConsulta: 15000, especialidade: 'Clínico Geral' } })),
+  http.get(`${BASE}/medicos/me`, () => HttpResponse.json({ medico: { ...MOCK_MEDICOS[0], bio: 'Médico de demonstração.', valorConsulta: DEFAULT_CONSULTA_VALOR_CENTAVOS, especialidade: 'Clínico Geral' } })),
   http.put(`${BASE}/medicos/me`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({ medico: { ...MOCK_MEDICOS[0], ...body } });
@@ -478,7 +479,7 @@ export const handlers = [
       dataHora: body.dataHora ?? body.data,
       sintomas: body.sintomas ?? body.motivo ?? 'Consulta geral',
       status: 'PENDENTE',
-      valor: medico.valorConsulta ?? 15000,
+      valor: medico.valorConsulta ?? DEFAULT_CONSULTA_VALOR_CENTAVOS,
       meetLink: null,
       medico,
     };
@@ -496,7 +497,7 @@ export const handlers = [
       dataHora: body.dataHora ?? body.data,
       sintomas: body.sintomas ?? body.motivo ?? 'Consulta geral',
       status: 'PENDENTE',
-      valor: medico.valorConsulta ?? 15000,
+      valor: medico.valorConsulta ?? DEFAULT_CONSULTA_VALOR_CENTAVOS,
       meetLink: null,
       medico,
     };

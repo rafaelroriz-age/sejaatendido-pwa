@@ -274,6 +274,8 @@ export interface MedicoListResponse {
   page: number;
 }
 
+const DEFAULT_VALOR_CONSULTA_CENTAVOS = 10000;
+
 function normalizeValorConsultaCentavos(raw: any): number | undefined {
   const candidates = [
     raw?.valorConsulta,
@@ -311,7 +313,7 @@ function normalizeMedico(raw: any): Medico {
     crm: medicoRaw?.crm ?? raw?.crm,
     fotoPerfil: medicoRaw?.fotoPerfil ?? raw?.fotoPerfil,
     bio: medicoRaw?.bio ?? raw?.bio,
-    valorConsulta: normalizeValorConsultaCentavos(medicoRaw) ?? normalizeValorConsultaCentavos(raw),
+    valorConsulta: normalizeValorConsultaCentavos(medicoRaw) ?? normalizeValorConsultaCentavos(raw) ?? DEFAULT_VALOR_CONSULTA_CENTAVOS,
     status: medicoRaw?.status ?? raw?.status,
     aprovado: medicoRaw?.aprovado ?? raw?.aprovado,
     usuario: {
