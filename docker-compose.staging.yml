@@ -1,0 +1,22 @@
+# Ambiente de HOMOLOGAÇÃO (sandbox local).
+# Sobe o build de produção apontando para o backend de STAGING, na porta 3001.
+# Uso: npm run sandbox:up  (ou: docker compose -f docker-compose.staging.yml up -d --build)
+#
+# As variáveis abaixo são lidas de um arquivo .env local (NUNCA commitado).
+# Use credenciais de TESTE (Mercado Pago sandbox, etc.) em homologação.
+services:
+  sejaatendido-pwa-staging:
+    container_name: sejaatendido-pwa-staging
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://sejaatendido-staging-backend.onrender.com}
+        VITE_MP_PUBLIC_KEY: ${VITE_MP_PUBLIC_KEY:-}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
+    ports:
+      - "3001:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
