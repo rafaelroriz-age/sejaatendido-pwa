@@ -142,19 +142,21 @@ export interface AuthResponse {
 }
 
 export async function loginRequest(data: LoginRequest): Promise<AuthResponse> {
-  const r = await api.post('/auth/login', data);
+  const r = await api.post('/auth/login', data, { timeout: 15000 });
   return r.data;
 }
 
 export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthResponse> {
   try {
-    const r = await api.post('/auth/login', data);
+    const r = await api.post('/auth/login', data, { timeout: 15000 });
     return r.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
-      if (status === 404 || status === 405) {
-        const fallback = await api.post('/auth/medicos/login', data);
+      // The unified /auth/login endpoint may return 400 when receiving CPF instead of email.
+      // Also fallback on 404/405 if the endpoint doesn't exist on this backend version.
+      if (status === 400 || status === 404 || status === 405) {
+        const fallback = await api.post('/auth/medicos/login', data, { timeout: 15000 });
         return fallback.data;
       }
     }
@@ -198,7 +200,7 @@ export interface RegisterResponse {
 }
 
 export async function registerRequest(data: RegisterRequest): Promise<RegisterResponse> {
-  const r = await api.post('/auth/registro', data, { timeout: 30000 });
+  const r = await api.post('/auth/registro', data, { timeout: 20000 });
   return r.data;
 }
 

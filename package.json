@@ -8,7 +8,11 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "check:unused": "tsc --noEmit --noUnusedLocals --noUnusedParameters"
+    "check:unused": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
+    "sandbox:up": "docker compose -f docker-compose.staging.yml up -d --build",
+    "sandbox:down": "docker compose -f docker-compose.staging.yml down",
+    "sandbox:logs": "docker compose -f docker-compose.staging.yml logs -f",
+    "sandbox:build": "docker compose -f docker-compose.staging.yml build"
   },
   "dependencies": {
     "@mercadopago/sdk-react": "^1.0.7",
