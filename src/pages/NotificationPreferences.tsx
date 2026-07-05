@@ -174,16 +174,19 @@ export default function NotificationPreferences() {
     }
 
     const json = subscription.toJSON();
-    // registerPushToken will silently skip if backend doesn't accept web-pwa
-    await registerPushToken({
-      endpoint: json.endpoint || subscription.endpoint,
-      keys: json.keys,
-      expirationTime: json.expirationTime,
-      userAgent: navigator.userAgent,
-      platform: 'web-pwa',
-    });
-
-    setPushWebNote('Push web registrado localmente. A entrega depende de suporte no backend.');
+    try {
+      await registerPushToken({
+        endpoint: json.endpoint || subscription.endpoint,
+        keys: json.keys,
+        expirationTime: json.expirationTime,
+        userAgent: navigator.userAgent,
+        platform: 'web-pwa',
+      });
+      setPushWebNote('Push web registrado. A entrega depende da configuração do backend e do navegador.');
+    } catch {
+      // Keep preference save non-blocking when backend push contract differs.
+      setPushWebNote('Push web assinado no navegador, mas o backend não confirmou o registro do token.');
+    }
   }
 
   const inputStyle: React.CSSProperties = { width: '100%', backgroundColor: Colors.inputBg, borderRadius: 14, padding: 16, fontSize: 16, border: `1px solid ${Colors.border}`, color: Colors.textPrimary, outline: 'none', boxSizing: 'border-box' };
