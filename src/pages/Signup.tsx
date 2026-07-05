@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerRequest, sendFrontendTelemetryEvent } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
-import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import LegalConsent, { LegalConsentErrors } from '../components/LegalConsent';
 import { LEGAL_PRIVACY_VERSION, LEGAL_TERMS_VERSION } from '../config/legal';
@@ -99,6 +98,9 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [stepError, setStepError] = useState('');
+  const [signupError, setSignupError] = useState('');
+  const [slowServer, setSlowServer] = useState(false);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progress = useMemo(() => (step / 4) * 100, [step]);
 
@@ -172,10 +174,13 @@ export default function SignupScreen() {
 
   function handleNext() {
     if (!validateStep(step)) return;
+    setSignupError('');
     if (step < 4) setStep((step + 1) as SignupStep);
   }
 
   function handleBack() {
+    setStepError('');
+    setSignupError('');
     if (step > 1) setStep((step - 1) as SignupStep);
   }
 
@@ -217,9 +222,11 @@ export default function SignupScreen() {
   }
 
   async function handleSignup() {
+    setSignupError('');
     if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
 
     setLoading(true);
+    slowTimerRef.current = setTimeout(() => setSlowServer(true), 8000);
     try {
       const rawCpf = cpf.replace(/\D/g, '');
       const rawTelefone = normalizePhone(telefone);
@@ -253,8 +260,12 @@ export default function SignupScreen() {
       await saveAuthSession(response.accessToken, response.usuario, response.refreshToken);
       setRegistered(true);
     } catch (error) {
-      showErrorAlert(error, 'Erro ao criar conta');
+      if (import.meta.env.DEV) console.error('[Signup]', error);
+      const { handleApiError } = await import('../utils/errorHandler');
+      setSignupError(handleApiError(error));
     } finally {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+      setSlowServer(false);
       setLoading(false);
     }
   }
@@ -419,7 +430,13 @@ export default function SignupScreen() {
             </>
           )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: Space.md, position: 'sticky', bottom: 0, backgroundColor: Colors.card, paddingTop: 10, paddingBottom: 4 }}>
+          {(stepError || signupError) && (
+            <div style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: '10px 14px', marginTop: 12, marginBottom: 4, border: '1px solid #EF9A9A' }}>
+              <span style={{ fontSize: 14, color: '#C62828', fontWeight: 600 }} role="alert">{stepError || signupError}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: Space.sm, position: 'sticky', bottom: 0, backgroundColor: Colors.card, paddingTop: 10, paddingBottom: 4 }}>
             <button
               onClick={handleBack}
               disabled={loading || step === 1}
@@ -471,14 +488,14 @@ export default function SignupScreen() {
                   opacity: loading ? 0.6 : 1,
                 }}
               >
-                {loading ? 'Cadastrando...' : 'Finalizar cadastro'}
+                {loading ? 'Aguarde, cadastrando...' : 'Finalizar cadastro'}
               </button>
             )}
           </div>
 
-          {stepError && (
-            <div style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: '10px 14px', marginTop: 12, border: '1px solid #EF9A9A' }}>
-              <span style={{ fontSize: 14, color: '#C62828', fontWeight: 600 }} role="alert">{stepError}</span>
+          {slowServer && (
+            <div style={{ backgroundColor: '#FFF8E1', borderRadius: 10, padding: '8px 12px', marginTop: 10, border: '1px solid #FFE082', textAlign: 'center' }}>
+              <span style={{ fontSize: 12, color: '#795548' }}>⏳ O servidor está iniciando (pode levar até 60s). Aguarde...</span>
             </div>
           )}
         </div>

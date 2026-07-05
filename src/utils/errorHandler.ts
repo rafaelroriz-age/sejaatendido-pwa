@@ -53,5 +53,11 @@ export const showErrorAlert = (error: unknown, title = 'Erro') => {
     console.error('[API_ERROR]', error);
   }
   const message = handleApiError(error);
-  window.alert(`${title}\n${message}`);
+  // Use a non-blocking notification instead of window.alert.
+  // Any page that needs an inline error banner should catch errors directly.
+  // eslint-disable-next-line no-console
+  console.warn(`${title}: ${message}`);
+  // Dispatch a custom event so future toast implementations can listen.
+  const event = new CustomEvent('app:error', { detail: { title, message } });
+  window.dispatchEvent(event);
 };

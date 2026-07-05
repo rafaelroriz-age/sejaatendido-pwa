@@ -53,9 +53,11 @@ export default function LoginScreen() {
   const [cpf, setCpf] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
+  const [slowServer, setSlowServer] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
   const googleBtnRef = useRef<HTMLDivElement>(null);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   const navigateByRole = useCallback((tipo: string) => {
@@ -136,10 +138,12 @@ export default function LoginScreen() {
 
   async function handleLoginMedico() {
     setErrorMsg('');
+    setSlowServer(false);
     const rawCpf = cpf.replace(/\D/g, '');
     if (!rawCpf || !senha) { setErrorMsg('Preencha CPF e senha.'); return; }
     if (!isValidCpf(rawCpf)) { setErrorMsg('CPF inválido, verifique o número digitado.'); return; }
     setLoading(true);
+    slowTimerRef.current = setTimeout(() => setSlowServer(true), 8000);
     try {
       const { accessToken, usuario, refreshToken } = await loginCpfRequest({ cpf: rawCpf, senha });
       const user = {
@@ -167,14 +171,18 @@ export default function LoginScreen() {
       }
       showErrorAlert(error, 'Erro ao fazer login');
     } finally {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+      setSlowServer(false);
       setLoading(false);
     }
   }
 
   async function handleLoginPaciente() {
     setErrorMsg('');
+    setSlowServer(false);
     if (!email || !senha) { setErrorMsg('Preencha email e senha.'); return; }
     setLoading(true);
+    slowTimerRef.current = setTimeout(() => setSlowServer(true), 8000);
     try {
       const { accessToken, usuario, refreshToken } = await loginRequest({ email, senha });
       const user = {
@@ -193,6 +201,8 @@ export default function LoginScreen() {
       }
       showErrorAlert(error, 'Erro ao fazer login');
     } finally {
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+      setSlowServer(false);
       setLoading(false);
     }
   }
@@ -323,6 +333,12 @@ export default function LoginScreen() {
               : <span style={{ color: '#fff', fontSize: Font.md + 1, fontWeight: 700, letterSpacing: 0.5 }}>Entrar</span>
             }
           </button>
+
+          {slowServer && (
+            <div style={{ backgroundColor: '#FFF8E1', borderRadius: 10, padding: '8px 12px', marginTop: 10, border: '1px solid #FFE082', textAlign: 'center' }}>
+              <span style={{ fontSize: Font.xs, color: '#795548' }}>⏳ O servidor está iniciando (pode levar até 60s). Aguarde...</span>
+            </div>
+          )}
 
           <div style={{ textAlign: 'right', marginTop: 8, marginBottom: 8 }}>
             <span
