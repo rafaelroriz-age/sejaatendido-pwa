@@ -153,7 +153,9 @@ export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthRespon
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
-      if (status === 404 || status === 405) {
+      // The unified /auth/login endpoint may return 400 when receiving CPF instead of email.
+      // Also fallback on 404/405 if the endpoint doesn't exist on this backend version.
+      if (status === 400 || status === 404 || status === 405) {
         const fallback = await api.post('/auth/medicos/login', data);
         return fallback.data;
       }

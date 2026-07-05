@@ -158,7 +158,7 @@ export default function LoginScreen() {
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
-        if (status === 400) { setErrorMsg('CPF inválido, verifique o número digitado.'); return; }
+        if (status === 400) { setErrorMsg('CPF ou senha incorretos. Verifique os dados e tente novamente.'); return; }
         if (status === 401) { setErrorMsg('CPF ou senha incorretos.'); return; }
         if (status === 403) {
           setErrorMsg('Seu CRM ainda não foi validado. Valide sua carteirinha na área de perfil.');
