@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearAuthSession, saveUser, User } from '../storage/localStorage';
-import { fetchMedicoPerfil, savePerfil, updateMedicoPerfil } from '../services/api';
-import { showErrorAlert } from '../utils/errorHandler';
+import { fetchMedicoPerfil, savePerfil, updateMedicoPerfil, changePasswordRequest } from '../services/api';
+import { handleApiError } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Card from '../components/Card';
@@ -37,6 +37,14 @@ export default function Profile() {
   const [telefone, setTelefone] = useState('');
   const [cpf, setCpf] = useState('');
   const [valorConsultaInput, setValorConsultaInput] = useState('');
+
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [senhaAtual, setSenhaAtual] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmaNovaSenha, setConfirmaNovaSenha] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   function applyCpfMask(value: string): string {
     const d = value.replace(/\D/g, '').slice(0, 11);
@@ -123,9 +131,32 @@ export default function Profile() {
       setSaveMsg(user?.tipo === 'MEDICO' ? 'Perfil e valor da consulta atualizados com sucesso!' : 'Perfil atualizado com sucesso!');
       setTimeout(() => setSaveMsg(''), 3000);;
     } catch (error) {
-      showErrorAlert(error, 'Erro ao salvar perfil');
+      setSaveError(handleApiError(error));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleChangePassword() {
+    setPasswordMsg('');
+    setPasswordError('');
+    if (!senhaAtual) { setPasswordError('Informe a senha atual.'); return; }
+    if (!novaSenha) { setPasswordError('Informe a nova senha.'); return; }
+    if (novaSenha.length < 8) { setPasswordError('A nova senha deve ter pelo menos 8 caracteres.'); return; }
+    if (novaSenha !== confirmaNovaSenha) { setPasswordError('As senhas não coincidem.'); return; }
+    setSavingPassword(true);
+    try {
+      await changePasswordRequest(senhaAtual, novaSenha);
+      setPasswordMsg('Senha alterada com sucesso!');
+      setSenhaAtual('');
+      setNovaSenha('');
+      setConfirmaNovaSenha('');
+      setChangingPassword(false);
+      setTimeout(() => setPasswordMsg(''), 4000);
+    } catch (error) {
+      setPasswordError(handleApiError(error));
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -219,12 +250,81 @@ export default function Profile() {
 
         <Card style={{ marginBottom: Space.lg }}>
           <h4 style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.lg }}>Segurança</h4>
-          {['Alterar Senha', 'Autenticação em 2 Fatores'].map(item => (
-            <div key={item} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: `1px solid ${Colors.borderLight}`, cursor: 'pointer' }}>
-              <span style={{ fontSize: 15, color: Colors.textPrimary, fontWeight: 500 }}>{item}</span>
-              <span style={{ fontSize: 22, color: Colors.textMuted }}>›</span>
+
+          {/* Alterar Senha */}
+          <div
+            onClick={() => {
+              setChangingPassword(p => !p);
+              setPasswordMsg('');
+              setPasswordError('');
+              setSenhaAtual('');
+              setNovaSenha('');
+              setConfirmaNovaSenha('');
+            }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: changingPassword ? 'none' : `1px solid ${Colors.borderLight}`, cursor: 'pointer' }}
+          >
+            <span style={{ fontSize: 15, color: Colors.textPrimary, fontWeight: 500 }}>Alterar Senha</span>
+            <span style={{ fontSize: 18, color: Colors.textMuted, transition: 'transform 0.2s', display: 'inline-block', transform: changingPassword ? 'rotate(90deg)' : 'none' }}>›</span>
+          </div>
+
+          {changingPassword && (
+            <div style={{ paddingBottom: 16, borderBottom: `1px solid ${Colors.borderLight}` }}>
+              <div style={{ marginTop: 12, marginBottom: 10 }}>
+                <input
+                  type="password"
+                  placeholder="Senha atual"
+                  value={senhaAtual}
+                  onChange={e => setSenhaAtual(e.target.value)}
+                  disabled={savingPassword}
+                  autoComplete="current-password"
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <input
+                  type="password"
+                  placeholder="Nova senha (mín. 8 caracteres)"
+                  value={novaSenha}
+                  onChange={e => setNovaSenha(e.target.value)}
+                  disabled={savingPassword}
+                  autoComplete="new-password"
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <input
+                  type="password"
+                  placeholder="Confirmar nova senha"
+                  value={confirmaNovaSenha}
+                  onChange={e => setConfirmaNovaSenha(e.target.value)}
+                  disabled={savingPassword}
+                  autoComplete="new-password"
+                  style={inputStyle}
+                />
+              </div>
+              {passwordError && (
+                <div style={{ backgroundColor: '#FFEBEE', borderRadius: 8, padding: '8px 12px', marginBottom: 10, border: '1px solid #EF9A9A' }}>
+                  <span style={{ fontSize: 13, color: '#C62828', fontWeight: 600 }} role="alert">{passwordError}</span>
+                </div>
+              )}
+              {passwordMsg && (
+                <p style={{ fontSize: 14, color: Colors.success, fontWeight: 700, marginBottom: 10 }}>{passwordMsg}</p>
+              )}
+              <button
+                onClick={handleChangePassword}
+                disabled={savingPassword}
+                style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Space.lg, border: 'none', color: '#fff', fontSize: 15, fontWeight: 700, cursor: savingPassword ? 'not-allowed' : 'pointer', opacity: savingPassword ? 0.6 : 1 }}
+              >
+                {savingPassword ? 'Salvando...' : 'Confirmar Alteração'}
+              </button>
             </div>
-          ))}
+          )}
+
+          {/* 2FA - placeholder */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0' }}>
+            <span style={{ fontSize: 15, color: Colors.textSecondary, fontWeight: 500 }}>Autenticação em 2 Fatores</span>
+            <span style={{ fontSize: 11, backgroundColor: Colors.borderLight, color: Colors.textMuted, padding: '3px 8px', borderRadius: Radius.full, fontWeight: 600 }}>Em breve</span>
+          </div>
         </Card>
 
         {user?.tipo === 'MEDICO' && (
