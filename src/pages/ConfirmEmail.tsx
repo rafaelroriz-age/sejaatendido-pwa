@@ -11,6 +11,9 @@ export default function ConfirmEmail() {
   const token = searchParams.get('token') || '';
   const [status, setStatus] = useState<Status>('loading');
   const [message, setMessage] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [resendError, setResendError] = useState('');
 
   useEffect(() => {
     if (token) { doConfirm(); }
@@ -26,6 +29,20 @@ export default function ConfirmEmail() {
     } catch (error: any) {
       setStatus('error');
       setMessage(error?.response?.data?.message || error?.response?.data?.error || 'Não foi possível confirmar o email. Tente novamente.');
+    }
+  }
+
+  async function handleResendConfirmEmail() {
+    setResendLoading(true);
+    setResendMessage('');
+    setResendError('');
+    try {
+      await resendConfirmEmailRequest();
+      setResendMessage('Email de confirmação reenviado! Verifique sua caixa de entrada.');
+    } catch {
+      setResendError('Não foi possível reenviar agora. Faça login e tente novamente.');
+    } finally {
+      setResendLoading(false);
     }
   }
 
@@ -59,16 +76,11 @@ export default function ConfirmEmail() {
             <button onClick={doConfirm} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: 14, padding: 16, border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D` }}>
               <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Tentar Novamente</span>
             </button>
-            <button onClick={async () => {
-              try {
-                await resendConfirmEmailRequest();
-                window.alert('Email de confirmação reenviado! Verifique sua caixa de entrada.');
-              } catch {
-                window.alert('Não foi possível reenviar. Faça login primeiro para reenviar o email.');
-              }
-            }} style={{ width: '100%', backgroundColor: 'transparent', borderRadius: 14, padding: 16, border: `2px solid ${Colors.primary}`, cursor: 'pointer', marginTop: 12 }}>
-              <span style={{ color: Colors.primary, fontSize: 16, fontWeight: 700 }}>Reenviar Email</span>
+            <button onClick={handleResendConfirmEmail} disabled={resendLoading} style={{ width: '100%', backgroundColor: 'transparent', borderRadius: 14, padding: 16, border: `2px solid ${Colors.primary}`, cursor: resendLoading ? 'not-allowed' : 'pointer', marginTop: 12, opacity: resendLoading ? 0.7 : 1 }}>
+              <span style={{ color: Colors.primary, fontSize: 16, fontWeight: 700 }}>{resendLoading ? 'Reenviando...' : 'Reenviar Email'}</span>
             </button>
+            {resendMessage && <p style={{ marginTop: 12, marginBottom: 0, fontSize: 14, color: Colors.success }}>{resendMessage}</p>}
+            {resendError && <p style={{ marginTop: 12, marginBottom: 0, fontSize: 14, color: Colors.error }}>{resendError}</p>}
             <button onClick={() => navigate('/login', { replace: true })} style={{ background: 'none', border: 'none', marginTop: 16, padding: 8, cursor: 'pointer' }}>
               <span style={{ color: Colors.primary, fontSize: 15, fontWeight: 600 }}>Voltar para Login</span>
             </button>
