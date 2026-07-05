@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerRequest, sendFrontendTelemetryEvent } from '../services/api';
 import { saveAuthSession } from '../storage/localStorage';
@@ -99,8 +99,6 @@ export default function SignupScreen() {
   const [registered, setRegistered] = useState(false);
   const [stepError, setStepError] = useState('');
   const [signupError, setSignupError] = useState('');
-  const [slowServer, setSlowServer] = useState(false);
-  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progress = useMemo(() => (step / 4) * 100, [step]);
 
@@ -226,7 +224,6 @@ export default function SignupScreen() {
     if (!validateStep(1) || !validateStep(2) || !validateStep(3) || !validateStep(4)) return;
 
     setLoading(true);
-    slowTimerRef.current = setTimeout(() => setSlowServer(true), 8000);
     try {
       const rawCpf = cpf.replace(/\D/g, '');
       const rawTelefone = normalizePhone(telefone);
@@ -264,8 +261,6 @@ export default function SignupScreen() {
       const { handleApiError } = await import('../utils/errorHandler');
       setSignupError(handleApiError(error));
     } finally {
-      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
-      setSlowServer(false);
       setLoading(false);
     }
   }
@@ -488,16 +483,11 @@ export default function SignupScreen() {
                   opacity: loading ? 0.6 : 1,
                 }}
               >
-                {loading ? 'Aguarde, cadastrando...' : 'Finalizar cadastro'}
+                {loading ? 'Cadastrando...' : 'Finalizar cadastro'}
               </button>
             )}
           </div>
 
-          {slowServer && (
-            <div style={{ backgroundColor: '#FFF8E1', borderRadius: 10, padding: '8px 12px', marginTop: 10, border: '1px solid #FFE082', textAlign: 'center' }}>
-              <span style={{ fontSize: 12, color: '#795548' }}>⏳ O servidor está iniciando (pode levar até 60s). Aguarde...</span>
-            </div>
-          )}
         </div>
 
         <div style={{ textAlign: 'center', marginTop: Space.xl }}>
