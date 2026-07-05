@@ -1139,6 +1139,10 @@ export async function savePerfil(data: SavePerfilRequest): Promise<PerfilRespons
   return res.data;
 }
 
+export async function changePasswordRequest(senhaAtual: string, novaSenha: string): Promise<void> {
+  await api.put('/usuarios/me/senha', { senhaAtual, novaSenha });
+}
+
 // SALDO / GANHOS
 export interface SaldoMedico {
   saldo_a_liberar: number;
