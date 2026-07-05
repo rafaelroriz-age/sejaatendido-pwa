@@ -423,7 +423,7 @@ export const handlers = [
   http.get(`${BASE}/medicos/me/consultas`, () => HttpResponse.json({ consultas: MOCK_CONSULTAS_MEDICO, total: MOCK_CONSULTAS_MEDICO.length })),
   http.patch(`${BASE}/medicos/me/consultas/:id`, async ({ request, params }) => {
     const body = await request.json() as { acao?: string };
-    const statusMap: Record<string, string> = { ACEITAR: 'ACEITA', RECUSAR: 'RECUSADA' };
+    const statusMap: Record<string, string> = { ACEITAR: 'ACEITA', RECUSAR: 'RECUSADA', FINALIZAR: 'CONCLUIDA' };
     const novoStatus = statusMap[body.acao ?? ''] ?? body.acao ?? 'PENDENTE';
     const consulta = MOCK_CONSULTAS_MEDICO.find(c => c.id === params.id);
     if (consulta) (consulta as any).status = novoStatus;

@@ -636,10 +636,10 @@ export async function cancelConsulta(id: string): Promise<void> {
   }
 }
 
-export async function updateConsultaMedico(id: string, acao: 'ACEITA' | 'RECUSADA', motivoRecusa?: string): Promise<void> {
-  const acaoMap = { ACEITA: 'ACEITAR', RECUSADA: 'RECUSAR' } as const;
+export async function updateConsultaMedico(id: string, acao: 'ACEITA' | 'RECUSADA' | 'CONCLUIDA', motivoRecusa?: string): Promise<void> {
+  const acaoMap: Record<string, string> = { ACEITA: 'ACEITAR', RECUSADA: 'RECUSAR', CONCLUIDA: 'FINALIZAR' };
   await api.patch(`/medicos/me/consultas/${id}`, {
-    acao: acaoMap[acao],
+    acao: acaoMap[acao] ?? acao,
     ...(motivoRecusa ? { motivoRecusa } : {}),
   });
 }
@@ -1093,12 +1093,51 @@ export interface PushTokenPayload {
 }
 
 export async function registerPushToken(data: PushTokenPayload): Promise<void> {
+  const normalizedPlatform = String(data.platform ?? '').toUpperCase();
   const plataforma =
-    data.platform?.toUpperCase() === 'IOS' || data.platform?.toUpperCase() === 'ANDROID'
-      ? (data.platform.toUpperCase() as 'IOS' | 'ANDROID')
-      : null;
-  if (!plataforma) return;
-  await api.post('/usuarios/me/push-token', { token: data.endpoint, plataforma });
+    normalizedPlatform === 'IOS' || normalizedPlatform === 'ANDROID'
+      ? normalizedPlatform
+      : normalizedPlatform === 'WEB_PWA' || normalizedPlatform === 'WEB-PWA' || normalizedPlatform === 'WEB' || normalizedPlatform === 'PWA' || normalizedPlatform === 'BROWSER'
+        ? 'WEB_PWA'
+        : null;
+
+  if (!plataforma || !data.endpoint) return;
+
+  const endpoints = [
+    '/usuarios/me/push-token',
+    '/usuarios/me/notificacoes/push-token',
+    '/notificacoes/push-token',
+  ];
+
+  const payloads: Array<Record<string, unknown>> = [
+    { token: data.endpoint, plataforma },
+    {
+      endpoint: data.endpoint,
+      keys: data.keys,
+      expirationTime: data.expirationTime ?? null,
+      userAgent: data.userAgent,
+      platform: plataforma,
+    },
+    { pushToken: data.endpoint, platform: plataforma },
+  ];
+
+  let lastError: unknown;
+  for (const endpoint of endpoints) {
+    for (const payload of payloads) {
+      try {
+        await api.post(endpoint, payload, { timeout: 15000 });
+        return;
+      } catch (error) {
+        lastError = error;
+        const status = (error as any)?.response?.status;
+        if (status === 404 || status === 405) break;
+        if (status === 400 || status === 422) continue;
+        throw error;
+      }
+    }
+  }
+
+  if (lastError) throw lastError;
 }
 
 export async function unregisterPushToken(): Promise<void> {

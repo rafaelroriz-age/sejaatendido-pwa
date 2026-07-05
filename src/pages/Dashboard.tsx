@@ -223,7 +223,7 @@ export default function Dashboard() {
               <span style={{ fontSize: Font.sm, color: Colors.primary, fontWeight: 600 }}>{formatDate(c.dataHora ?? c.data)}</span>
             </div>
             {isPendingPayment(c.status) && (
-              <button onClick={() => navigate('/payment', { state: { consultaId: c.id, valor: 150 } })} style={{
+              <button onClick={() => navigate('/payment', { state: { consultaId: c.id, valor: typeof c.valor === 'number' ? c.valor : undefined } })} style={{
                 width: '100%', backgroundColor: Colors.success, padding: 14, borderRadius: Radius.md,
                 marginTop: Space.md, border: 'none', color: '#fff', fontWeight: 700, cursor: 'pointer',
               }}>Pagar consulta</button>
