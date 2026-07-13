@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Colors from '../theme/colors';
 
-const ANDROID_APK_URL = 'https://expo.dev/accounts/rafaelroriz_dev/projects/sejaatendido-rn/builds/d5be9460-48c7-4829-be64-b386d0bf62c1';
 const OFFICIAL_LOGO = '/logo-oficial.png';
 
 /* ─── Feature icon components ─── */
@@ -135,11 +134,6 @@ export default function LandingPage() {
             </ul>
           )}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            {!isMobile && (
-              <a href={ANDROID_APK_URL} target="_blank" rel="noreferrer" style={{ ...s.btnPrimary, background: Colors.accentSoft, color: Colors.primary }}>
-                Baixar APK
-              </a>
-            )}
             <button style={s.btnPrimary} onClick={() => navigate('/login')}>Acessar App</button>
           </div>
         </div>
@@ -162,9 +156,6 @@ export default function LandingPage() {
               Seja Atendido conecta pacientes a médicos verificados para agendamento rápido, pagamento seguro via PIX e acompanhamento por chat, tudo pelo celular.
             </p>
             <div style={{ ...s.heroCTA, ...(isMobile ? { justifyContent: 'center' } : {}) }}>
-              <a href={ANDROID_APK_URL} target="_blank" rel="noreferrer" style={{ ...s.btnPrimary, padding: '14px 32px', fontSize: 16 }}>
-                Baixar APK Android
-              </a>
               <button style={{ ...s.btnPrimary, padding: '14px 32px', fontSize: 16 }} onClick={() => navigate('/signup')}>
                 Criar conta grátis
               </button>
@@ -299,9 +290,8 @@ export default function LandingPage() {
       <section style={s.cta}>
         <div style={{ maxWidth: 620, margin: '0 auto', padding: '0 20px' }}>
           <h2 style={s.ctaTitle}>Pronto para cuidar da sua saúde?</h2>
-          <p style={s.ctaDesc}>Baixe o APK Android agora ou crie sua conta gratuitamente para começar a agendar consultas.</p>
+          <p style={s.ctaDesc}>Crie sua conta gratuitamente e comece a agendar consultas agora mesmo.</p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' as const }}>
-            <a href={ANDROID_APK_URL} target="_blank" rel="noreferrer" style={s.btnWhite}>Baixar APK Android</a>
             <button style={s.btnWhite} onClick={() => navigate('/signup')}>Criar conta grátis</button>
             <button style={s.btnOutline} onClick={() => navigate('/login')}>Já tenho conta</button>
           </div>

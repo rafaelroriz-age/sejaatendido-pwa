@@ -56,12 +56,22 @@ export default function DoctorDashboard() {
     navigate('/login', { replace: true });
   }
 
-  async function handleUpdateConsulta(id: string, acao: 'ACEITA' | 'RECUSADA') {
+  async function handleUpdateConsulta(id: string, acao: 'ACEITA' | 'RECUSADA' | 'CONCLUIDA') {
     try {
       await updateConsultaMedico(id, acao);
       setConsultas(prev => prev.map(c => c.id === id ? { ...c, status: acao } : c));
     } catch (error) {
       showErrorAlert(error, 'Erro ao atualizar consulta');
+    }
+  }
+
+  function handleIniciarConsulta(c: Consulta) {
+    const anyC = c as any;
+    const meetLink: string | undefined = anyC.meetLink ?? c.meetLink;
+    if (meetLink) {
+      window.open(meetLink, '_blank', 'noopener,noreferrer');
+    } else {
+      navigate(`/chat?consultaId=${c.id}`);
     }
   }
 
@@ -185,13 +195,43 @@ export default function DoctorDashboard() {
               <span style={{ fontSize: Font.xs + 1, color: Colors.textSecondary }}>{formatDate(c.dataHora ?? c.data)}</span>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button style={{ flex: 1, backgroundColor: Colors.doctor, borderRadius: Radius.md, padding: 12, border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Iniciar Consulta</button>
-              {c.status.toUpperCase().includes('PEND') && (
-                <>
-                  <button onClick={() => handleUpdateConsulta(c.id, 'ACEITA')} style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.success, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Confirmar</button>
-                  <button onClick={() => handleUpdateConsulta(c.id, 'RECUSADA')} style={{ flex: 1, backgroundColor: Colors.errorLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.error, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Recusar</button>
-                </>
-              )}
+              {(() => {
+                const st = c.status.toUpperCase();
+                const isPending = st.includes('PEND');
+                const isActive = st.includes('ACEITA') || st.includes('CONFIRM');
+                const isConcluded = st.includes('CONCLU') || st.includes('FINALIZ');
+                return (
+                  <>
+                    {!isConcluded && (
+                      <button
+                        onClick={() => handleIniciarConsulta(c)}
+                        style={{ flex: 1, backgroundColor: Colors.doctor, borderRadius: Radius.md, padding: 12, border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {isActive ? 'Entrar na Consulta' : 'Ver Consulta'}
+                      </button>
+                    )}
+                    {isPending && (
+                      <>
+                        <button onClick={() => handleUpdateConsulta(c.id, 'ACEITA')} style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.success, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Confirmar</button>
+                        <button onClick={() => handleUpdateConsulta(c.id, 'RECUSADA')} style={{ flex: 1, backgroundColor: Colors.errorLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.error, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Recusar</button>
+                      </>
+                    )}
+                    {isActive && (
+                      <button
+                        onClick={() => handleUpdateConsulta(c.id, 'CONCLUIDA')}
+                        style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, border: 'none', color: Colors.success, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Finalizar
+                      </button>
+                    )}
+                    {isConcluded && (
+                      <div style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, textAlign: 'center' }}>
+                        <span style={{ color: Colors.success, fontSize: 14, fontWeight: 700 }}>✓ Concluída</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </Card>
         ))}
