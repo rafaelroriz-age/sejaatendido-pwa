@@ -16,6 +16,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Preflight (secrets/config)
+        env:
+          HOMOLOG_DEPLOY_TOKEN: ${{ secrets.HOMOLOG_DEPLOY_TOKEN }}
+        run: |
+          if [ -z "$HOMOLOG_DEPLOY_TOKEN" ]; then
+            echo "::error::Secret HOMOLOG_DEPLOY_TOKEN ausente. Configure em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "Preflight OK: token de deploy encontrado."
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -30,6 +40,7 @@ jobs:
         env:
           # URL do backend de STAGING — adicione o secret VITE_API_URL_STAGING no repo original
           VITE_API_URL: ${{ secrets.VITE_API_URL_STAGING || 'https://sejaatendido-staging-backend.onrender.com' }}
+          VITE_MOCK: 'false'
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
           # Use a chave TESTE do Mercado Pago em homologação, nunca a de produção
@@ -37,7 +48,7 @@ jobs:
 
       - name: Preparar dist (CNAME + 404 fallback)
         run: |
-          # CNAME para subdomínio de homologação (ajuste se mudar o domínio)
+          # CNAME para subdomínio de homologação (ajuste aqui se mudar o domínio)
           echo "homolog.sejaatendido.com.br" > dist/CNAME
           # Fallback SPA para GitHub Pages
           cp dist/index.html dist/404.html
