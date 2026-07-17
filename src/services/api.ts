@@ -236,11 +236,17 @@ export async function resendConfirmEmailRequest(): Promise<void> {
 }
 
 // CRM
+export type CrmCartaoOrigem = 'PDF_CARTEIRA' | 'QR_PAYLOAD' | null;
+
 export interface CrmStatusResponse {
   crmCartaoValidado: boolean;
   status?: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | string;
+  statusAprovacao?: 'APROVADO' | 'PENDENTE' | 'REJEITADO' | string;
   crmNumero?: string;
   crmUf?: string;
+  crmCartaoOrigem?: CrmCartaoOrigem;
+  mensagem?: string;
+  motivo?: string;
 }
 
 export async function fetchCrmStatus(): Promise<CrmStatusResponse> {
@@ -250,6 +256,16 @@ export async function fetchCrmStatus(): Promise<CrmStatusResponse> {
 
 export async function validarCrmQr(payload: string): Promise<CrmStatusResponse> {
   const r = await api.post('/medicos/me/crm/validar-cartao', { payload });
+  return r.data;
+}
+
+export async function validarCrmCarteira(arquivo: File): Promise<CrmStatusResponse> {
+  const formData = new FormData();
+  formData.append('arquivo', arquivo);
+  const r = await api.post('/medicos/me/crm/validar-carteira', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000,
+  });
   return r.data;
 }
 
