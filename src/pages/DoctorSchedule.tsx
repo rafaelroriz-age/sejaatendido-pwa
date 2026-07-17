@@ -10,6 +10,7 @@ import {
   HorarioBloqueado,
 } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
+import { formatConsultaDateTime } from '../utils/datetime';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -304,7 +305,7 @@ export default function DoctorSchedule() {
                 }}>
                   <div>
                     <div style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textPrimary }}>
-                      {new Date(b.dataHora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                      {formatConsultaDateTime(b.dataHora)}
                       {b.duracao ? ` — ${b.duracao} min` : ''}
                     </div>
                     {b.motivo && <div style={{ fontSize: Font.xs, color: Colors.textSecondary }}>{b.motivo}</div>}

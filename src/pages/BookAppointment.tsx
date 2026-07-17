@@ -3,24 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { fetchMedicos, createConsulta, fetchDisponibilidadeMedico, fetchMinhasConsultas, Medico } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
+import { formatConsultaTime } from '../utils/datetime';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 
-// Fallback slots when doctor has no configured availability (backward compat)
+// Fallback slots when doctor has no configured availability (backward compat).
+// Janela alinhada à regra do backend: 06:00–23:59 horário de São Paulo (não inclui 00:00).
 const FALLBACK_TIME_SLOTS = (() => {
   const slots: string[] = [];
   for (let hour = 6; hour <= 23; hour += 1) {
     slots.push(`${String(hour).padStart(2, '0')}:00`);
     slots.push(`${String(hour).padStart(2, '0')}:30`);
   }
-  slots.push('00:00');
   return slots;
 })();
 
-/** Format a slot for display. Slots from API are ISO timestamps; fallbacks are "HH:MM". */
+/** Format a slot for display. Slots from API are ISO timestamps (UTC); fallbacks are "HH:MM" (já em horário local). */
 function formatSlotDisplay(slot: string): string {
   if (slot.includes('T')) {
-    return new Date(slot).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return formatConsultaTime(slot);
   }
   return slot;
 }
@@ -132,6 +133,8 @@ export default function BookAppointment() {
   }
 
   async function handleConfirm() {
+    // Guarda extra contra clique duplo/concorrência, além do `disabled` do botão.
+    if (submitting) return;
     if (!selectedMedico || !selectedDate || !selectedTime) { window.alert('Selecione médico, data e horário'); return; }
     if (availabilityError) {
       window.alert('Não foi possível validar a disponibilidade do médico. Tente novamente em instantes.');
@@ -185,29 +188,48 @@ export default function BookAppointment() {
         }
       }
 
-      navigate('/payment', { state: { consultaId: consulta.id, valor: consulta.valor } });
+      // Nao redireciona direto para /payment: o backend so permite criar pagamento
+      // quando a consulta esta CONCLUIDA (regra de negocio pos-atendimento), o que
+      // so acontece minutos depois do horario marcado. O Dashboard mostra o botao
+      // "Pagar consulta" automaticamente assim que isso acontecer.
+      navigate('/dashboard', { state: { bookingConfirmed: true } });
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
-        if (status === 400) {
-          const msg = (error.response?.data as Record<string, string>)?.message
-            ?? (error.response?.data as Record<string, string>)?.erro
-            ?? 'Não foi possível agendar. Verifique se o médico tem CRM validado.';
-          window.alert(msg);
-          return;
-        }
-        if (status === 409) {
+        const msg = (error.response?.data as Record<string, string> | undefined)?.message
+          ?? (error.response?.data as Record<string, string> | undefined)?.erro
+          ?? '';
+        const msgLower = msg.toLowerCase();
+        // Backend responde 400 { erro: "Horário já ocupado" } tanto para colisão de
+        // timestamp idêntico quanto para sobreposição de intervalo; 409 é tratado da
+        // mesma forma por segurança (compatibilidade com versões antigas da API).
+        const isHorarioOcupado = status === 409
+          || (status === 400 && (msgLower.includes('ocupado') || msgLower.includes('já ocupado') || msgLower.includes('sobrep')));
+
+        if (isHorarioOcupado) {
           const maybeCreated = await findRecentlyCreatedConsulta(dataHora, getMedicoCandidateIds(selectedMedico));
           if (maybeCreated) {
-            navigate('/payment', { state: { consultaId: maybeCreated.id, valor: maybeCreated.valor } });
+            navigate('/dashboard', { state: { bookingConfirmed: true } });
             return;
           }
-          window.alert('Conflito de agenda: o horário acabou de ser ocupado. Escolha outro slot.');
+          window.alert(msg || 'Horário já ocupado. Escolha outro horário — a lista de horários disponíveis foi atualizada.');
           setSelectedTime(null);
           if (selectedMedico && selectedDate) {
-            const slots = await fetchDisponibilidadeMedico(getMedicoCandidateIds(selectedMedico), selectedDate);
-            setAvailableSlots(slots);
+            setAvailabilityLoading(true);
+            try {
+              const slots = await fetchDisponibilidadeMedico(getMedicoCandidateIds(selectedMedico), selectedDate);
+              setAvailableSlots(slots);
+            } catch {
+              // Se o refresh de horários falhar, o usuário ainda pode tentar novamente manualmente.
+            } finally {
+              setAvailabilityLoading(false);
+            }
           }
+          return;
+        }
+
+        if (status === 400) {
+          window.alert(msg || 'Não foi possível agendar. Verifique se o médico tem CRM validado.');
           return;
         }
       }
@@ -291,7 +313,7 @@ export default function BookAppointment() {
             const nomeMedico = getMedicoNome(m);
             const isTestMedico = m.valorConsulta === 10;
             return (
-              <div key={m.id} onClick={() => setSelectedMedico(m)}
+              <div key={m.id} data-testid={`medico-option-${m.id}`} onClick={() => setSelectedMedico(m)}
                 style={{ minWidth: 130, backgroundColor: sel ? Colors.accent : Colors.card, borderRadius: Radius.lg, padding: Space.lg, textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.04)', flexShrink: 0 }}
               >
                 <Avatar name={nomeMedico} size={52} color={sel ? Colors.primary : Colors.textMuted} style={{ margin: '0 auto' }} />
@@ -330,7 +352,7 @@ export default function BookAppointment() {
             const iso = toLocalDateIso(d);
             const sel = selectedDate === iso;
             return (
-              <div key={iso} onClick={() => setSelectedDate(iso)}
+              <div key={iso} data-testid={`data-option-${iso}`} onClick={() => setSelectedDate(iso)}
                 style={{ minWidth: 64, backgroundColor: sel ? Colors.primary : Colors.card, borderRadius: Radius.md, padding: '14px 16px', textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: 'pointer', flexShrink: 0 }}
               >
                 <div style={{ fontSize: 12, fontWeight: 600, color: sel ? '#fff' : Colors.textSecondary }}>{f.dia}</div>
@@ -362,7 +384,7 @@ export default function BookAppointment() {
               : !availabilityError && (availableSlots.length === 0 || availableSlots.includes(slot)) && isFutureSlot;
             const sel = selectedTime === slot;
             return (
-              <div key={slot} onClick={() => enabled && setSelectedTime(slot)}
+              <div key={slot} data-testid={`slot-option-${slot}`} onClick={() => enabled && setSelectedTime(slot)}
                 style={{ minWidth: 72, backgroundColor: sel ? Colors.primary : Colors.card, borderRadius: Radius.md, padding: '12px 16px', textAlign: 'center', border: `2px solid ${sel ? Colors.primary : Colors.border}`, cursor: enabled ? 'pointer' : 'not-allowed', opacity: enabled ? 1 : 0.45 }}
               >
                 <span style={{ fontSize: 14, fontWeight: 700, color: sel ? '#fff' : Colors.textPrimary }}>{formatSlotDisplay(slot)}</span>
@@ -379,7 +401,7 @@ export default function BookAppointment() {
           style={{ width: '100%', backgroundColor: Colors.card, borderRadius: Radius.md, padding: Space.lg, fontSize: Font.sm + 1, border: `1px solid ${Colors.border}`, color: Colors.textPrimary, resize: 'vertical', outline: 'none' }}
         />
 
-        <button onClick={handleConfirm} disabled={submitting}
+        <button onClick={handleConfirm} disabled={submitting} data-testid="confirmar-agendamento"
           style={{
             width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
             border: 'none', cursor: submitting ? 'not-allowed' : 'pointer', marginTop: Space.xl + 4,

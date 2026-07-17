@@ -531,6 +531,10 @@ export interface Consulta {
   valor?: number;
   meetLink?: string;
   medico?: Medico;
+  // Opcional: alguns contratos de backend embutem o status do pagamento vinculado
+  // a consulta (evita N+1 chamadas a /v1/pagamentos/sync/:consultaId por item da lista).
+  // Quando ausente, o frontend nao assume nada sobre o pagamento.
+  pagamentoStatus?: string;
 }
 
 export interface CreateConsultaRequest {
@@ -554,6 +558,7 @@ function normalizeConsulta(raw: any): Consulta {
     valor: raw?.valor,
     meetLink: raw?.meetLink,
     medico: medicoRaw,
+    pagamentoStatus: raw?.pagamento?.status ?? raw?.pagamentoStatus ?? raw?.statusPagamento,
     ...(pacienteRaw ? { paciente: pacienteRaw } : {}),
   } as Consulta;
 }
@@ -1203,7 +1208,7 @@ export interface Repasse {
   id: string;
   periodo: string;
   valor: number;
-  status: 'concluido' | 'erro' | 'pendente';
+  status: 'concluido' | 'erro' | 'pendente' | 'processando';
   data_repasse: string;
   chave_pix_destino?: string;
   consultas?: ConsultaRepasse[];
