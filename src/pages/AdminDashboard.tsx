@@ -21,17 +21,31 @@ import Avatar from '../components/Avatar';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import { SkeletonCard } from '../components/Skeleton';
+import {
+  isConsultaAceita,
+  isConsultaCancelada,
+  isConsultaConcluida,
+  isConsultaPendente,
+  isConsultaRecusada,
+} from '../constants/consultaStatus';
+import { formatConsultaDate, formatConsultaDateTime } from '../utils/datetime';
 
 type Tab = 'pendentes' | 'medicos' | 'consultas' | 'usuarios';
 
 function StatusBadge({ status }: { status?: string }) {
   const s = (status ?? '').toUpperCase();
   let bg: string = Colors.warningLight, color: string = Colors.warning, label = status ?? '—';
+  // Status de aprovação de médico (CRM) — não faz parte do enum de Consulta.
   if (s === 'APROVADO' || s === 'ATIVO') { bg = Colors.successLight; color = Colors.success; label = 'Aprovado'; }
-  else if (s === 'PENDENTE') { bg = Colors.warningLight; color = Colors.warning; label = 'Pendente'; }
-  else if (s === 'REJEITADO' || s === 'RECUSADO') { bg = Colors.errorLight; color = Colors.error; label = 'Rejeitado'; }
-  else if (s.includes('CONFIRM') || s.includes('ACEITA')) { bg = Colors.successLight; color = Colors.success; label = 'Confirmada'; }
-  else if (s.includes('CANCEL')) { bg = Colors.errorLight; color = Colors.error; label = 'Cancelada'; }
+  else if (s === 'REJEITADO') { bg = Colors.errorLight; color = Colors.error; label = 'Rejeitado'; }
+  // Status oficiais de Consulta (ver src/constants/consultaStatus.ts) têm prioridade sobre os fallbacks textuais abaixo.
+  else if (isConsultaAceita(status)) { bg = Colors.successLight; color = Colors.success; label = 'Confirmada'; }
+  else if (isConsultaCancelada(status) || isConsultaRecusada(status)) { bg = Colors.errorLight; color = Colors.error; label = 'Cancelada'; }
+  else if (isConsultaConcluida(status)) { bg = Colors.infoLight; color = Colors.info; label = 'Concluída'; }
+  else if (isConsultaPendente(status)) { bg = Colors.warningLight; color = Colors.warning; label = 'Pendente'; }
+  // Fallbacks textuais para valores legados/variações que não seguem o enum.
+  else if (s.includes('CONFIRM')) { bg = Colors.successLight; color = Colors.success; label = 'Confirmada'; }
+  else if (s.includes('CANCEL') || s.includes('RECUS')) { bg = Colors.errorLight; color = Colors.error; label = 'Cancelada'; }
   else if (s.includes('CONCLU') || s.includes('FINALIZ')) { bg = Colors.infoLight; color = Colors.info; label = 'Concluída'; }
   return (
     <span style={{ backgroundColor: bg, color, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: Radius.full }}>
@@ -199,12 +213,12 @@ export default function AdminDashboard() {
 
   function formatDate(iso?: string) {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return formatConsultaDate(iso) || '—';
   }
 
   function formatDateTime(iso?: string) {
     if (!iso) return '—';
-    return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    return formatConsultaDateTime(iso) || '—';
   }
 
   if (loadingInit) {

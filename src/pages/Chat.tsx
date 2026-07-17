@@ -9,6 +9,7 @@ import {
   ChatMessage,
 } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
+import { formatConsultaTime } from '../utils/datetime';
 import Colors from '../theme/colors';
 
 export default function Chat() {
@@ -105,7 +106,7 @@ export default function Chat() {
                   <span style={{ fontSize: 15, fontWeight: 700, color: Colors.textPrimary }}>{c.outraParte?.nome || 'Conversa'}</span>
                   {c.atualizadoEm && (
                     <span style={{ fontSize: 12, color: Colors.textMuted }}>
-                      {new Date(c.atualizadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      {formatConsultaTime(c.atualizadoEm)}
                     </span>
                   )}
                 </div>
@@ -148,7 +149,7 @@ export default function Chat() {
             }}>
               <div style={{ fontSize: 15, lineHeight: '21px', color: isMine ? '#fff' : Colors.textPrimary }}>{m.texto}</div>
               <div style={{ fontSize: 11, marginTop: 4, textAlign: 'right', color: isMine ? 'rgba(255,255,255,0.7)' : Colors.textMuted }}>
-                {new Date(m.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                {formatConsultaTime(m.criadoEm)}
               </div>
             </div>
           );

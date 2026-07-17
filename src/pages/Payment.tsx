@@ -70,6 +70,18 @@ function isPendingStatus(status: PaymentStatus): boolean {
   return normalized === 'AGUARDANDO' || normalized === 'PENDENTE';
 }
 
+// Backend so cria pagamento quando consulta.status === 'CONCLUIDA' (regra de
+// negocio pos-atendimento). Antes disso a API responde 400/403 com mensagem
+// especifica; tratamos esse caso separado de um erro generico.
+function isConsultaNaoConcluidaError(error: unknown): boolean {
+  const anyErr = error as any;
+  const status = anyErr?.response?.status;
+  if (status !== 400 && status !== 403) return false;
+  const payload = anyErr?.response?.data;
+  const msg = String(payload?.erro ?? payload?.mensagem ?? payload?.message ?? '').toLowerCase();
+  return msg.includes('conclu') || msg.includes('finaliz');
+}
+
 export default function Payment() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,13 +105,26 @@ export default function Payment() {
   const [paymentData, setPaymentData] = useState<PaymentResponse | null>(null);
   const [errorText, setErrorText] = useState('');
   const [copied, setCopied] = useState(false);
-  const [expired, setExpired] = useState(false);
+  // pixExpired: o QR/codigo copia-e-cola realmente venceu (campo `validade`).
+  // pollTimedOut: o polling automatico desistiu (10min) mas o pagamento pode
+  // ainda estar valido no Mercado Pago — nesse caso oferecemos apenas uma
+  // verificacao manual, para nao criar uma preference/QR duplicado.
+  const [pixExpired, setPixExpired] = useState(false);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
+  const [checkingExisting, setCheckingExisting] = useState(false);
+  const [manualChecking, setManualChecking] = useState(false);
+  const [blockedReason, setBlockedReason] = useState<'consulta_nao_concluida' | null>(null);
   const [useSavedCardPreference, setUseSavedCardPreference] = useState(true);
   const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
   const [useSavedCard, setUseSavedCard] = useState(true);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartedAt = useRef<number | null>(null);
+  // Guarda contra duplo-clique/duplo-submit alem do `disabled` do botao: o
+  // `disabled` so reflete o novo estado no proximo render, e dois cliques muito
+  // rapidos (ou eventos duplicados) poderiam disparar duas chamadas de criacao
+  // de pagamento antes disso — o que geraria duas preferences/QR distintos.
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (consultaId && typeof window !== 'undefined') {
@@ -134,13 +159,57 @@ export default function Payment() {
     setPaymentData(null);
     setStatus('AGUARDANDO');
     setErrorText('');
-    setExpired(false);
+    setPixExpired(false);
+    setPollTimedOut(false);
+    setBlockedReason(null);
     setCopied(false);
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
   }, [method]);
+
+  // Ao entrar na tela (ou trocar de consulta), verifica se ja existe um
+  // pagamento em AGUARDANDO para essa consulta antes de oferecer "Gerar PIX"/
+  // "Pagar com cartao". Isso evita criar uma preference/QR duplicada quando o
+  // usuario recarrega a pagina ou volta para a tela de pagamento.
+  useEffect(() => {
+    let active = true;
+
+    async function resumeExistingPayment() {
+      if (!consultaId) return;
+      setCheckingExisting(true);
+      try {
+        const sync = await syncPagamento(consultaId);
+        if (!active) return;
+        const nextStatus = normalizeStatus(sync as PaymentResponse);
+
+        if (nextStatus === 'PAGO') {
+          navigate('/dashboard', { replace: true, state: { paymentSuccess: true, consultaId } });
+          return;
+        }
+
+        if (isPendingStatus(nextStatus)) {
+          const hasPixFields = Boolean(sync?.pix?.qrCode || sync?.pix?.qrCodeBase64 || sync?.pix?.ticketUrl);
+          if (hasPixFields) {
+            setMethod('pix');
+            setPaymentData(sync as PaymentResponse);
+            setStatus(nextStatus);
+            startPolling(consultaId);
+          }
+        }
+      } catch {
+        // Sem pagamento existente ainda (ou falha transitoria na verificacao) —
+        // segue o fluxo normal, deixando o usuario iniciar um novo pagamento.
+      } finally {
+        if (active) setCheckingExisting(false);
+      }
+    }
+
+    resumeExistingPayment();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consultaId]);
 
   useEffect(() => {
     const validade = paymentData?.pix?.validade;
@@ -151,7 +220,7 @@ export default function Payment() {
 
     const updateExpiration = () => {
       if (Date.now() >= expirationTs) {
-        setExpired(true);
+        setPixExpired(true);
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
@@ -186,6 +255,7 @@ export default function Payment() {
   function startPolling(currentConsultaId: string) {
     stopPolling();
     pollStartedAt.current = Date.now();
+    setPollTimedOut(false);
 
     pollRef.current = setInterval(async () => {
       try {
@@ -209,8 +279,11 @@ export default function Payment() {
 
         const startedAt = pollStartedAt.current ?? Date.now();
         if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
+          // O polling automatico desiste, mas o pagamento pode continuar valido
+          // no Mercado Pago (webhook so demorou). Nao marcamos como "expirado":
+          // isso evita oferecer "gerar novo QR" e criar uma cobranca duplicada.
           stopPolling();
-          setExpired(true);
+          setPollTimedOut(true);
         }
       } catch {
         // Silent polling errors to avoid interrupting checkout UI.
@@ -218,14 +291,45 @@ export default function Payment() {
     }, POLL_INTERVAL_MS);
   }
 
+  async function handleManualCheck() {
+    if (!consultaId || manualChecking) return;
+    setManualChecking(true);
+    setErrorText('');
+    try {
+      const sync = await syncPagamento(consultaId);
+      const nextStatus = normalizeStatus(sync as PaymentResponse);
+      setStatus(nextStatus);
+
+      if (nextStatus === 'PAGO') {
+        stopPolling();
+        navigate('/dashboard', { replace: true, state: { paymentSuccess: true, consultaId } });
+        return;
+      }
+
+      if (isPendingStatus(nextStatus)) {
+        // Ainda pendente: retoma o polling automatico com uma nova janela de timeout.
+        startPolling(consultaId);
+      } else {
+        stopPolling();
+      }
+    } catch (error) {
+      setErrorText(getErrorMessage(error, 'Não foi possível verificar o pagamento agora. Tente novamente em instantes.'));
+    } finally {
+      setManualChecking(false);
+    }
+  }
+
   async function createPixPayment() {
     if (!consultaId) {
       setErrorText('ID da consulta não encontrado.');
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     setLoading(true);
     setErrorText('');
+    setBlockedReason(null);
 
     try {
       const data = (await criarPagamento({ consultaId, metodoPagamento: 'pix', valorCentavos: state?.valor })) as PaymentResponse;
@@ -238,13 +342,18 @@ export default function Payment() {
 
       setPaymentData(data);
       setStatus(normalizeStatus(data));
-      setExpired(false);
+      setPixExpired(false);
       startPolling(consultaId);
     } catch (error) {
-      const message = getErrorMessage(error, 'Falha ao gerar pagamento PIX.');
-      setErrorText(message);
+      if (isConsultaNaoConcluidaError(error)) {
+        setBlockedReason('consulta_nao_concluida');
+        setErrorText('O pagamento só é liberado depois que a consulta é marcada como concluída. Isso costuma levar alguns minutos após o horário marcado — volte ao painel, que o botão de pagamento aparece automaticamente.');
+      } else {
+        setErrorText(getErrorMessage(error, 'Falha ao gerar pagamento PIX.'));
+      }
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   }
 
@@ -253,9 +362,12 @@ export default function Payment() {
       setErrorText('ID da consulta não encontrado.');
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     setLoading(true);
     setErrorText('');
+    setBlockedReason(null);
     try {
       const data = (await criarPagamento({ consultaId, metodoPagamento: 'card', valorCentavos: state?.valor })) as PaymentResponse;
       const checkoutUrl = import.meta.env.PROD
@@ -267,10 +379,15 @@ export default function Payment() {
       }
       window.location.href = checkoutUrl;
     } catch (error) {
-      const message = getErrorMessage(error, 'Falha ao iniciar pagamento com cartão.');
-      setErrorText(message);
+      if (isConsultaNaoConcluidaError(error)) {
+        setBlockedReason('consulta_nao_concluida');
+        setErrorText('O pagamento só é liberado depois que a consulta é marcada como concluída. Isso costuma levar alguns minutos após o horário marcado — volte ao painel, que o botão de pagamento aparece automaticamente.');
+      } else {
+        setErrorText(getErrorMessage(error, 'Falha ao iniciar pagamento com cartão.'));
+      }
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   }
 
@@ -329,7 +446,13 @@ export default function Payment() {
 
         {method === 'pix' ? (
           <>
-            {!paymentData && (
+            {checkingExisting && !paymentData && (
+              <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: Colors.textMuted, fontWeight: 600 }}>
+                Verificando se já existe um pagamento em andamento…
+              </div>
+            )}
+
+            {!paymentData && !checkingExisting && blockedReason !== 'consulta_nao_concluida' && (
               <button type="button" onClick={createPixPayment} disabled={loading || !consultaId} style={{
                 width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
                 border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
@@ -337,6 +460,16 @@ export default function Payment() {
                 boxShadow: `0 6px 12px ${Colors.primary}59`,
               }}>
                 {loading ? 'Gerando PIX…' : 'Gerar código PIX'}
+              </button>
+            )}
+
+            {blockedReason === 'consulta_nao_concluida' && !paymentData && (
+              <button type="button" onClick={createPixPayment} disabled={loading} style={{
+                width: '100%', backgroundColor: Colors.card, borderRadius: Radius.md, padding: 16,
+                border: `1px solid ${Colors.border}`, cursor: loading ? 'not-allowed' : 'pointer',
+                color: Colors.textSecondary, fontSize: 15, fontWeight: 700,
+              }}>
+                {loading ? 'Verificando…' : 'Tentar novamente'}
               </button>
             )}
 
@@ -349,7 +482,7 @@ export default function Payment() {
                 {validadeText && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                     <span style={{ fontSize: 13, color: Colors.textMuted, fontWeight: 600 }}>Válido até</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: expired ? Colors.error : Colors.textPrimary }}>{validadeText}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: pixExpired ? Colors.error : Colors.textPrimary }}>{validadeText}</span>
                   </div>
                 )}
 
@@ -375,9 +508,26 @@ export default function Payment() {
                   </a>
                 )}
 
-                {expired && (
+                {pollTimedOut && !pixExpired && (
+                  <div style={{ width: '100%', textAlign: 'center' }}>
+                    <p style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 8 }}>
+                      Ainda não recebemos a confirmação do Mercado Pago. Isso pode levar alguns minutos — você pode continuar aguardando ou verificar manualmente.
+                    </p>
+                    <button type="button" onClick={handleManualCheck} disabled={manualChecking} style={{ width: '100%', backgroundColor: Colors.card, borderRadius: Radius.md, padding: 14, border: `1px solid ${Colors.border}`, cursor: manualChecking ? 'not-allowed' : 'pointer', color: Colors.textPrimary, fontWeight: 700, fontSize: 14 }}>
+                      {manualChecking ? 'Verificando…' : 'Verificar pagamento agora'}
+                    </button>
+                  </div>
+                )}
+
+                {pixExpired && (
                   <button type="button" onClick={createPixPayment} disabled={loading} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 16, border: 'none', cursor: 'pointer', color: '#fff', fontWeight: 700, fontSize: 15 }}>
                     Gerar novo código PIX
+                  </button>
+                )}
+
+                {!pollTimedOut && !pixExpired && isPendingStatus(status) && (
+                  <button type="button" onClick={handleManualCheck} disabled={manualChecking} style={{ width: '100%', backgroundColor: 'transparent', borderRadius: Radius.md, padding: 12, border: 'none', cursor: manualChecking ? 'not-allowed' : 'pointer', color: Colors.textSecondary, fontWeight: 600, fontSize: 13, textDecoration: 'underline' }}>
+                    {manualChecking ? 'Verificando…' : 'Já paguei / verificar agora'}
                   </button>
                 )}
               </div>
@@ -403,10 +553,10 @@ export default function Payment() {
                 </div>
               )}
 
-              <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId} style={{
+              <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId || blockedReason === 'consulta_nao_concluida'} style={{
             width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
                 border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
-                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId) ? 0.6 : 1,
+                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId || blockedReason === 'consulta_nao_concluida') ? 0.6 : 1,
             boxShadow: `0 6px 12px ${Colors.primary}59`,
           }}>
                 {loading ? 'Iniciando checkout…' : useSavedCard && savedCard ? 'Pagar com cartao salvo' : 'Pagar com cartao'}

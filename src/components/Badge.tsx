@@ -1,5 +1,12 @@
 import { CSSProperties } from 'react';
 import Colors, { Radius, Font } from '../theme/colors';
+import {
+  isConsultaAceita,
+  isConsultaCancelada,
+  isConsultaConcluida,
+  isConsultaPendente,
+  isConsultaRecusada,
+} from '../constants/consultaStatus';
 
 type BadgeVariant = 'agendada' | 'confirmada' | 'cancelada' | 'concluida' | 'pendente';
 
@@ -12,9 +19,16 @@ const CONFIG: Record<BadgeVariant, { bg: string; text: string; label: string }> 
 };
 
 function normalise(status: string): BadgeVariant {
+  // Status oficiais do backend (ver src/constants/consultaStatus.ts) têm prioridade;
+  // os fallbacks textuais cobrem valores legados/variações que não seguem o enum.
+  if (isConsultaAceita(status)) return 'confirmada';
+  if (isConsultaCancelada(status) || isConsultaRecusada(status)) return 'cancelada';
+  if (isConsultaConcluida(status)) return 'concluida';
+  if (isConsultaPendente(status)) return 'pendente';
+
   const s = status.toLowerCase().trim();
   if (s.includes('confirm') || s === 'realizada') return 'confirmada';
-  if (s.includes('cancel')) return 'cancelada';
+  if (s.includes('cancel') || s.includes('recus')) return 'cancelada';
   if (s.includes('conclu') || s === 'finalizada') return 'concluida';
   if (s.includes('pend') || s.includes('aguard')) return 'pendente';
   return 'agendada';

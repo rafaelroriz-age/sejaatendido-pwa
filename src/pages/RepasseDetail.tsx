@@ -22,6 +22,8 @@ function StatusBadgeLarge({ status }: { status: string }) {
       ? { bg: Colors.successLight, color: Colors.success, label: 'Concluído' }
       : status === 'erro'
       ? { bg: Colors.errorLight, color: Colors.error, label: 'Erro no repasse' }
+      : status === 'processando'
+      ? { bg: Colors.infoLight, color: Colors.info, label: 'Processando' }
       : { bg: Colors.warningLight, color: Colors.warning, label: 'Pendente' };
   return (
     <div style={{ display: 'flex', alignItems: 'center', backgroundColor: cfg.bg, paddingLeft: Space.lg, paddingRight: Space.lg, paddingTop: Space.sm, paddingBottom: Space.sm, borderRadius: Radius.full, gap: Space.sm }}>
