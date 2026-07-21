@@ -1,0 +1,66 @@
+{
+  // Configuração de servidores MCP (Model Context Protocol) para este workspace.
+  // Nenhum token/segredo é armazenado aqui: os valores são solicitados de forma
+  // segura (input mascarado) na primeira utilização e ficam apenas na sessão local.
+  "inputs": [
+    {
+      "id": "github-token",
+      "type": "promptString",
+      "description": "GitHub Personal Access Token (repo, workflow, read:org)",
+      "password": true
+    },
+    {
+      "id": "render-api-key",
+      "type": "promptString",
+      "description": "Render API Key (Account Settings > API Keys)",
+      "password": true
+    },
+    {
+      "id": "supabase-access-token",
+      "type": "promptString",
+      "description": "Supabase Personal Access Token (Account > Access Tokens)",
+      "password": true
+    },
+    {
+      "id": "supabase-project-ref",
+      "type": "promptString",
+      "description": "Supabase Project Ref (opcional - deixe vazio para acesso a todos os projetos)"
+    }
+  ],
+  "servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${input:github-token}"
+      }
+    },
+    "render": {
+      "type": "http",
+      "url": "https://mcp.render.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:render-api-key}"
+      }
+    },
+    "supabase": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "${input:supabase-access-token}",
+        "--project-ref",
+        "${input:supabase-project-ref}"
+      ]
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
+    }
+  }
+}
