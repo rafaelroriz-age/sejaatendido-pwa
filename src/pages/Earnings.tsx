@@ -163,7 +163,7 @@ export default function Earnings() {
       return <EmptyState title="Sem histórico" subtitle="Nenhum repasse realizado ainda. Os valores serão repassados toda segunda-feira." />;
     }
     return repasses.map(r => (
-      <div key={r.id} onClick={() => navigate('/repasse/' + r.id)} style={{ cursor: 'pointer' }}>
+      <div key={r.id} onClick={() => navigate('/repasse/' + r.cicloRepasseId)} style={{ cursor: 'pointer' }}>
         <Card style={{ marginBottom: Space.md }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
