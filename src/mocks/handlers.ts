@@ -139,6 +139,7 @@ const MOCK_REPASSES = {
       dataRepasse: null,
       criadoEm: new Date().toISOString(),
       cicloRepasse: {
+        id: 'ciclo-001',
         semanaInicio: '2026-05-04T00:00:00.000Z',
         semanaFim: '2026-05-10T23:59:59.000Z',
       },

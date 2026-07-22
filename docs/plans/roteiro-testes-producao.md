@@ -136,7 +136,7 @@ Referência: [Processo de Pagamento da Consulta](../processes/pagamentos-consult
 - [ ] `/crm-validation` — upload de PDF da carteira do CRM envia e exibe status retornado pelo backend (aprovado/pendente/rejeitado).
 - [ ] Perfil do médico (`/profile`) permite configurar "Valor da consulta (R$)" e o valor reflete em `/book` para pacientes.
 - [ ] `/earnings` exibe repasses/ganhos do médico.
-- [ ] `/repasse/:id` (RepasseDetail) exibe detalhe de um repasse específico sem cair em fallback mock silencioso — erro real da API deve aparecer se houver falha.
+- [x] `/repasse/:id` (RepasseDetail) exibe detalhe de um repasse específico sem cair em fallback mock silencioso — erro real da API deve aparecer se houver falha. (2026-07-22: corrigido bug em que Earnings.tsx navegava com o id do repasse individual em vez do id do ciclo de repasse, causando erro 404 real ao abrir o detalhe — ver `divergencias.md`.)
 - [ ] `/bank-details` permite cadastrar/editar dados bancários para repasse.
 - [ ] Definir e validar o processo de repasse (manual ou automático) conforme decisão de negócio — não pode ficar como "em breve" se o modelo comercial depende disso.
 
