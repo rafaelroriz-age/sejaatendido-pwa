@@ -53,7 +53,6 @@ export default function PaymentPending() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div style={{ backgroundColor: Colors.card, borderRadius: 24, padding: 32, width: '100%', maxWidth: 400, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
           <div style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFF8E1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-            <span style={{ fontSize: 40 }}>⏳</span>
           </div>
 
           <h1 style={{ fontSize: 24, fontWeight: 900, color: Colors.textPrimary, marginBottom: 8 }}>

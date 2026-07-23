@@ -340,7 +340,7 @@ export default function Profile() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   backgroundColor: user?.crmCartaoValidado ? Colors.successLight : Colors.warningLight,
                 }}>
-                  {user?.crmCartaoValidado ? '✅' : '⏳'}
+                  {''}
                 </div>
                 <div>
                   <div style={{ fontSize: 15, color: Colors.textPrimary, fontWeight: 600 }}>

@@ -166,10 +166,10 @@ export default function Earnings() {
       <div
         key={r.id}
         onClick={() =>
-          // Enviamos o repasse já carregado via state para a tela de detalhe:
-          // assim ela nao depende exclusivamente do GET /medicos/me/ciclos-repasse/:id
-          // (que pode falhar para o repasse mais recente, com o ciclo ainda em processamento).
-          navigate('/repasse/' + r.cicloRepasseId, { state: { repasse: r } })
+          // Sempre navega com o id do repasse individual (GET /medicos/me/repasses/:id),
+          // nunca com o id do ciclo de repasse. Tambem enviamos o repasse ja carregado
+          // via state para a tela de detalhe exibir os dados de imediato.
+          navigate('/repasse/' + r.id, { state: { repasse: r } })
         }
         style={{ cursor: 'pointer' }}
       >
@@ -215,7 +215,6 @@ export default function Earnings() {
             alignItems: 'center', gap: 10, cursor: 'pointer',
           }}
         >
-          <span style={{ fontSize: 20 }}>🏦</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>Dados bancários não cadastrados</div>
             <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Cadastre sua chave Pix para receber repasses. Toque aqui.</div>

@@ -32,7 +32,6 @@ export default function HomeScreen() {
           backgroundColor: Colors.card, borderRadius: 18, padding: 20, display: 'flex', alignItems: 'center',
           marginBottom: 12, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
         }}>
-          <span style={{ fontSize: 28, marginRight: 16 }}>📋</span>
           <span style={{ fontSize: 17, fontWeight: 700, color: Colors.textPrimary }}>Minhas Consultas</span>
         </div>
 
@@ -40,7 +39,6 @@ export default function HomeScreen() {
           backgroundColor: Colors.card, borderRadius: 18, padding: 20, display: 'flex', alignItems: 'center',
           marginBottom: 12, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
         }}>
-          <span style={{ fontSize: 28, marginRight: 16 }}>👤</span>
           <span style={{ fontSize: 17, fontWeight: 700, color: Colors.textPrimary }}>Meu Perfil</span>
         </div>
 

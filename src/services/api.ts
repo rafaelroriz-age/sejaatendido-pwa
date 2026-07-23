@@ -1222,7 +1222,6 @@ export interface ConsultaRepasse {
 
 export interface Repasse {
   id: string;
-  cicloRepasseId: string;
   periodo: string;
   valor: number;
   status: 'concluido' | 'erro' | 'pendente' | 'processando';
@@ -1232,25 +1231,9 @@ export interface Repasse {
   comprovante_url?: string;
 }
 
-export async function fetchSaldoMedico(): Promise<SaldoMedico> {
-  const raw = (await api.get('/medicos/me/saldo')).data;
+function mapRepasse(r: any): Repasse {
   return {
-    saldo_a_liberar: (raw.saldoALiberarCentavos ?? 0) / 100,
-    saldo_pendente: (raw.saldoPendenteCentavos ?? 0) / 100,
-    ganhos_hoje: (raw.ganhosHojeCentavos ?? 0) / 100,
-    proximo_repasse: raw.proximoRepasse ?? '',
-    ganhos_semana: raw.ganhosSemana ?? [0, 0, 0, 0, 0, 0, 0],
-  };
-}
-
-export async function fetchRepasses(): Promise<Repasse[]> {
-  const raw = (await api.get('/medicos/me/repasses')).data;
-  const list = raw.repasses ?? raw ?? [];
-  return list.map((r: any) => ({
     id: r.id,
-    // O detalhe (/medicos/me/ciclos-repasse/:id) espera o id do CICLO de repasse,
-    // não o id do repasse individual — sem isso a navegação abre um repasse inexistente.
-    cicloRepasseId: r.cicloRepasse?.id ?? r.id,
     periodo: r.cicloRepasse?.semanaInicio
       ? `${new Date(r.cicloRepasse.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(r.cicloRepasse.semanaFim).toLocaleDateString('pt-BR')}`
       : '',
@@ -1269,33 +1252,31 @@ export async function fetchRepasses(): Promise<Repasse[]> {
           },
         ]
       : [],
-  }));
+  };
+}
+
+export async function fetchSaldoMedico(): Promise<SaldoMedico> {
+  const raw = (await api.get('/medicos/me/saldo')).data;
+  return {
+    saldo_a_liberar: (raw.saldoALiberarCentavos ?? 0) / 100,
+    saldo_pendente: (raw.saldoPendenteCentavos ?? 0) / 100,
+    ganhos_hoje: (raw.ganhosHojeCentavos ?? 0) / 100,
+    proximo_repasse: raw.proximoRepasse ?? '',
+    ganhos_semana: raw.ganhosSemana ?? [0, 0, 0, 0, 0, 0, 0],
+  };
+}
+
+export async function fetchRepasses(): Promise<Repasse[]> {
+  const raw = (await api.get('/medicos/me/repasses')).data;
+  const list = raw.repasses ?? raw ?? [];
+  return list.map(mapRepasse);
 }
 
 export async function fetchRepasseById(id: string): Promise<Repasse> {
-  const raw = (await api.get(`/medicos/me/ciclos-repasse/${id}`)).data;
-  const repasses = raw.repasses ?? [];
-  const totalValor = repasses.reduce((acc: number, r: any) => acc + (r.valorRepasse ?? 0), 0);
-  return {
-    id: raw.id,
-    cicloRepasseId: raw.id,
-    periodo: raw.semanaInicio
-      ? `${new Date(raw.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(raw.semanaFim).toLocaleDateString('pt-BR')}`
-      : '',
-    valor: totalValor / 100,
-    status: (raw.status ?? 'pendente').toLowerCase(),
-    data_repasse: raw.semanaFim ?? '',
-    chave_pix_destino: undefined,
-    consultas: repasses.map((r: any) => ({
-      id: r.consulta?.id ?? r.id,
-      paciente: r.consulta?.paciente?.usuario?.nome ?? 'Paciente',
-      horario: r.consulta?.data
-        ? new Date(r.consulta.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        : '',
-      valor: (r.valorRepasse ?? 0) / 100,
-      status: r.status === 'PROCESSADO' ? 'confirmado' : 'pendente',
-    })),
-  };
+  // Usa sempre o id do repasse individual (nao o id do ciclo de repasse):
+  // GET /medicos/me/repasses/:id e o endpoint correto para o detalhe.
+  const raw = (await api.get(`/medicos/me/repasses/${id}`)).data;
+  return mapRepasse(raw.repasse ?? raw);
 }
 
 // CHAT

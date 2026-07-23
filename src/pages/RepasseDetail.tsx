@@ -39,8 +39,8 @@ export default function RepasseDetail() {
   const { id } = useParams<{ id: string }>();
   // Quando o usuario chega vindo do Historico (Earnings.tsx), o repasse ja
   // foi carregado na listagem e e enviado via state. Usamos esses dados de
-  // imediato para nao depender do GET /medicos/me/ciclos-repasse/:id, que
-  // pode falhar para o repasse mais recente (ciclo ainda em processamento).
+  // imediato para uma exibicao instantanea, e buscamos o detalhe completo em
+  // segundo plano via GET /medicos/me/repasses/:id (id do repasse individual).
   const repasseFromState = (location.state as { repasse?: Repasse } | null)?.repasse ?? null;
   const [repasse, setRepasse] = useState<Repasse | null>(repasseFromState);
   const [loading, setLoading] = useState(!repasseFromState);

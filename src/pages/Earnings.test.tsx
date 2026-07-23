@@ -38,7 +38,6 @@ function baseSaldo(): SaldoMedico {
 function baseRepasse(overrides: Partial<Repasse> = {}): Repasse {
   return {
     id: 'repasse-001',
-    cicloRepasseId: 'ciclo-001',
     periodo: '04/05/2026 - 10/05/2026',
     valor: 150,
     status: 'pendente',
@@ -65,7 +64,7 @@ describe('Earnings — navegação para o detalhe do repasse', () => {
     navigateMock.mockReset();
   });
 
-  it('navega usando o id do ciclo de repasse (cicloRepasseId), não o id do repasse individual', async () => {
+  it('navega usando o id do repasse individual (GET /medicos/me/repasses/:id)', async () => {
     fetchRepassesMock.mockResolvedValue([baseRepasse()]);
 
     await renderEarnings();
@@ -75,7 +74,6 @@ describe('Earnings — navegação para o detalhe do repasse', () => {
     const item = await screen.findByText('R$ 150,00');
     fireEvent.click(item);
 
-    expect(navigateMock).toHaveBeenCalledWith('/repasse/ciclo-001', { state: { repasse: baseRepasse() } });
-    expect(navigateMock).not.toHaveBeenCalledWith('/repasse/repasse-001');
+    expect(navigateMock).toHaveBeenCalledWith('/repasse/repasse-001', { state: { repasse: baseRepasse() } });
   });
 });

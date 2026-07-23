@@ -86,7 +86,6 @@ export default function Chat() {
           )}
           {!loading && chats.length === 0 && (
             <div style={{ textAlign: 'center', padding: 40 }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>💬</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: Colors.textPrimary }}>Nenhuma conversa ainda</div>
               <div style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 6 }}>Suas conversas de consulta aparecerão aqui.</div>
             </div>

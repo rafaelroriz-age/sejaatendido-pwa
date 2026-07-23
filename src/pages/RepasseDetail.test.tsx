@@ -13,7 +13,6 @@ vi.mock('../services/api', () => ({
 function baseRepasse(overrides: Partial<Repasse> = {}): Repasse {
   return {
     id: 'repasse-001',
-    cicloRepasseId: 'ciclo-001',
     periodo: '04/05/2026 - 10/05/2026',
     valor: 150,
     status: 'pendente',
@@ -24,7 +23,7 @@ function baseRepasse(overrides: Partial<Repasse> = {}): Repasse {
 
 function renderDetail(state?: { repasse?: Repasse }) {
   return render(
-    <MemoryRouter initialEntries={[{ pathname: '/repasse/ciclo-001', state }]}>
+    <MemoryRouter initialEntries={[{ pathname: '/repasse/repasse-001', state }]}>
       <Routes>
         <Route path="/repasse/:id" element={<RepasseDetail />} />
       </Routes>
@@ -49,7 +48,7 @@ describe('RepasseDetail', () => {
     renderDetail({ repasse: baseRepasse() });
 
     expect(await screen.findByText('R$ 150,00')).toBeInTheDocument();
-    await waitFor(() => expect(fetchRepasseByIdMock).toHaveBeenCalledWith('ciclo-001'));
+    await waitFor(() => expect(fetchRepasseByIdMock).toHaveBeenCalledWith('repasse-001'));
     expect(screen.queryByText(/Nao foi possivel carregar/i)).not.toBeInTheDocument();
   });
 
@@ -58,7 +57,7 @@ describe('RepasseDetail', () => {
     renderDetail(undefined);
 
     expect(await screen.findByText('R$ 200,00')).toBeInTheDocument();
-    expect(fetchRepasseByIdMock).toHaveBeenCalledWith('ciclo-001');
+    expect(fetchRepasseByIdMock).toHaveBeenCalledWith('repasse-001');
   });
 
   it('exibe erro com retry quando busca na API falha (acesso direto/link profundo)', async () => {
