@@ -3,6 +3,9 @@
 Data: 2026-06-08
 Objetivo: liberar produção com segurança para iniciar faturamento.
 
+> Para o passo a passo executável de testes (automatizados e manuais, por fluxo/papel),
+> veja [docs/plans/roteiro-testes-producao.md](docs/plans/roteiro-testes-producao.md).
+
 ## 1) Itens que BLOQUEIAM lançamento
 
 - [ ] Produção sem mock

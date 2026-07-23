@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { cancelConsulta, fetchMinhasConsultas, Consulta, fetchPerfil, sendFrontendTelemetryEvent, testarNotificacaoWhatsapp } from '../services/api';
 import { clearAuthSession, getUser } from '../storage/localStorage';
 import { handleApiError } from '../utils/errorHandler';
+import { formatConsultaDateTime } from '../utils/datetime';
+import { isConsultaCancelada, isConsultaConcluida, isConsultaRecusada, podeEntrarNaConsulta } from '../constants/consultaStatus';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
@@ -11,44 +13,109 @@ import Card from '../components/Card';
 import { SkeletonCard } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 
+// Intervalo de polling do Dashboard: cobre tanto a transição PENDENTE -> ACEITA
+// (quando o médico aceita e o meetLink passa a existir) quanto o atraso esperado
+// do cron de auto-conclusão (roda a cada ~10min no backend).
+const CONSULTAS_POLL_INTERVAL_MS = 30000;
+
+type DashboardNavigationState = {
+  bookingConfirmed?: boolean;
+  paymentSuccess?: boolean;
+  consultaId?: string;
+} | null;
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = (location.state as DashboardNavigationState) ?? null;
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [testingWhatsapp, setTestingWhatsapp] = useState(false);
   const [userName, setUserName] = useState('');
+  const [infoMessage] = useState<string | null>(
+    navState?.bookingConfirmed
+      ? 'Consulta agendada com sucesso! O pagamento é liberado automaticamente assim que a consulta é concluída (pode levar alguns minutos após o horário marcado).'
+      : null,
+  );
+  // Payment.tsx só redireciona para cá após confirmar PAGO via API — usamos esse
+  // sinal para esconder o botão "Pagar consulta" de imediato, sem esperar o
+  // backend refletir o pagamento no proximo fetch de consultas.
+  const [locallyPaidIds, setLocallyPaidIds] = useState<Set<string>>(() =>
+    navState?.paymentSuccess && navState.consultaId ? new Set([navState.consultaId]) : new Set(),
+  );
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => { loadData(); loadUserName(); }, []);
+  useEffect(() => {
+    // Limpa o state de navegação para não repetir o banner/flag num refresh futuro.
+    if (navState && typeof window !== 'undefined') {
+      window.history.replaceState({}, '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    loadData();
+    loadUserName();
+
+    // Polling silencioso: detecta PENDENTE -> ACEITA (meetLink passa a existir)
+    // e a conclusão automática (com atraso, já que o cron não é instantâneo)
+    // sem depender de o usuário dar refresh manual na página.
+    pollRef.current = setInterval(() => loadData({ silent: true }), CONSULTAS_POLL_INTERVAL_MS);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   async function loadUserName() {
     const user = await getUser();
     if (user) setUserName(user.nome.split(' ')[0]);
   }
 
-  async function loadData() {
+  async function loadData(options?: { silent?: boolean }) {
     try {
-      setLoadError(null);
-      setConsultas(await fetchMinhasConsultas());
+      if (!options?.silent) setLoadError(null);
+      const data = await fetchMinhasConsultas();
+      setConsultas(data);
+      if (options?.silent) setLoadError(null);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         // Paciente profile not yet created — treat as empty list, not a hard error.
         setConsultas([]);
-      } else {
+      } else if (!options?.silent) {
         setLoadError(handleApiError(error));
       }
+      // Em polling silencioso, evita substituir os dados já exibidos por um erro passageiro.
     } finally { setLoading(false); }
   }
 
-  function isPendingPayment(status: string) {
-    const n = (status ?? '').toLowerCase();
-    return n.includes('pend') || n.includes('aguard') || n.includes('waiting') || n.includes('unpaid');
+  // Regra do backend: um pagamento só pode ser criado quando a consulta está
+  // CONCLUIDA (o cron marca isso ~10min após o horário, cobrindo tanto consultas
+  // ACEITA quanto PENDENTE). Antes disso, a API responde 400/403 — então o botão
+  // "Pagar consulta" não deve aparecer para nenhum outro status.
+  function canPayConsulta(consulta: Consulta): boolean {
+    if (!isConsultaConcluida(consulta.status)) return false;
+    if (locallyPaidIds.has(consulta.id)) return false;
+    // Se o backend já embutir o status do pagamento na consulta, respeita-o.
+    const pagamentoStatus = (consulta.pagamentoStatus ?? '').toUpperCase();
+    if (pagamentoStatus === 'PAGO') return false;
+    return true;
+  }
+
+  // Consulta cujo horário já passou mas o cron de conclusão ainda não rodou —
+  // usado apenas para exibir uma mensagem de "aguarde alguns minutos", nunca
+  // para liberar o pagamento no frontend.
+  function isAwaitingConclusion(consulta: Consulta): boolean {
+    if (isConsultaConcluida(consulta.status) || isConsultaCancelada(consulta.status) || isConsultaRecusada(consulta.status)) return false;
+    const scheduled = consulta.dataHora ?? consulta.data;
+    if (!scheduled) return false;
+    const scheduledTs = new Date(scheduled).getTime();
+    return !Number.isNaN(scheduledTs) && scheduledTs <= Date.now();
   }
 
   function canCancel(status: string) {
+    if (isConsultaCancelada(status) || isConsultaRecusada(status) || isConsultaConcluida(status)) return false;
     const n = (status ?? '').toLowerCase();
-    if (n.includes('cancel')) return false;
+    if (n.includes('cancel') || n.includes('recus')) return false;
     if (n.includes('conclu') || n.includes('finaliz')) return false;
     return true;
   }
@@ -123,14 +190,11 @@ export default function Dashboard() {
   }
 
   function formatDate(dateString: string | undefined) {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
+    return formatConsultaDateTime(dateString);
   }
 
   const upcoming = consultas.filter(c => { const s = c.status.toLowerCase(); return !s.includes('cancel') && !s.includes('conclu') && !s.includes('finaliz'); });
-  const pendentes = consultas.filter(c => isPendingPayment(c.status)).length;
+  const pendentes = consultas.filter(c => canPayConsulta(c)).length;
 
   const actions = [
     { label: 'Agendar\nConsulta', icon: '+', bg: Colors.accent, path: '/book' },
@@ -201,6 +265,12 @@ export default function Dashboard() {
 
         <h3 style={{ fontSize: Font.lg - 2, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.md, letterSpacing: -0.3 }}>Próximas Consultas</h3>
 
+        {infoMessage && (
+          <div style={{ backgroundColor: '#E3F2FD', border: '1px solid #90CAF9', borderRadius: Radius.md, padding: `${Space.sm}px ${Space.lg}px`, marginBottom: Space.md, fontSize: Font.sm, color: '#0D47A1' }}>
+            {infoMessage}
+          </div>
+        )}
+
         {loadError && (
           <div style={{ backgroundColor: Colors.errorLight, border: `1px solid ${Colors.error}`, borderRadius: Radius.md, padding: `${Space.sm}px ${Space.lg}px`, marginBottom: Space.md, fontSize: Font.sm, color: Colors.error }}>
             {loadError}
@@ -222,14 +292,19 @@ export default function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'center', marginTop: Space.md, paddingTop: Space.md, borderTop: `1px solid ${Colors.borderLight}` }}>
               <span style={{ fontSize: Font.sm, color: Colors.primary, fontWeight: 600 }}>{formatDate(c.dataHora ?? c.data)}</span>
             </div>
-            {isPendingPayment(c.status) && (
+            {isAwaitingConclusion(c) && (
+              <div style={{ backgroundColor: Colors.warningLight, borderRadius: Radius.md, padding: '10px 12px', marginTop: Space.md, fontSize: Font.xs, color: Colors.warning, fontWeight: 600 }}>
+                Aguardando a confirmação de que a consulta foi concluída. O pagamento é liberado automaticamente em alguns minutos.
+              </div>
+            )}
+            {canPayConsulta(c) && (
               <button onClick={() => navigate('/payment', { state: { consultaId: c.id, valor: typeof c.valor === 'number' ? c.valor : undefined } })} style={{
                 width: '100%', backgroundColor: Colors.success, padding: 14, borderRadius: Radius.md,
                 marginTop: Space.md, border: 'none', color: '#fff', fontWeight: 700, cursor: 'pointer',
               }}>Pagar consulta</button>
             )}
-            {c.meetLink && (
-              <button onClick={() => window.open(c.meetLink, '_blank')} style={{
+            {c.meetLink && podeEntrarNaConsulta(c) && (
+              <button onClick={() => window.open(c.meetLink, '_blank', 'noopener,noreferrer')} style={{
                 width: '100%', backgroundColor: Colors.accent, padding: 14, borderRadius: Radius.md,
                 marginTop: Space.md, border: 'none', color: Colors.primary, fontWeight: 700, cursor: 'pointer',
               }}>Entrar na consulta</button>

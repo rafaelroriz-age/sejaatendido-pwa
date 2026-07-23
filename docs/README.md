@@ -54,6 +54,7 @@ Este hub consolida a base textual do Segundo Cerebro para onboarding humano e us
 - [Divergencias Entre Documentacao e Codigo](plans/divergencias.md)
 - [Duvidas Abertas](plans/duvidas-abertas.md)
 - [Roadmap do Segundo Cerebro](plans/segundo-cerebro-roadmap.md)
+- [Roteiro de Testes para Go-Live em Producao](plans/roteiro-testes-producao.md) - Checklist executavel (automatizado + manual) para liberar producao.
 
 ## Ponto de partida recomendado
 

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getUser, clearAuthSession, User } from '../storage/localStorage';
 import { Consulta, fetchConsultasMedico, fetchCrmStatus, updateConsultaMedico } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
+import { formatConsultaDate, formatConsultaTime } from '../utils/datetime';
+import { isConsultaAceita, isConsultaConcluida, isConsultaPendente, podeEntrarNaConsulta } from '../constants/consultaStatus';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
@@ -22,6 +24,14 @@ export default function DoctorDashboard() {
     if (explicitStatus.includes('APROV') || explicitStatus.includes('ATIVO')) return 'APROVADO';
     if (explicitStatus.includes('PEND')) return 'PENDENTE';
     return crm?.crmCartaoValidado ? 'APROVADO' : 'PENDENTE';
+  }
+
+  async function loadConsultas() {
+    try {
+      setConsultas(await fetchConsultasMedico());
+    } catch (error) {
+      showErrorAlert(error, 'Erro ao carregar consultas do médico');
+    }
   }
 
   useEffect(() => {
@@ -59,17 +69,20 @@ export default function DoctorDashboard() {
   async function handleUpdateConsulta(id: string, acao: 'ACEITA' | 'RECUSADA' | 'CONCLUIDA') {
     try {
       await updateConsultaMedico(id, acao);
+      // Atualização otimista para feedback imediato...
       setConsultas(prev => prev.map(c => c.id === id ? { ...c, status: acao } : c));
+      // ...seguida de um refetch, pois ao aceitar (ACEITA) o backend gera
+      // automaticamente o meetLink (sala Jitsi) quando o médico não informa um
+      // manualmente — esse dado só existe depois da ação, não no patch otimista.
+      void loadConsultas();
     } catch (error) {
       showErrorAlert(error, 'Erro ao atualizar consulta');
     }
   }
 
   function handleIniciarConsulta(c: Consulta) {
-    const anyC = c as any;
-    const meetLink: string | undefined = anyC.meetLink ?? c.meetLink;
-    if (meetLink) {
-      window.open(meetLink, '_blank', 'noopener,noreferrer');
+    if (podeEntrarNaConsulta(c) && c.meetLink) {
+      window.open(c.meetLink, '_blank', 'noopener,noreferrer');
     } else {
       navigate(`/chat?consultaId=${c.id}`);
     }
@@ -81,13 +94,11 @@ export default function DoctorDashboard() {
   }
 
   function formatDate(dateIso: string | undefined) {
-    if (!dateIso) return '';
-    return new Date(dateIso).toLocaleDateString('pt-BR');
+    return formatConsultaDate(dateIso);
   }
 
   function formatHour(dateIso: string | undefined) {
-    if (!dateIso) return '';
-    return new Date(dateIso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return formatConsultaTime(dateIso);
   }
 
   function getPatientName(c: Consulta) {
@@ -97,8 +108,8 @@ export default function DoctorDashboard() {
 
   const stats = {
     hoje: consultas.filter(c => { const d = c.dataHora ?? c.data; return d ? toYmd(d) === toYmd(new Date().toISOString()) : false; }).length,
-    pendentes: consultas.filter(c => c.status.toUpperCase().includes('PEND')).length,
-    confirmadas: consultas.filter(c => c.status.toUpperCase().includes('CONFIRM')).length,
+    pendentes: consultas.filter(c => isConsultaPendente(c.status)).length,
+    confirmadas: consultas.filter(c => isConsultaAceita(c.status)).length,
   };
 
   if (loading) {
@@ -196,10 +207,9 @@ export default function DoctorDashboard() {
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               {(() => {
-                const st = c.status.toUpperCase();
-                const isPending = st.includes('PEND');
-                const isActive = st.includes('ACEITA') || st.includes('CONFIRM');
-                const isConcluded = st.includes('CONCLU') || st.includes('FINALIZ');
+                const isPending = isConsultaPendente(c.status);
+                const isActive = isConsultaAceita(c.status);
+                const isConcluded = isConsultaConcluida(c.status);
                 return (
                   <>
                     {!isConcluded && (

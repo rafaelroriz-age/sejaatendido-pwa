@@ -236,11 +236,17 @@ export async function resendConfirmEmailRequest(): Promise<void> {
 }
 
 // CRM
+export type CrmCartaoOrigem = 'PDF_CARTEIRA' | 'QR_PAYLOAD' | null;
+
 export interface CrmStatusResponse {
   crmCartaoValidado: boolean;
   status?: 'PENDENTE' | 'APROVADO' | 'REJEITADO' | string;
+  statusAprovacao?: 'APROVADO' | 'PENDENTE' | 'REJEITADO' | string;
   crmNumero?: string;
   crmUf?: string;
+  crmCartaoOrigem?: CrmCartaoOrigem;
+  mensagem?: string;
+  motivo?: string;
 }
 
 export async function fetchCrmStatus(): Promise<CrmStatusResponse> {
@@ -250,6 +256,16 @@ export async function fetchCrmStatus(): Promise<CrmStatusResponse> {
 
 export async function validarCrmQr(payload: string): Promise<CrmStatusResponse> {
   const r = await api.post('/medicos/me/crm/validar-cartao', { payload });
+  return r.data;
+}
+
+export async function validarCrmCarteira(arquivo: File): Promise<CrmStatusResponse> {
+  const formData = new FormData();
+  formData.append('arquivo', arquivo);
+  const r = await api.post('/medicos/me/crm/validar-carteira', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000,
+  });
   return r.data;
 }
 
@@ -531,6 +547,10 @@ export interface Consulta {
   valor?: number;
   meetLink?: string;
   medico?: Medico;
+  // Opcional: alguns contratos de backend embutem o status do pagamento vinculado
+  // a consulta (evita N+1 chamadas a /v1/pagamentos/sync/:consultaId por item da lista).
+  // Quando ausente, o frontend nao assume nada sobre o pagamento.
+  pagamentoStatus?: string;
 }
 
 export interface CreateConsultaRequest {
@@ -554,6 +574,7 @@ function normalizeConsulta(raw: any): Consulta {
     valor: raw?.valor,
     meetLink: raw?.meetLink,
     medico: medicoRaw,
+    pagamentoStatus: raw?.pagamento?.status ?? raw?.pagamentoStatus ?? raw?.statusPagamento,
     ...(pacienteRaw ? { paciente: pacienteRaw } : {}),
   } as Consulta;
 }
@@ -1201,9 +1222,10 @@ export interface ConsultaRepasse {
 
 export interface Repasse {
   id: string;
+  cicloRepasseId: string;
   periodo: string;
   valor: number;
-  status: 'concluido' | 'erro' | 'pendente';
+  status: 'concluido' | 'erro' | 'pendente' | 'processando';
   data_repasse: string;
   chave_pix_destino?: string;
   consultas?: ConsultaRepasse[];
@@ -1226,6 +1248,9 @@ export async function fetchRepasses(): Promise<Repasse[]> {
   const list = raw.repasses ?? raw ?? [];
   return list.map((r: any) => ({
     id: r.id,
+    // O detalhe (/medicos/me/ciclos-repasse/:id) espera o id do CICLO de repasse,
+    // não o id do repasse individual — sem isso a navegação abre um repasse inexistente.
+    cicloRepasseId: r.cicloRepasse?.id ?? r.id,
     periodo: r.cicloRepasse?.semanaInicio
       ? `${new Date(r.cicloRepasse.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(r.cicloRepasse.semanaFim).toLocaleDateString('pt-BR')}`
       : '',
@@ -1253,6 +1278,7 @@ export async function fetchRepasseById(id: string): Promise<Repasse> {
   const totalValor = repasses.reduce((acc: number, r: any) => acc + (r.valorRepasse ?? 0), 0);
   return {
     id: raw.id,
+    cicloRepasseId: raw.id,
     periodo: raw.semanaInicio
       ? `${new Date(raw.semanaInicio).toLocaleDateString('pt-BR')} - ${new Date(raw.semanaFim).toLocaleDateString('pt-BR')}`
       : '',

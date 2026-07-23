@@ -14,6 +14,8 @@ import Card from '../components/Card';
 import Avatar from '../components/Avatar';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
+import { formatConsultaTime } from '../utils/datetime';
+import { isConsultaPendente } from '../constants/consultaStatus';
 
 const DAYS_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
 type Tab = 'semana' | 'historico';
@@ -28,6 +30,8 @@ function RepasseStatusBadge({ status }: { status: string }) {
       ? { bg: Colors.successLight, color: Colors.success, label: 'Concluído' }
       : status === 'erro'
       ? { bg: Colors.errorLight, color: Colors.error, label: 'Erro' }
+      : status === 'processando'
+      ? { bg: Colors.infoLight, color: Colors.info, label: 'Processando' }
       : { bg: Colors.warningLight, color: Colors.warning, label: 'Pendente' };
   return (
     <div style={{ display: 'flex', alignItems: 'center', backgroundColor: cfg.bg, paddingLeft: 10, paddingRight: 10, paddingTop: 5, paddingBottom: 5, borderRadius: Radius.full, gap: 6 }}>
@@ -69,18 +73,31 @@ export default function Earnings() {
   const [consultasSemana, setConsultasSemana] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
   const [semDadosBancarios, setSemDadosBancarios] = useState(false);
+  const [saldoError, setSaldoError] = useState('');
 
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
+    setLoading(true);
     try {
-      const [saldoData, repassesData, consultasData, dadosBancarios] = await Promise.all([
-        fetchSaldoMedico().catch(() => ({ saldo_a_liberar: 0, saldo_pendente: 0, ganhos_hoje: 0, proximo_repasse: '', ganhos_semana: [0, 0, 0, 0, 0, 0, 0] })),
+      // O saldo nunca deve ser mascarado com um fallback de R$ 0,00 silencioso:
+      // isso passaria a informacao (errada) de que o medico nao tem nada a receber
+      // quando na verdade a chamada falhou. Falhas aqui viram um erro visivel + retry.
+      let saldoData: SaldoMedico | null = null;
+      let saldoFetchError = '';
+      try {
+        saldoData = await fetchSaldoMedico();
+      } catch {
+        saldoFetchError = 'Não foi possível carregar seu saldo agora. Tente novamente em instantes.';
+      }
+
+      const [repassesData, consultasData, dadosBancarios] = await Promise.all([
         fetchRepasses().catch(() => []),
         fetchConsultasMedico().catch(() => []),
         fetchDadosBancarios().catch(() => null),
       ]);
       setSaldo(saldoData);
+      setSaldoError(saldoFetchError);
       setRepasses(repassesData);
       setSemDadosBancarios(!dadosBancarios?.chavePix);
       // Filter to current ISO week
@@ -118,8 +135,8 @@ export default function Earnings() {
         ) : consultasSemana.map(c => {
           const anyC = c as any;
           const pacienteNome = anyC.paciente?.usuario?.nome || anyC.paciente?.nome || anyC.pacienteNome || anyC.nomePaciente || 'Paciente';
-          const horario = new Date(c.dataHora ?? c.data ?? '').toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-          const isPend = c.status.toUpperCase().includes('PEND');
+          const horario = formatConsultaTime(c.dataHora ?? c.data);
+          const isPend = isConsultaPendente(c.status);
           return (
           <Card key={c.id} style={{ marginBottom: Space.md }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -146,7 +163,7 @@ export default function Earnings() {
       return <EmptyState title="Sem histórico" subtitle="Nenhum repasse realizado ainda. Os valores serão repassados toda segunda-feira." />;
     }
     return repasses.map(r => (
-      <div key={r.id} onClick={() => navigate('/repasse/' + r.id)} style={{ cursor: 'pointer' }}>
+      <div key={r.id} onClick={() => navigate('/repasse/' + r.cicloRepasseId)} style={{ cursor: 'pointer' }}>
         <Card style={{ marginBottom: Space.md }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
@@ -170,6 +187,15 @@ export default function Earnings() {
         <span style={{ color: '#fff', fontSize: Font.lg - 2, fontWeight: 800, letterSpacing: -0.3 }}>Meus Ganhos</span>
         <div style={{ width: 60 }} />
       </div>
+
+      {saldoError && !loading && (
+        <div style={{ margin: '12px 20px 0', backgroundColor: Colors.errorLight, border: `1px solid ${Colors.error}`, borderRadius: Radius.md, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ flex: 1, fontSize: 13, color: Colors.error, fontWeight: 600 }}>{saldoError}</span>
+          <button type="button" onClick={loadData} style={{ backgroundColor: Colors.error, color: '#fff', border: 'none', borderRadius: Radius.sm, padding: '6px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+            Tentar novamente
+          </button>
+        </div>
+      )}
 
       {semDadosBancarios && !loading && (
         <div
