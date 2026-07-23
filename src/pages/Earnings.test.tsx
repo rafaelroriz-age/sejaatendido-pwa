@@ -75,7 +75,7 @@ describe('Earnings — navegação para o detalhe do repasse', () => {
     const item = await screen.findByText('R$ 150,00');
     fireEvent.click(item);
 
-    expect(navigateMock).toHaveBeenCalledWith('/repasse/ciclo-001');
+    expect(navigateMock).toHaveBeenCalledWith('/repasse/ciclo-001', { state: { repasse: baseRepasse() } });
     expect(navigateMock).not.toHaveBeenCalledWith('/repasse/repasse-001');
   });
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { fetchRepasseById, Repasse } from '../services/api';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Card from '../components/Card';
@@ -35,14 +35,38 @@ function StatusBadgeLarge({ status }: { status: string }) {
 
 export default function RepasseDetail() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
-  const [repasse, setRepasse] = useState<Repasse | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Quando o usuario chega vindo do Historico (Earnings.tsx), o repasse ja
+  // foi carregado na listagem e e enviado via state. Usamos esses dados de
+  // imediato para nao depender do GET /medicos/me/ciclos-repasse/:id, que
+  // pode falhar para o repasse mais recente (ciclo ainda em processamento).
+  const repasseFromState = (location.state as { repasse?: Repasse } | null)?.repasse ?? null;
+  const [repasse, setRepasse] = useState<Repasse | null>(repasseFromState);
+  const [loading, setLoading] = useState(!repasseFromState);
   const [errorText, setErrorText] = useState('');
 
   useEffect(() => {
-    loadRepasse();
+    if (repasseFromState) {
+      // Tenta enriquecer os dados em segundo plano (ex.: lista completa de
+      // consultas do ciclo), mas sem exibir erro caso falhe — os dados vindos
+      // da listagem ja sao suficientes para a tela.
+      refreshInBackground();
+    } else {
+      loadRepasse();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function refreshInBackground() {
+    if (!id) return;
+    try {
+      const data = await fetchRepasseById(id);
+      setRepasse(data);
+    } catch {
+      // mantem os dados ja exibidos, vindos da listagem
+    }
+  }
 
   async function loadRepasse() {
     if (!id) {

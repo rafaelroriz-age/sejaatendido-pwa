@@ -163,7 +163,16 @@ export default function Earnings() {
       return <EmptyState title="Sem histórico" subtitle="Nenhum repasse realizado ainda. Os valores serão repassados toda segunda-feira." />;
     }
     return repasses.map(r => (
-      <div key={r.id} onClick={() => navigate('/repasse/' + r.cicloRepasseId)} style={{ cursor: 'pointer' }}>
+      <div
+        key={r.id}
+        onClick={() =>
+          // Enviamos o repasse já carregado via state para a tela de detalhe:
+          // assim ela nao depende exclusivamente do GET /medicos/me/ciclos-repasse/:id
+          // (que pode falhar para o repasse mais recente, com o ciclo ainda em processamento).
+          navigate('/repasse/' + r.cicloRepasseId, { state: { repasse: r } })
+        }
+        style={{ cursor: 'pointer' }}
+      >
         <Card style={{ marginBottom: Space.md }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
