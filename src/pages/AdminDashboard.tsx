@@ -20,6 +20,7 @@ import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
+import { Icon } from '../components/Icon';
 import { SkeletonCard } from '../components/Skeleton';
 import {
   isConsultaAceita,
@@ -237,12 +238,12 @@ export default function AdminDashboard() {
   ];
 
   const statCards = stats ? [
-    { label: 'Usuários', value: stats.totalUsuarios, icon: '', bg: Colors.accent },
-    { label: 'Médicos', value: stats.totalMedicos, icon: '', bg: Colors.doctorLight },
-    { label: 'Aprovados', value: stats.medicosAprovados, icon: '', bg: Colors.successLight },
-    { label: 'Pendentes', value: stats.medicosPendentes, icon: '', bg: Colors.warningLight },
-    { label: 'Consultas', value: stats.totalConsultas, icon: '', bg: Colors.infoLight },
-    { label: 'Receita', value: `R$${Math.floor((stats.receitaTotal ?? 0) / 100)}`, icon: '', bg: Colors.successLight },
+    { label: 'Usuários', value: stats.totalUsuarios, icon: 'users' as const, color: Colors.primary, bg: Colors.accent },
+    { label: 'Médicos', value: stats.totalMedicos, icon: 'stethoscope' as const, color: Colors.doctor, bg: Colors.doctorLight },
+    { label: 'Aprovados', value: stats.medicosAprovados, icon: 'check-circle' as const, color: Colors.success, bg: Colors.successLight },
+    { label: 'Pendentes', value: stats.medicosPendentes, icon: 'clock' as const, color: Colors.warning, bg: Colors.warningLight },
+    { label: 'Consultas', value: stats.totalConsultas, icon: 'clipboard-list' as const, color: Colors.info, bg: Colors.infoLight },
+    { label: 'Receita', value: `R$${Math.floor((stats.receitaTotal ?? 0) / 100)}`, icon: 'dollar-sign' as const, color: Colors.success, bg: Colors.successLight },
   ] : [];
 
   return (
@@ -268,7 +269,7 @@ export default function AdminDashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: Space.xl }}>
             {statCards.map(s => (
               <Card key={s.label} style={{ textAlign: 'center', padding: 12 }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}><Icon name={s.icon} color={s.color} size={20} /></div>
                 <div style={{ fontSize: Font.lg, fontWeight: 800, color: Colors.textPrimary }}>{s.value}</div>
                 <div style={{ fontSize: Font.xs, color: Colors.textSecondary, fontWeight: 600 }}>{s.label}</div>
               </Card>

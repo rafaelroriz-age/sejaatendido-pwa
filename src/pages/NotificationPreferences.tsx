@@ -4,6 +4,7 @@ import { getUser } from '../storage/localStorage';
 import { fetchPreferenciasNotificacao, fetchPerfil, registerPushToken, savePreferenciasNotificacao, testarNotificacaoWhatsapp } from '../services/api';
 import { handleApiError } from '../utils/errorHandler';
 import Colors from '../theme/colors';
+import { Icon } from '../components/Icon';
 
 interface Prefs {
   pushEnabled: boolean;
@@ -261,7 +262,7 @@ export default function NotificationPreferences() {
               >
                 {testingWhatsapp
                   ? <div className="spinner" />
-                  : <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Enviar mensagem de teste</span>
+                  : <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><Icon name="send" size={16} color="#fff" /> Enviar mensagem de teste</span>
                 }
               </button>
               {whatsappTestMsg && (

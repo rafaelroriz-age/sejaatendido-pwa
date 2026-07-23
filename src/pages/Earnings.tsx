@@ -12,6 +12,7 @@ import {
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Card from '../components/Card';
 import Avatar from '../components/Avatar';
+import { Icon } from '../components/Icon';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
 import { formatConsultaTime } from '../utils/datetime';
@@ -215,6 +216,7 @@ export default function Earnings() {
             alignItems: 'center', gap: 10, cursor: 'pointer',
           }}
         >
+          <Icon name="landmark" size={20} color="#856404" />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>Dados bancários não cadastrados</div>
             <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Cadastre sua chave Pix para receber repasses. Toque aqui.</div>

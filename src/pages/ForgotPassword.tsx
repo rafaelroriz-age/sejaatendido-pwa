@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { forgotPasswordRequest } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
+import { Icon } from '../components/Icon';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export default function ForgotPassword() {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <div style={{ backgroundColor: Colors.card, borderRadius: 24, padding: 36, textAlign: 'center', width: '100%', maxWidth: 380, boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
-          <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}></div>
+          <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px' }}><Icon name="mail" size={32} color={Colors.success} /></div>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 8, letterSpacing: -0.3 }}>Email Enviado!</h2>
           <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>
             Se o email <strong>{email}</strong> estiver cadastrado, você receberá um link para redefinir sua senha. Verifique também a pasta de spam.
@@ -56,7 +57,7 @@ export default function ForgotPassword() {
       <div style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ backgroundColor: Colors.card, borderRadius: Radius.xl, padding: Space.xl, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}>
           <div style={{ textAlign: 'center', marginBottom: Space.xl }}>
-            <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.accent, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 16px', fontSize: 32 }}></div>
+            <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.accent, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 16px' }}><Icon name="key" size={32} color={Colors.primary} /></div>
             <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 8, letterSpacing: -0.3 }}>Esqueceu sua senha?</h2>
             <p style={{ fontSize: Font.sm, color: Colors.textSecondary, lineHeight: '20px' }}>
               Informe seu email e enviaremos um link para redefinir sua senha.
