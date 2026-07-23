@@ -294,7 +294,7 @@ export default function CrmValidation() {
                     : approvalState === 'rejeitado' ? Colors.errorLight : Colors.warningLight,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
                 }}>
-                  {approvalState === 'aprovado' ? '✅' : approvalState === 'rejeitado' ? '❌' : '⏳'}
+                  {''}
                 </div>
                 <div>
                   <div style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary }}>
@@ -402,7 +402,6 @@ export default function CrmValidation() {
                   boxShadow: `0 6px 12px ${Colors.doctor}59`,
                 }}
               >
-                <span style={{ fontSize: 20 }}>📄</span>
                 <span style={{ color: '#fff', fontSize: Font.md, fontWeight: 700 }}>{primaryCtaLabel}</span>
               </label>
               <input
@@ -430,7 +429,7 @@ export default function CrmValidation() {
                   padding: `${Space.sm}px ${Space.md}px`,
                 }}>
                   <span style={{ fontSize: Font.sm, color: Colors.textPrimary, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    📎 {pdfFile.name}
+                    {pdfFile.name}
                   </span>
                   <button
                     onClick={removeSelectedFile}
@@ -488,7 +487,6 @@ export default function CrmValidation() {
                     marginBottom: Space.md,
                   }}
                 >
-                  <span style={{ fontSize: 20 }}>📷</span>
                   <span style={{ color: Colors.textPrimary, fontSize: Font.md, fontWeight: 700 }}>Escanear QR da Carteirinha</span>
                 </button>
 
@@ -502,7 +500,6 @@ export default function CrmValidation() {
                     marginBottom: pasteMode ? Space.md : 0,
                   }}
                 >
-                  <span style={{ fontSize: 20 }}>📋</span>
                   <span style={{ color: Colors.textPrimary, fontSize: Font.md, fontWeight: 700 }}>
                     {pasteMode ? 'Fechar campo de texto' : 'Colar conteúdo do QR Code'}
                   </span>

@@ -237,12 +237,12 @@ export default function AdminDashboard() {
   ];
 
   const statCards = stats ? [
-    { label: 'Usuários', value: stats.totalUsuarios, icon: '👥', bg: Colors.accent },
-    { label: 'Médicos', value: stats.totalMedicos, icon: '🩺', bg: Colors.doctorLight },
-    { label: 'Aprovados', value: stats.medicosAprovados, icon: '✅', bg: Colors.successLight },
-    { label: 'Pendentes', value: stats.medicosPendentes, icon: '⏳', bg: Colors.warningLight },
-    { label: 'Consultas', value: stats.totalConsultas, icon: '📋', bg: Colors.infoLight },
-    { label: 'Receita', value: `R$${Math.floor((stats.receitaTotal ?? 0) / 100)}`, icon: '💰', bg: Colors.successLight },
+    { label: 'Usuários', value: stats.totalUsuarios, icon: '', bg: Colors.accent },
+    { label: 'Médicos', value: stats.totalMedicos, icon: '', bg: Colors.doctorLight },
+    { label: 'Aprovados', value: stats.medicosAprovados, icon: '', bg: Colors.successLight },
+    { label: 'Pendentes', value: stats.medicosPendentes, icon: '', bg: Colors.warningLight },
+    { label: 'Consultas', value: stats.totalConsultas, icon: '', bg: Colors.infoLight },
+    { label: 'Receita', value: `R$${Math.floor((stats.receitaTotal ?? 0) / 100)}`, icon: '', bg: Colors.successLight },
   ] : [];
 
   return (

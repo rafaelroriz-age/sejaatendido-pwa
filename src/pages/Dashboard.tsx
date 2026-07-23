@@ -198,9 +198,9 @@ export default function Dashboard() {
 
   const actions = [
     { label: 'Agendar\nConsulta', icon: '+', bg: Colors.accent, path: '/book' },
-    { label: 'Meu\nPerfil', icon: '👤', bg: Colors.adminLight, path: '/profile' },
-    { label: 'Chat', icon: '💬', bg: Colors.infoLight, path: '/chat' },
-    { label: testingWhatsapp ? 'Enviando...' : 'Testar\nWhatsApp', icon: '🟢', bg: Colors.successLight, onClick: handleTestarWhatsapp },
+    { label: 'Meu\nPerfil', icon: '', bg: Colors.adminLight, path: '/profile' },
+    { label: 'Chat', icon: '', bg: Colors.infoLight, path: '/chat' },
+    { label: testingWhatsapp ? 'Enviando...' : 'Testar\nWhatsApp', icon: '', bg: Colors.successLight, onClick: handleTestarWhatsapp },
   ];
 
   return (

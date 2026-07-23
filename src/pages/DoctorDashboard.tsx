@@ -156,7 +156,6 @@ export default function DoctorDashboard() {
             cursor: 'pointer',
           }}
         >
-          <span style={{ fontSize: 20 }}>⚠️</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>CRM não validado</div>
             <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Valide sua carteirinha para receber pacientes. Toque aqui.</div>
@@ -176,8 +175,8 @@ export default function DoctorDashboard() {
         {/* Stats */}
         <div style={{ display: 'flex', gap: 8, marginBottom: Space.xl }}>
           {[
-            { n: stats.hoje, l: 'Hoje', bg: Colors.doctorLight, icon: '📅' },
-            { n: stats.pendentes, l: 'Pendentes', bg: Colors.warningLight, icon: '⏳' },
+            { n: stats.hoje, l: 'Hoje', bg: Colors.doctorLight, icon: '' },
+            { n: stats.pendentes, l: 'Pendentes', bg: Colors.warningLight, icon: '' },
             { n: stats.confirmadas, l: 'Confirmadas', bg: Colors.successLight, icon: '✓' },
           ].map(s => (
             <Card key={s.l} style={{ flex: 1, textAlign: 'center' }}>
@@ -249,11 +248,11 @@ export default function DoctorDashboard() {
         <h3 style={{ fontSize: Font.lg, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.md + 2, letterSpacing: -0.3 }}>Ações Rápidas</h3>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {[
-            { l: 'Agenda', icon: '📅', bg: Colors.doctorLight, path: '/doctor/schedule' },
-            { l: 'Mensagens', icon: '💬', bg: Colors.accent, path: '/chat' },
-            { l: 'Ganhos', icon: '💰', bg: Colors.successLight, path: '/earnings' },
-            { l: 'Conta', icon: '🏦', bg: '#E3F2FD', path: '/bank-details' },
-            { l: 'Perfil', icon: '👤', bg: Colors.warningLight, path: '/profile' },
+            { l: 'Agenda', icon: '', bg: Colors.doctorLight, path: '/doctor/schedule' },
+            { l: 'Mensagens', icon: '', bg: Colors.accent, path: '/chat' },
+            { l: 'Ganhos', icon: '', bg: Colors.successLight, path: '/earnings' },
+            { l: 'Conta', icon: '', bg: '#E3F2FD', path: '/bank-details' },
+            { l: 'Perfil', icon: '', bg: Colors.warningLight, path: '/profile' },
           ].map(a => (
             <div key={a.l} onClick={() => a.path && navigate(a.path)}
               style={{ flex: '1 1 80px', backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Space.lg, textAlign: 'center', cursor: a.path ? 'pointer' : 'default', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}

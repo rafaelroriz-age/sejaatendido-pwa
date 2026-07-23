@@ -215,7 +215,6 @@ export default function Earnings() {
             alignItems: 'center', gap: 10, cursor: 'pointer',
           }}
         >
-          <span style={{ fontSize: 20 }}>🏦</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>Dados bancários não cadastrados</div>
             <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Cadastre sua chave Pix para receber repasses. Toque aqui.</div>

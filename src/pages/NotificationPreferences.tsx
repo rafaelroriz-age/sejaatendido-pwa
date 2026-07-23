@@ -261,7 +261,7 @@ export default function NotificationPreferences() {
               >
                 {testingWhatsapp
                   ? <div className="spinner" />
-                  : <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>📲 Enviar mensagem de teste</span>
+                  : <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Enviar mensagem de teste</span>
                 }
               </button>
               {whatsappTestMsg && (

@@ -43,7 +43,7 @@ export default function ResetPassword() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
       <div style={{ backgroundColor: Colors.card, borderRadius: 24, padding: 32, width: '100%', maxWidth: 380, textAlign: 'center', boxShadow: '0 8px 20px rgba(0,0,0,0.08)' }}>
-        <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.accent, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}>🔒</div>
+        <div style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.accent, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 32 }}></div>
 
         <h2 style={{ fontSize: 24, fontWeight: 800, color: Colors.textPrimary, marginBottom: 8, letterSpacing: -0.3 }}>Nova Senha</h2>
         <p style={{ fontSize: 15, color: Colors.textSecondary, marginBottom: 28 }}>Crie uma nova senha para sua conta</p>
