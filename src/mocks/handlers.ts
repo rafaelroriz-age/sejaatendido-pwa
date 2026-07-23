@@ -153,22 +153,21 @@ const MOCK_REPASSES = {
 };
 
 const MOCK_REPASSE_DETAIL = {
-  id: 'ciclo-001',
-  semanaInicio: '2026-05-04T00:00:00.000Z',
-  semanaFim: '2026-05-10T23:59:59.000Z',
+  id: 'repasse-001',
+  valorRepasse: LOW_COST_CONSULTA_VALOR_CENTAVOS,
   status: 'PENDENTE',
-  repasses: [
-    {
-      id: 'repasse-001',
-      valorRepasse: LOW_COST_CONSULTA_VALOR_CENTAVOS,
-      status: 'PENDENTE',
-      consulta: {
-        id: 'consulta-002',
-        data: tomorrow,
-        paciente: { usuario: { nome: 'Maria Teste', email: 'maria.teste@mock.com', telefone: '+5511988880000' } },
-      },
-    },
-  ],
+  dataRepasse: null,
+  criadoEm: new Date().toISOString(),
+  cicloRepasse: {
+    id: 'ciclo-001',
+    semanaInicio: '2026-05-04T00:00:00.000Z',
+    semanaFim: '2026-05-10T23:59:59.000Z',
+  },
+  consulta: {
+    id: 'consulta-002',
+    data: tomorrow,
+    paciente: { usuario: { nome: 'Maria Teste', email: 'maria.teste@mock.com', telefone: '+5511988880000' } },
+  },
 };
 
 function getConsultaValorCentavos(consultaId: unknown): number {
@@ -432,7 +431,7 @@ export const handlers = [
   }),
   http.get(`${BASE}/medicos/me/saldo`, () => HttpResponse.json(MOCK_SALDO)),
   http.get(`${BASE}/medicos/me/repasses`, () => HttpResponse.json(MOCK_REPASSES)),
-  http.get(`${BASE}/medicos/me/ciclos-repasse/:id`, () => HttpResponse.json(MOCK_REPASSE_DETAIL)),
+  http.get(`${BASE}/medicos/me/repasses/:id`, () => HttpResponse.json(MOCK_REPASSE_DETAIL)),
   http.get(`${BASE}/medicos/me/dados-bancarios`, () => HttpResponse.json(MOCK_DADOS_BANCARIOS_MEDICO)),
   http.put(`${BASE}/medicos/me/dados-bancarios`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
