@@ -48,4 +48,4 @@ Status: review.
 
 ## Pontos de atencao
 
-- loginGoogleRequest existe em src/services/api.ts, mas nao esta conectado a UI atual. Ver divergencia em ../plans/divergencias.md.
+- Login social Google foi removido em 2026-07-23 (UI, SDK e loginGoogleRequest); nao ha mais fluxo Google no frontend. Ver decisao em ../plans/duvidas-abertas.md.

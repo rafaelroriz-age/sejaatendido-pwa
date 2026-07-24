@@ -88,7 +88,7 @@ Para `main` (e idealmente `homolog`):
 Arquivos criados por este plano:
 
 - `docker-compose.staging.yml` — sobe o build de produção apontando para o backend de staging, na **porta 3001** (produção local usa 3000, então não conflita).
-- `Dockerfile` — passa a aceitar args extras (`VITE_MP_PUBLIC_KEY`, `VITE_GOOGLE_CLIENT_ID`, `VITE_VAPID_PUBLIC_KEY`) além de `VITE_API_URL`.
+- `Dockerfile` — passa a aceitar args extras (`VITE_MP_PUBLIC_KEY`, `VITE_VAPID_PUBLIC_KEY`) além de `VITE_API_URL`.
 - Scripts npm `sandbox:*` para subir/derrubar/ver logs.
 
 ### Variáveis de ambiente (arquivo `.env` local — NUNCA commitado)
@@ -101,7 +101,6 @@ VITE_API_URL=https://sejaatendido-staging-backend.onrender.com
 
 # Chaves de TESTE / sandbox (não usar chaves de produção em homolog!)
 VITE_MP_PUBLIC_KEY=TEST-xxxxxxxx-xxxx-xxxx       # Mercado Pago: credencial de TESTE
-VITE_GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
 VITE_VAPID_PUBLIC_KEY=                            # opcional (push web)
 ```
 

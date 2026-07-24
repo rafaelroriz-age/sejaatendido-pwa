@@ -79,8 +79,6 @@ Referência: [Processo de Autenticação e Autorização](../processes/autentica
 - [ ] Login médico com CPF/senha correta → redireciona para `/doctor`.
 - [ ] Login admin → redireciona para `/admin`.
 - [ ] Login com senha incorreta → mensagem de erro (não trava a tela).
-- [ ] **Login com Google** → autentica sem erro 404 e cai na home correta por papel.
-  - [ ] Validar Client ID configurado no Google Cloud Console para o domínio de produção.
 - [ ] "Esqueci minha senha" (`/esqueci-senha`) envia o fluxo de recuperação.
 - [ ] Reset de senha (`/resetar-senha`) com token válido troca a senha e permite novo login.
 
@@ -138,7 +136,8 @@ Referência: [Processo de Pagamento da Consulta](../processes/pagamentos-consult
 - [ ] `/earnings` exibe repasses/ganhos do médico.
 - [x] `/repasse/:id` (RepasseDetail) exibe detalhe de um repasse específico sem cair em fallback mock silencioso — erro real da API deve aparecer se houver falha. (2026-07-22: corrigido bug em que Earnings.tsx navegava com o id do repasse individual em vez do id do ciclo de repasse, causando erro 404 real ao abrir o detalhe — ver `divergencias.md`.)
 - [ ] `/bank-details` permite cadastrar/editar dados bancários para repasse.
-- [ ] Definir e validar o processo de repasse (manual ou automático) conforme decisão de negócio — não pode ficar como "em breve" se o modelo comercial depende disso.
+- [x] Definir o processo de repasse (manual ou automático) conforme decisão de negócio — decidido em 2026-07-23: repasse automático semanal, com opção de repasse imediato mediante taxa retida pela plataforma. Ver [ADR 0002](../decisions/adr-0002-estrategia-repasse-medico.md).
+- [ ] Validar em produção o fluxo de solicitação de repasse imediato (depende de confirmação do contrato do endpoint pelo backend).
 
 ---
 
@@ -250,4 +249,4 @@ npm run build
 | Validação CRM | `src/pages/CrmValidation.test.tsx` | Upload de PDF e status retornado |
 | Agendamento | `src/pages/BookAppointment.test.tsx` | Conflito de horário (409) |
 
-**Gaps conhecidos (sem teste automatizado hoje):** login (e-mail/senha, CPF/senha, Google), signup, reset de senha, fluxo completo de cartão (success/pending/failure), notificações/preferências, admin, earnings/repasse, bank details, PWA/service worker. Por isso o roteiro manual nas Fases 2 a 8 é a forma principal de validar esses fluxos antes do go-live.
+**Gaps conhecidos (sem teste automatizado hoje):** login (e-mail/senha, CPF/senha), signup, reset de senha, fluxo completo de cartão (success/pending/failure), notificações/preferências, admin, earnings/repasse, bank details, PWA/service worker. Por isso o roteiro manual nas Fases 2 a 8 é a forma principal de validar esses fluxos antes do go-live.

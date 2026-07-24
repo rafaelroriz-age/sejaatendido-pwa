@@ -128,6 +128,7 @@ const MOCK_SALDO = {
   ganhosHojeCentavos: LOW_COST_CONSULTA_VALOR_CENTAVOS,
   proximoRepasse: '2026-05-15',
   ganhosSemana: [0, 0, LOW_COST_CONSULTA_VALOR_CENTAVOS, 0, 0, 0, 0],
+  taxaRepasseImediatoPercentual: 5,
 };
 
 const MOCK_REPASSES = {
@@ -264,9 +265,6 @@ export const handlers = [
     if (email.includes('medico') || email.includes('doctor') || email.includes('med')) return authResponse(MOCK_MEDICO_USER);
     return authResponse(MOCK_PACIENTE);
   }),
-
-  http.post(`${BASE}/auth/google`, () => authResponse(MOCK_PACIENTE)),
-  http.post(`${BASE}/auth/login-google`, () => authResponse(MOCK_PACIENTE)),
 
   http.post(`${BASE}/auth/registro`, async ({ request }) => {
     const body = await request.json() as {
@@ -432,6 +430,25 @@ export const handlers = [
   http.get(`${BASE}/medicos/me/saldo`, () => HttpResponse.json(MOCK_SALDO)),
   http.get(`${BASE}/medicos/me/repasses`, () => HttpResponse.json(MOCK_REPASSES)),
   http.get(`${BASE}/medicos/me/repasses/:id`, () => HttpResponse.json(MOCK_REPASSE_DETAIL)),
+  // Repasse imediato (antecipacao mediante taxa retida pela plataforma) — ver ADR 0002.
+  http.post(`${BASE}/medicos/me/repasses/imediato`, async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { valorCentavos?: number };
+    const valorSolicitadoCentavos = body.valorCentavos ?? MOCK_SALDO.saldoALiberarCentavos;
+    const taxaCentavos = Math.round((valorSolicitadoCentavos * MOCK_SALDO.taxaRepasseImediatoPercentual) / 100);
+    const valorLiquidoCentavos = valorSolicitadoCentavos - taxaCentavos;
+    MOCK_SALDO.saldoALiberarCentavos = Math.max(0, MOCK_SALDO.saldoALiberarCentavos - valorSolicitadoCentavos);
+    return HttpResponse.json({
+      taxaCentavos,
+      valorLiquidoCentavos,
+      repasse: {
+        id: `repasse-imediato-${Date.now()}`,
+        valorRepasse: valorLiquidoCentavos,
+        status: 'PROCESSANDO',
+        dataRepasse: null,
+        criadoEm: new Date().toISOString(),
+      },
+    });
+  }),
   http.get(`${BASE}/medicos/me/dados-bancarios`, () => HttpResponse.json(MOCK_DADOS_BANCARIOS_MEDICO)),
   http.put(`${BASE}/medicos/me/dados-bancarios`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;

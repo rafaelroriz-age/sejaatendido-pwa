@@ -24,7 +24,6 @@
 
 ## Pendencias de acompanhamento
 
-- Definir destino do login Google (reativar UI ou remover exigencia de checklist).
 - Validar estrategia unica de service worker/push web.
 - Decidir se paginas de retorno de pagamento devem executar syncPagamento automaticamente.
 - Completar dados legais reais em src/config/legal.ts.

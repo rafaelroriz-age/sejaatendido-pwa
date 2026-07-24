@@ -164,22 +164,6 @@ export async function loginCpfRequest(data: LoginCpfRequest): Promise<AuthRespon
   }
 }
 
-export async function loginGoogleRequest(idToken: string): Promise<AuthResponse> {
-  try {
-    const r = await api.post('/auth/google', { idToken });
-    return r.data;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      if (status === 404 || status === 405) {
-        const fallback = await api.post('/auth/login-google', { idToken });
-        return fallback.data;
-      }
-    }
-    throw error;
-  }
-}
-
 export async function loginAppleRequest(identityToken: string, firstName?: string, lastName?: string): Promise<AuthResponse> {
   const body: Record<string, unknown> = { identityToken };
   if (firstName || lastName) body.user = { name: { firstName: firstName ?? '', lastName: lastName ?? '' } };
@@ -1210,7 +1194,16 @@ export interface SaldoMedico {
   ganhos_hoje: number;
   proximo_repasse: string;
   ganhos_semana: number[];
+  // Percentual de taxa cobrado quando o medico solicita repasse imediato (antecipacao).
+  // Ver docs/decisions/adr-0002-estrategia-repasse-medico.md. Enquanto o backend nao
+  // retorna esse valor, usamos DEFAULT_TAXA_REPASSE_IMEDIATO_PERCENTUAL como fallback.
+  taxa_repasse_imediato_percentual?: number;
 }
+
+// Repasse padrao (automatico, ciclo semanal) nao cobra taxa. Repasse imediato
+// (antecipacao a pedido do medico) cobra essa taxa, retida pela plataforma,
+// enquanto o backend nao confirma um percentual configuravel (ver ADR 0002).
+export const DEFAULT_TAXA_REPASSE_IMEDIATO_PERCENTUAL = 5;
 
 export interface ConsultaRepasse {
   id: string;
@@ -1263,6 +1256,7 @@ export async function fetchSaldoMedico(): Promise<SaldoMedico> {
     ganhos_hoje: (raw.ganhosHojeCentavos ?? 0) / 100,
     proximo_repasse: raw.proximoRepasse ?? '',
     ganhos_semana: raw.ganhosSemana ?? [0, 0, 0, 0, 0, 0, 0],
+    taxa_repasse_imediato_percentual: raw.taxaRepasseImediatoPercentual ?? undefined,
   };
 }
 
@@ -1277,6 +1271,27 @@ export async function fetchRepasseById(id: string): Promise<Repasse> {
   // GET /medicos/me/repasses/:id e o endpoint correto para o detalhe.
   const raw = (await api.get(`/medicos/me/repasses/${id}`)).data;
   return mapRepasse(raw.repasse ?? raw);
+}
+
+// Resultado da solicitacao de repasse imediato (antecipacao mediante taxa).
+export interface RepasseImediatoResult {
+  taxa: number;
+  valor_liquido: number;
+  repasse: Repasse;
+}
+
+// Repasse automatico (ciclo semanal) e o padrao e nao requer nenhuma chamada explicita
+// do medico. Esta funcao cobre a solicitacao opcional de repasse imediato (antecipacao),
+// que desconta uma taxa retida pela plataforma (ver ADR 0002). Se valorCentavos nao for
+// informado, o backend deve antecipar o saldo disponivel integral.
+export async function solicitarRepasseImediato(valorCentavos?: number): Promise<RepasseImediatoResult> {
+  const body = valorCentavos !== undefined ? { valorCentavos } : {};
+  const raw = (await api.post('/medicos/me/repasses/imediato', body)).data;
+  return {
+    taxa: (raw.taxaCentavos ?? 0) / 100,
+    valor_liquido: (raw.valorLiquidoCentavos ?? 0) / 100,
+    repasse: mapRepasse(raw.repasse ?? raw),
+  };
 }
 
 // CHAT

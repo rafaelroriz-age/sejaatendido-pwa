@@ -28,18 +28,14 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
   - Critério: considerar pago quando `pagamento.status === "PAGO"`.
   - Risco: pagamento aprovado no backend sem confirmação no frontend.
 
-- [ ] Login social Google validado em produção
-  - Critério: botão Google autentica via endpoint ativo de produção sem erro 404.
-  - **Pendência**: configurar `VITE_GOOGLE_CLIENT_ID` nas variáveis de ambiente de produção e validar OAuth Client ID no Google Cloud Console.
-  - Risco: queda de conversão e suporte manual.
-
 - [ ] Médicos aprovados visíveis para agendamento
   - Critério: lista de `/medicos` renderiza médicos aprovados com shape real do backend.
   - Risco: paciente não encontra médico, não agenda, não paga.
 
-- [ ] Estratégia de repasse para médico definida
-  - Critério: se o modelo comercial exige repasse automático, integração de repasse não pode ficar “em breve”.
-  - Risco: gargalo financeiro/operacional pós-venda.
+- [x] Estratégia de repasse para médico definida
+  - Decisão (2026-07-23): repasse **automático** (ciclo semanal, sem ação manual do médico). O médico pode opcionalmente solicitar **repasse imediato**, mediante **taxa retida pela plataforma**, descontada do valor antecipado. Ver [ADR 0002](docs/decisions/adr-0002-estrategia-repasse-medico.md) e [Processo de Pagamento da Consulta](docs/processes/pagamentos-consulta.md).
+  - Pendência restante: confirmar com o backend o contrato definitivo do endpoint de repasse imediato (rota e percentual/valor da taxa) antes de validar em produção.
+  - Risco: gargalo financeiro/operacional pós-venda (mitigado pela decisão acima).
 
 ## 2) Itens que NÃO bloqueiam lançamento (mas devem entrar no backlog)
 
@@ -59,7 +55,7 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 - [x] Rodar build, corrigir erros TS e publicar via commit/push.
 - [x] Sincronização automática de status no retorno de checkout (PaymentSuccess/Pending/Failure).
 - [x] Remover fallback mock silencioso em RepasseDetail — erros reais agora visíveis.
-- [x] Login com Google implementado no LoginScreen (requer VITE_GOOGLE_CLIENT_ID configurado).
+- [x] Login com Google removido do LoginScreen (decisão de negócio: fluxo retirado).
 - [x] Push web-pwa: fallback graceful sem alert — não bloqueia save de preferências.
 - [x] window.alert removido dos fluxos críticos (Signup, ResetPassword, ForgotPassword, BankDetails, Profile, Payment, NotificationPreferences).
 - [x] Redesign visual da tela de Pagamento com branding consistente.
@@ -69,13 +65,13 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 
 - [ ] Confirmar variáveis de ambiente de produção (Actions/host):
   - `VITE_API_URL`
-  - `VITE_GOOGLE_CLIENT_ID`
   - `VITE_MP_PUBLIC_KEY` (se necessário no frontend)
   - `VITE_MOCK=false`
 
 - [ ] Executar teste real de pagamento (transação controlada) com conta paciente real.
 - [ ] Validar operação do lado médico após compra (consulta aparece, status correto, agenda consistente).
-- [ ] Definir processo financeiro de repasse (manual/automático) e operação de suporte.
+- [x] Definir processo financeiro de repasse (manual/automático) e operação de suporte — decidido: automático, com opção de repasse imediato mediante taxa (ver ADR 0002).
+- [ ] Confirmar com o backend o contrato definitivo do endpoint de repasse imediato (rota e percentual/valor de taxa).
 - [ ] Conferir políticas legais/publicação (termos, privacidade, contato, suporte).
 
 ## 5) Go / No-Go (decisão rápida)
@@ -89,7 +85,7 @@ Marque GO apenas se todos os itens da seção "BLOQUEIAM lançamento" estiverem 
 
 ## 6) Plano de validação mínima (30-60 min)
 
-1. Login paciente (email/senha e Google).
+1. Login paciente (email/senha).
 2. Abrir agendamento e confirmar médico aprovado visível.
 3. Criar consulta em slot válido.
 4. Gerar PIX e validar QR + copia-e-cola.
