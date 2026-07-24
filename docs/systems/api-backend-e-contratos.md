@@ -42,7 +42,7 @@ Status: review.
 
 ## Endpoints relevantes observados
 
-- Auth: /auth/login, /auth/registro, /auth/google, /auth/apple.
+- Auth: /auth/login, /auth/registro, /auth/apple.
 - Consultas/agendamento: /medicos, /medicos/:id/slots, createConsulta (no mesmo service).
 - Pagamentos: /v1/pagamentos/pix, /v1/pagamentos/cartao, /v1/pagamentos/sync/:consultaId.
 - Notificacoes: multiplos endpoints para preferencias e teste WhatsApp (fallback por tentativas).

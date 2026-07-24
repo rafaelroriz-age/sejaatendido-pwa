@@ -5,6 +5,7 @@ import { fetchCrmStatus, validarCrmCarteira, validarCrmQr, CrmStatusResponse } f
 import { getUser, saveUser } from '../storage/localStorage';
 import { showErrorAlert } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
+import { Icon } from '../components/Icon';
 import axios from 'axios';
 
 type ActionState = 'idle' | 'scanning' | 'loading' | 'success' | 'error';
@@ -294,7 +295,11 @@ export default function CrmValidation() {
                     : approvalState === 'rejeitado' ? Colors.errorLight : Colors.warningLight,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
                 }}>
-                  {''}
+                  {approvalState === 'aprovado'
+                    ? <Icon name="check-circle" size={22} color={Colors.success} />
+                    : approvalState === 'rejeitado'
+                      ? <Icon name="x-circle" size={22} color={Colors.error} />
+                      : <Icon name="clock" size={22} color={Colors.warning} />}
                 </div>
                 <div>
                   <div style={{ fontSize: Font.md + 1, fontWeight: 800, color: Colors.textPrimary }}>
@@ -402,6 +407,7 @@ export default function CrmValidation() {
                   boxShadow: `0 6px 12px ${Colors.doctor}59`,
                 }}
               >
+                <span style={{ display: 'flex' }}><Icon name="file-text" size={20} color="#fff" /></span>
                 <span style={{ color: '#fff', fontSize: Font.md, fontWeight: 700 }}>{primaryCtaLabel}</span>
               </label>
               <input
@@ -428,8 +434,8 @@ export default function CrmValidation() {
                   gap: Space.sm, backgroundColor: Colors.inputBg, borderRadius: Radius.md,
                   padding: `${Space.sm}px ${Space.md}px`,
                 }}>
-                  <span style={{ fontSize: Font.sm, color: Colors.textPrimary, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {pdfFile.name}
+                  <span style={{ fontSize: Font.sm, color: Colors.textPrimary, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Icon name="paperclip" size={16} color={Colors.textSecondary} /> {pdfFile.name}
                   </span>
                   <button
                     onClick={removeSelectedFile}
@@ -487,6 +493,7 @@ export default function CrmValidation() {
                     marginBottom: Space.md,
                   }}
                 >
+                  <Icon name="camera" size={20} color={Colors.textPrimary} />
                   <span style={{ color: Colors.textPrimary, fontSize: Font.md, fontWeight: 700 }}>Escanear QR da Carteirinha</span>
                 </button>
 
@@ -500,6 +507,7 @@ export default function CrmValidation() {
                     marginBottom: pasteMode ? Space.md : 0,
                   }}
                 >
+                  <Icon name="clipboard" size={20} color={Colors.textPrimary} />
                   <span style={{ color: Colors.textPrimary, fontSize: Font.md, fontWeight: 700 }}>
                     {pasteMode ? 'Fechar campo de texto' : 'Colar conteúdo do QR Code'}
                   </span>

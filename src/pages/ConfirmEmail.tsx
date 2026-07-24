@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { confirmEmailRequest, resendConfirmEmailRequest } from '../services/api';
 import Colors from '../theme/colors';
+import { Icon } from '../components/Icon';
 
 type Status = 'loading' | 'success' | 'error';
 
@@ -59,7 +60,7 @@ export default function ConfirmEmail() {
 
         {status === 'success' && (
           <>
-            <div style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 36 }}>✓</div>
+            <div style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.successLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px' }}><Icon name="check-circle" size={36} color={Colors.success} /></div>
             <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 10, letterSpacing: -0.3 }}>Email Confirmado!</h2>
             <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>{message}</p>
             <button onClick={() => navigate('/login', { replace: true })} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: 14, padding: 16, border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D` }}>
@@ -70,7 +71,7 @@ export default function ConfirmEmail() {
 
         {status === 'error' && (
           <>
-            <div style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.errorLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px', fontSize: 36 }}>✗</div>
+            <div style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.errorLight, display: 'flex', justifyContent: 'center', alignItems: 'center', margin: '0 auto 20px' }}><Icon name="x-circle" size={36} color={Colors.error} /></div>
             <h2 style={{ fontSize: 22, fontWeight: 800, color: Colors.textPrimary, marginBottom: 10, letterSpacing: -0.3 }}>Erro na Confirmação</h2>
             <p style={{ fontSize: 15, color: Colors.textSecondary, lineHeight: '22px', marginBottom: 24 }}>{message}</p>
             <button onClick={doConfirm} style={{ width: '100%', backgroundColor: Colors.primary, borderRadius: 14, padding: 16, border: 'none', cursor: 'pointer', boxShadow: `0 4px 8px ${Colors.primary}4D` }}>

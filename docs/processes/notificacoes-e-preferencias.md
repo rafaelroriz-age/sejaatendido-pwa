@@ -9,7 +9,7 @@ related:
   - ../decisions/adr-0001-fallback-endpoints-notificacao.md
   - ../plans/duvidas-abertas.md
 tags: [notificacao, push, whatsapp, preferencia]
-last_updated: 2026-06-17
+last_updated: 2026-07-23
 ---
 
 <!-- ai-summary
@@ -35,9 +35,10 @@ Status: review.
 4. Em indisponibilidade dos endpoints de notificacao (404/405), frontend usa fallback localStorage.
 5. Teste de WhatsApp tenta multiplos endpoints em sequencia (testarNotificacaoWhatsapp).
 
-## Diagnostico rapido (SALVY)
+## Diagnostico rapido (Meta API + SALVY)
 
-- Frontend nao integra Twilio diretamente; o envio real depende do backend/integrador SALVY.
+- Frontend nao integra Twilio diretamente; o envio real do WhatsApp e feito pelo backend diretamente via API da Meta (WhatsApp Cloud API).
+- SALVY e usada apenas como fonte/validacao do numero de telefone, nao como integrador de envio de mensagens (esclarecido em 2026-07-23).
 - Endpoints de teste de WhatsApp exigem autenticacao Bearer valida.
 - O frontend tenta variacoes de formato de numero no teste (nacional e E.164 BR) para reduzir falsos negativos de contrato.
 
@@ -50,8 +51,8 @@ Status: review.
 ## Validacao recomendada no backend
 
 1. Logar payload recebido no endpoint de teste (sanitizado, sem dados sensiveis).
-2. Logar chamada ao SALVY com status HTTP, body resumido e codigo de erro.
-3. Confirmar formato aceito para destino WhatsApp: local (11 digitos) vs E.164 (+55...).
+2. Logar chamada a API da Meta com status HTTP, body resumido e codigo de erro.
+3. Confirmar formato aceito para destino WhatsApp: local (11 digitos) vs E.164 (+55...) — Meta Cloud API normalmente exige E.164.
 4. Definir endpoint canonico unico para teste WhatsApp e manter aliases apenas durante transicao.
 
 ## Push web

@@ -11,6 +11,7 @@ import {
 import { showErrorAlert } from '../utils/errorHandler';
 import { formatConsultaTime } from '../utils/datetime';
 import Colors from '../theme/colors';
+import { Icon } from '../components/Icon';
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -86,6 +87,7 @@ export default function Chat() {
           )}
           {!loading && chats.length === 0 && (
             <div style={{ textAlign: 'center', padding: 40 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><Icon name="message-circle" size={40} color={Colors.textMuted} /></div>
               <div style={{ fontSize: 15, fontWeight: 700, color: Colors.textPrimary }}>Nenhuma conversa ainda</div>
               <div style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 6 }}>Suas conversas de consulta aparecerão aqui.</div>
             </div>

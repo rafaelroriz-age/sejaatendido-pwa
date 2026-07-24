@@ -51,20 +51,11 @@ A funcionalidade de editar valor ja esta no front. Falta decidir as regras de ne
 
 ---
 
-## 1) Ativar login Google em producao (bloqueador de go-live)
+## 1) Login Google removido (decisão de 2026-07-23)
 
-O botao Google JA esta implementado no LoginScreen.
-O que falta fazer:
-
-1. Acessar console.cloud.google.com com sua conta Google.
-2. Criar ou selecionar um projeto OAuth.
-3. Em "Credenciais" -> "Criar credenciais" -> "ID de cliente OAuth 2.0" -> Tipo: Aplicativo da Web.
-4. Adicionar em "Origens JavaScript autorizadas":
-   - https://seudominio.com.br
-   - http://localhost:3000 (dev)
-5. Copiar o "ID de cliente" (formato: xxxx.apps.googleusercontent.com).
-6. Definir a variavel de ambiente `VITE_GOOGLE_CLIENT_ID=seu-client-id` em producao.
-7. Validar fluxo completo: login Google -> redirecionamento correto -> perfil MEDICO bloqueado com mensagem.
+O fluxo de login social Google foi retirado da UI e do checklist operacional (ver duvidas-abertas.md, item 1).
+O botão Google, o SDK do Google Identity Services e o endpoint `/auth/google` nao sao mais usados pelo frontend.
+Se o login social for retomado no futuro, tratar como nova feature (nao ha pendencia de credenciais em aberto).
 
 ## 2) Confirmar contrato de push para web PWA
 
@@ -103,14 +94,12 @@ O que falta confirmar com o backend:
 2. Configurar variaveis de ambiente de producao:
    - VITE_API_URL=https://seu-backend.com
    - VITE_MOCK=false
-   - VITE_GOOGLE_CLIENT_ID=seu-client-id
    - VITE_VAPID_PUBLIC_KEY=sua-chave-vapid (se push web ativo)
 3. Executar: docker compose up -d --build
 4. Ou publicar artefato da pasta dist/ no seu hosting/CDN.
 5. Atualizar DNS/CNAME para o dominio final.
 6. Executar smoke checks de go-live (GO-LIVE-CHECKLIST.md secao 6):
    - login email/senha
-   - login Google
    - listagem de medicos aprovados
    - agendamento
    - geracao de PIX e confirmacao de status

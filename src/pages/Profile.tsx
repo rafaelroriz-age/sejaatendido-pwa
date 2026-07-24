@@ -6,6 +6,7 @@ import { handleApiError } from '../utils/errorHandler';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Card from '../components/Card';
+import { Icon } from '../components/Icon';
 import BalanceCard from '../components/BalanceCard';
 
 const MIN_VALOR_CONSULTA_CENTAVOS = 3000; // R$ 30,00
@@ -340,7 +341,9 @@ export default function Profile() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   backgroundColor: user?.crmCartaoValidado ? Colors.successLight : Colors.warningLight,
                 }}>
-                  {''}
+                  {user?.crmCartaoValidado
+                    ? <Icon name="check-circle" size={16} color={Colors.success} />
+                    : <Icon name="clock" size={16} color={Colors.warning} />}
                 </div>
                 <div>
                   <div style={{ fontSize: 15, color: Colors.textPrimary, fontWeight: 600 }}>

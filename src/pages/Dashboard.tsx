@@ -10,6 +10,7 @@ import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import Card from '../components/Card';
+import { Icon, IconName } from '../components/Icon';
 import { SkeletonCard } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 
@@ -197,10 +198,10 @@ export default function Dashboard() {
   const pendentes = consultas.filter(c => canPayConsulta(c)).length;
 
   const actions = [
-    { label: 'Agendar\nConsulta', icon: '+', bg: Colors.accent, path: '/book' },
-    { label: 'Meu\nPerfil', icon: '', bg: Colors.adminLight, path: '/profile' },
-    { label: 'Chat', icon: '', bg: Colors.infoLight, path: '/chat' },
-    { label: testingWhatsapp ? 'Enviando...' : 'Testar\nWhatsApp', icon: '', bg: Colors.successLight, onClick: handleTestarWhatsapp },
+    { label: 'Agendar\nConsulta', icon: 'calendar' as IconName, color: Colors.primary, bg: Colors.accent, path: '/book' },
+    { label: 'Meu\nPerfil', icon: 'user' as IconName, color: Colors.admin, bg: Colors.adminLight, path: '/profile' },
+    { label: 'Chat', icon: 'message-circle' as IconName, color: Colors.info, bg: Colors.infoLight, path: '/chat' },
+    { label: testingWhatsapp ? 'Enviando...' : 'Testar\nWhatsApp', icon: 'send' as IconName, color: Colors.success, bg: Colors.successLight, onClick: handleTestarWhatsapp },
   ];
 
   return (
@@ -257,7 +258,7 @@ export default function Dashboard() {
                 opacity: testingWhatsapp && (a as any).onClick ? 0.7 : 1,
               }}
             >
-              <div style={{ width: 48, height: 48, borderRadius: Radius.md, backgroundColor: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontSize: 24 }}>{a.icon}</div>
+              <div style={{ width: 48, height: 48, borderRadius: Radius.md, backgroundColor: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}><Icon name={a.icon} size={24} color={a.color} /></div>
               <div style={{ fontSize: Font.xs, color: Colors.textSecondary, fontWeight: 600, lineHeight: '16px', whiteSpace: 'pre-line' }}>{a.label}</div>
             </div>
           ))}

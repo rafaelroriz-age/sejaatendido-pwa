@@ -9,6 +9,7 @@ import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
 import Card from '../components/Card';
+import { Icon, IconName } from '../components/Icon';
 
 export default function DoctorDashboard() {
   const navigate = useNavigate();
@@ -156,6 +157,7 @@ export default function DoctorDashboard() {
             cursor: 'pointer',
           }}
         >
+          <Icon name="alert-triangle" size={20} color="#856404" />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>CRM não validado</div>
             <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Valide sua carteirinha para receber pacientes. Toque aqui.</div>
@@ -175,12 +177,12 @@ export default function DoctorDashboard() {
         {/* Stats */}
         <div style={{ display: 'flex', gap: 8, marginBottom: Space.xl }}>
           {[
-            { n: stats.hoje, l: 'Hoje', bg: Colors.doctorLight, icon: '' },
-            { n: stats.pendentes, l: 'Pendentes', bg: Colors.warningLight, icon: '' },
-            { n: stats.confirmadas, l: 'Confirmadas', bg: Colors.successLight, icon: '✓' },
+            { n: stats.hoje, l: 'Hoje', bg: Colors.doctorLight, icon: 'calendar' as IconName, color: Colors.doctor },
+            { n: stats.pendentes, l: 'Pendentes', bg: Colors.warningLight, icon: 'clock' as IconName, color: Colors.warning },
+            { n: stats.confirmadas, l: 'Confirmadas', bg: Colors.successLight, icon: 'check-circle' as IconName, color: Colors.success },
           ].map(s => (
             <Card key={s.l} style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ width: 40, height: 40, borderRadius: Radius.md, backgroundColor: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontSize: 18 }}>{s.icon}</div>
+              <div style={{ width: 40, height: 40, borderRadius: Radius.md, backgroundColor: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}><Icon name={s.icon} size={18} color={s.color} /></div>
               <div style={{ fontSize: Font.xl, fontWeight: 800, color: Colors.textPrimary }}>{s.n}</div>
               <div style={{ fontSize: Font.xs, color: Colors.textSecondary, fontWeight: 600, marginTop: 2 }}>{s.l}</div>
             </Card>
@@ -234,8 +236,9 @@ export default function DoctorDashboard() {
                       </button>
                     )}
                     {isConcluded && (
-                      <div style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, textAlign: 'center' }}>
-                        <span style={{ color: Colors.success, fontSize: 14, fontWeight: 700 }}>✓ Concluída</span>
+                      <div style={{ flex: 1, backgroundColor: Colors.successLight, borderRadius: Radius.md, padding: 12, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <Icon name="check-circle" size={16} color={Colors.success} />
+                        <span style={{ color: Colors.success, fontSize: 14, fontWeight: 700 }}>Concluída</span>
                       </div>
                     )}
                   </>
@@ -248,16 +251,16 @@ export default function DoctorDashboard() {
         <h3 style={{ fontSize: Font.lg, fontWeight: 800, color: Colors.textPrimary, marginBottom: Space.md + 2, letterSpacing: -0.3 }}>Ações Rápidas</h3>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {[
-            { l: 'Agenda', icon: '', bg: Colors.doctorLight, path: '/doctor/schedule' },
-            { l: 'Mensagens', icon: '', bg: Colors.accent, path: '/chat' },
-            { l: 'Ganhos', icon: '', bg: Colors.successLight, path: '/earnings' },
-            { l: 'Conta', icon: '', bg: '#E3F2FD', path: '/bank-details' },
-            { l: 'Perfil', icon: '', bg: Colors.warningLight, path: '/profile' },
+            { l: 'Agenda', icon: 'calendar' as IconName, color: Colors.doctor, bg: Colors.doctorLight, path: '/doctor/schedule' },
+            { l: 'Mensagens', icon: 'message-circle' as IconName, color: Colors.primary, bg: Colors.accent, path: '/chat' },
+            { l: 'Ganhos', icon: 'dollar-sign' as IconName, color: Colors.success, bg: Colors.successLight, path: '/earnings' },
+            { l: 'Conta', icon: 'landmark' as IconName, color: Colors.info, bg: '#E3F2FD', path: '/bank-details' },
+            { l: 'Perfil', icon: 'user' as IconName, color: Colors.warning, bg: Colors.warningLight, path: '/profile' },
           ].map(a => (
             <div key={a.l} onClick={() => a.path && navigate(a.path)}
               style={{ flex: '1 1 80px', backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Space.lg, textAlign: 'center', cursor: a.path ? 'pointer' : 'default', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}
             >
-              <div style={{ width: 44, height: 44, borderRadius: Radius.md, backgroundColor: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px', fontSize: 20 }}>{a.icon}</div>
+              <div style={{ width: 44, height: 44, borderRadius: Radius.md, backgroundColor: a.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}><Icon name={a.icon} size={20} color={a.color} /></div>
               <div style={{ fontSize: 12, fontWeight: 700, color: Colors.textPrimary }}>{a.l}</div>
             </div>
           ))}

@@ -5,13 +5,17 @@ import {
   fetchRepasses,
   fetchConsultasMedico,
   fetchDadosBancarios,
+  solicitarRepasseImediato,
   SaldoMedico,
   Repasse,
   Consulta,
+  RepasseImediatoResult,
+  DEFAULT_TAXA_REPASSE_IMEDIATO_PERCENTUAL,
 } from '../services/api';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Card from '../components/Card';
 import Avatar from '../components/Avatar';
+import { Icon } from '../components/Icon';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
 import { formatConsultaTime } from '../utils/datetime';
@@ -38,6 +42,101 @@ function RepasseStatusBadge({ status }: { status: string }) {
       <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: cfg.color }} />
       <span style={{ fontSize: Font.xs, fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
     </div>
+  );
+}
+
+interface AntecipacaoCardProps {
+  saldoDisponivel: number;
+  taxaPercentual: number;
+  confirming: boolean;
+  loading: boolean;
+  errorText: string;
+  successResult: RepasseImediatoResult | null;
+  onAbrirConfirmacao: () => void;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}
+
+function AntecipacaoCard({
+  saldoDisponivel,
+  taxaPercentual,
+  confirming,
+  loading,
+  errorText,
+  successResult,
+  onAbrirConfirmacao,
+  onCancelar,
+  onConfirmar,
+}: AntecipacaoCardProps) {
+  if (successResult) {
+    return (
+      <Card style={{ marginBottom: Space.lg, backgroundColor: Colors.successLight }}>
+        <span style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.success, display: 'block', marginBottom: 4 }}>Repasse imediato solicitado</span>
+<span style={{ fontSize: Font.xs, color: Colors.textSecondary, display: 'block' }}>Taxa retida: {formatCurrency(successResult.taxa)} • Valor líquido a receber: {formatCurrency(successResult.valor_liquido)}</span>
+      </Card>
+    );
+  }
+
+  if (saldoDisponivel <= 0) return null;
+
+  const taxa = (saldoDisponivel * taxaPercentual) / 100;
+  const liquido = saldoDisponivel - taxa;
+
+  return (
+    <Card style={{ marginBottom: Space.lg }}>
+      <span style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textSecondary, marginBottom: Space.xs, display: 'block' }}>Repasse imediato</span>
+      <span style={{ fontSize: Font.xs, color: Colors.textMuted, display: 'block', marginBottom: Space.md }}>
+        O repasse automático ocorre toda segunda-feira, sem custo. Se preferir receber agora, é cobrada uma taxa de {taxaPercentual}% retida pela plataforma.
+      </span>
+
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={onAbrirConfirmacao}
+          style={{ backgroundColor: Colors.doctor, color: '#fff', border: 'none', borderRadius: Radius.md, padding: '10px 14px', fontWeight: 700, cursor: 'pointer', fontSize: Font.sm }}
+        >
+          Solicitar repasse imediato
+        </button>
+      ) : (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+            <span style={{ fontSize: Font.xs, color: Colors.textSecondary }}>Saldo disponível</span>
+            <span style={{ fontSize: Font.xs, fontWeight: 700, color: Colors.textPrimary }}>{formatCurrency(saldoDisponivel)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
+            <span style={{ fontSize: Font.xs, color: Colors.textSecondary }}>Taxa ({taxaPercentual}%)</span>
+            <span style={{ fontSize: Font.xs, fontWeight: 700, color: Colors.error }}>- {formatCurrency(taxa)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', marginBottom: Space.md }}>
+            <span style={{ fontSize: Font.sm, fontWeight: 700, color: Colors.textPrimary }}>Você recebe</span>
+            <span style={{ fontSize: Font.sm, fontWeight: 800, color: Colors.textPrimary }}>{formatCurrency(liquido)}</span>
+          </div>
+
+          {errorText && (
+            <span style={{ fontSize: Font.xs, color: Colors.error, fontWeight: 600, display: 'block', marginBottom: Space.sm }}>{errorText}</span>
+          )}
+
+          <div style={{ display: 'flex', gap: Space.sm }}>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onConfirmar}
+              style={{ backgroundColor: Colors.doctor, color: '#fff', border: 'none', borderRadius: Radius.md, padding: '10px 14px', fontWeight: 700, cursor: loading ? 'default' : 'pointer', fontSize: Font.sm, opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? 'Processando...' : 'Confirmar solicitação'}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onCancelar}
+              style={{ backgroundColor: 'transparent', color: Colors.textSecondary, border: `1px solid ${Colors.border}`, borderRadius: Radius.md, padding: '10px 14px', fontWeight: 600, cursor: 'pointer', fontSize: Font.sm }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -74,8 +173,39 @@ export default function Earnings() {
   const [loading, setLoading] = useState(true);
   const [semDadosBancarios, setSemDadosBancarios] = useState(false);
   const [saldoError, setSaldoError] = useState('');
+  const [antecipacaoConfirmando, setAntecipacaoConfirmando] = useState(false);
+  const [antecipacaoLoading, setAntecipacaoLoading] = useState(false);
+  const [antecipacaoError, setAntecipacaoError] = useState('');
+  const [antecipacaoResultado, setAntecipacaoResultado] = useState<RepasseImediatoResult | null>(null);
 
   useEffect(() => { loadData(); }, []);
+
+  function abrirConfirmacaoAntecipacao() {
+    setAntecipacaoError('');
+    setAntecipacaoConfirmando(true);
+  }
+
+  function cancelarAntecipacao() {
+    setAntecipacaoConfirmando(false);
+    setAntecipacaoError('');
+  }
+
+  async function confirmarAntecipacao() {
+    setAntecipacaoLoading(true);
+    setAntecipacaoError('');
+    try {
+      const resultado = await solicitarRepasseImediato();
+      setAntecipacaoResultado(resultado);
+      setAntecipacaoConfirmando(false);
+      // Atualiza o saldo apos a antecipacao ser processada.
+      const saldoAtualizado = await fetchSaldoMedico().catch(() => null);
+      if (saldoAtualizado) setSaldo(saldoAtualizado);
+    } catch {
+      setAntecipacaoError('Não foi possível solicitar o repasse imediato agora. Tente novamente em instantes.');
+    } finally {
+      setAntecipacaoLoading(false);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -215,6 +345,7 @@ export default function Earnings() {
             alignItems: 'center', gap: 10, cursor: 'pointer',
           }}
         >
+          <Icon name="landmark" size={20} color="#856404" />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#856404' }}>Dados bancários não cadastrados</div>
             <div style={{ fontSize: 12, color: '#856404', marginTop: 2 }}>Cadastre sua chave Pix para receber repasses. Toque aqui.</div>
@@ -236,6 +367,19 @@ export default function Earnings() {
       </div>
 
       <div style={{ padding: 20, paddingTop: Space.lg }}>
+        {!loading && !semDadosBancarios && (
+          <AntecipacaoCard
+            saldoDisponivel={saldo?.saldo_a_liberar ?? 0}
+            taxaPercentual={saldo?.taxa_repasse_imediato_percentual ?? DEFAULT_TAXA_REPASSE_IMEDIATO_PERCENTUAL}
+            confirming={antecipacaoConfirmando}
+            loading={antecipacaoLoading}
+            errorText={antecipacaoError}
+            successResult={antecipacaoResultado}
+            onAbrirConfirmacao={abrirConfirmacaoAntecipacao}
+            onCancelar={cancelarAntecipacao}
+            onConfirmar={confirmarAntecipacao}
+          />
+        )}
         {loading ? renderSkeleton() : tab === 'semana' ? renderSemana() : renderHistorico()}
       </div>
     </div>

@@ -13,7 +13,6 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-https://sejaatendido-staging-backend.onrender.com}
         VITE_MP_PUBLIC_KEY: ${VITE_MP_PUBLIC_KEY:-}
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
         VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
     ports:
       - "3001:80"

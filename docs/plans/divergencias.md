@@ -26,7 +26,7 @@ Regra aplicada: quando houver conflito, o codigo e a fonte da verdade.
 
 | Tema | Fonte textual | Evidencia no codigo | Situacao |
 |---|---|---|---|
-| Login social Google em producao | GO-LIVE-CHECKLIST.md (item bloqueante) pede validacao de login Google | src/services/api.ts expoe loginGoogleRequest, mas src/pages/LoginScreen.tsx nao possui botao/fluxo Google | atualizar docs e backlog de implementacao |
+| Login social Google em producao | GO-LIVE-CHECKLIST.md pedia validacao de login Google | Decidido em 2026-07-23: fluxo Google removido de src/pages/LoginScreen.tsx e src/services/api.ts (loginGoogleRequest) | resolvido em 2026-07-23 |
 | Numero de slots no agendamento | src/pages/LandingPage.tsx cita "18 slots diarios (06h a 00h)" | src/pages/BookAppointment.tsx cria fallback a cada 30 min de 06:00 ate 00:00 (37 slots possiveis) + slots reais vindos da API | atualizar texto de marketing para nao fixar quantidade |
 | Nome do arquivo de prompt em ingles | my_step_by_step_second_brain_existing_project.md cita prompt_second_brain_existing_project.md | arquivo existente no repo e prompt_segundo_cerebro_projeto_existente.md | atualizar referencia de arquivo no guia em ingles |
 | Pos-retorno de checkout | expectativa comum de confirmacao final apos redirecionamento | src/pages/PaymentSuccess.tsx, src/pages/PaymentPending.tsx e src/pages/PaymentFailure.tsx executam syncPagamento no carregamento | resolvido em 2026-06-17 |

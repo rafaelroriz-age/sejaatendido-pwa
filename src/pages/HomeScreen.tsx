@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUser, clearAuthSession, User } from '../storage/localStorage';
 import Colors from '../theme/colors';
+import { Icon } from '../components/Icon';
 
 export default function HomeScreen() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ export default function HomeScreen() {
           backgroundColor: Colors.card, borderRadius: 18, padding: 20, display: 'flex', alignItems: 'center',
           marginBottom: 12, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
         }}>
+          <span style={{ marginRight: 16, display: 'flex' }}><Icon name="clipboard-list" size={28} color={Colors.primary} /></span>
           <span style={{ fontSize: 17, fontWeight: 700, color: Colors.textPrimary }}>Minhas Consultas</span>
         </div>
 
@@ -39,6 +41,7 @@ export default function HomeScreen() {
           backgroundColor: Colors.card, borderRadius: 18, padding: 20, display: 'flex', alignItems: 'center',
           marginBottom: 12, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
         }}>
+          <span style={{ marginRight: 16, display: 'flex' }}><Icon name="user" size={28} color={Colors.primary} /></span>
           <span style={{ fontSize: 17, fontWeight: 700, color: Colors.textPrimary }}>Meu Perfil</span>
         </div>
 

@@ -8,14 +8,20 @@ const fetchSaldoMedicoMock = vi.fn();
 const fetchRepassesMock = vi.fn();
 const fetchConsultasMedicoMock = vi.fn();
 const fetchDadosBancariosMock = vi.fn();
+const solicitarRepasseImediatoMock = vi.fn();
 const navigateMock = vi.fn();
 
-vi.mock('../services/api', () => ({
-  fetchSaldoMedico: (...args: unknown[]) => fetchSaldoMedicoMock(...args),
-  fetchRepasses: (...args: unknown[]) => fetchRepassesMock(...args),
-  fetchConsultasMedico: (...args: unknown[]) => fetchConsultasMedicoMock(...args),
-  fetchDadosBancarios: (...args: unknown[]) => fetchDadosBancariosMock(...args),
-}));
+vi.mock('../services/api', async () => {
+  const actual = await vi.importActual<typeof import('../services/api')>('../services/api');
+  return {
+    ...actual,
+    fetchSaldoMedico: (...args: unknown[]) => fetchSaldoMedicoMock(...args),
+    fetchRepasses: (...args: unknown[]) => fetchRepassesMock(...args),
+    fetchConsultasMedico: (...args: unknown[]) => fetchConsultasMedicoMock(...args),
+    fetchDadosBancarios: (...args: unknown[]) => fetchDadosBancariosMock(...args),
+    solicitarRepasseImediato: (...args: unknown[]) => solicitarRepasseImediatoMock(...args),
+  };
+});
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -25,13 +31,14 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-function baseSaldo(): SaldoMedico {
+function baseSaldo(overrides: Partial<SaldoMedico> = {}): SaldoMedico {
   return {
     saldo_a_liberar: 100,
     saldo_pendente: 50,
     ganhos_hoje: 0,
     proximo_repasse: '2026-05-15',
     ganhos_semana: [0, 0, 0, 0, 0, 0, 0],
+    ...overrides,
   };
 }
 
@@ -61,6 +68,7 @@ describe('Earnings — navegação para o detalhe do repasse', () => {
     fetchRepassesMock.mockReset();
     fetchConsultasMedicoMock.mockReset().mockResolvedValue([]);
     fetchDadosBancariosMock.mockReset().mockResolvedValue({ tipoChavePix: 'CPF', valorChavePix: '000.000.000-00' });
+    solicitarRepasseImediatoMock.mockReset();
     navigateMock.mockReset();
   });
 
@@ -75,5 +83,50 @@ describe('Earnings — navegação para o detalhe do repasse', () => {
     fireEvent.click(item);
 
     expect(navigateMock).toHaveBeenCalledWith('/repasse/repasse-001', { state: { repasse: baseRepasse() } });
+  });
+});
+
+describe('Earnings — repasse imediato (antecipação mediante taxa)', () => {
+  beforeEach(() => {
+    fetchSaldoMedicoMock.mockReset().mockResolvedValue(baseSaldo());
+    fetchRepassesMock.mockReset().mockResolvedValue([]);
+    fetchConsultasMedicoMock.mockReset().mockResolvedValue([]);
+    fetchDadosBancariosMock.mockReset().mockResolvedValue({ tipoChavePix: 'CPF', chavePix: '000.000.000-00' });
+    solicitarRepasseImediatoMock.mockReset();
+    navigateMock.mockReset();
+  });
+
+  it('exibe a opção de repasse imediato com taxa quando há saldo disponível', async () => {
+    await renderEarnings();
+
+    expect(await screen.findByText('Solicitar repasse imediato')).toBeInTheDocument();
+  });
+
+  it('mostra taxa e valor líquido ao confirmar solicitação, e chama a API', async () => {
+    solicitarRepasseImediatoMock.mockResolvedValue({
+      taxa: 5,
+      valor_liquido: 95,
+      repasse: baseRepasse({ id: 'repasse-imediato-1', status: 'processando' }),
+    });
+
+    await renderEarnings();
+
+    fireEvent.click(await screen.findByText('Solicitar repasse imediato'));
+
+    expect(await screen.findByText('Confirmar solicitação')).toBeInTheDocument();
+    expect(screen.getByText('Você recebe')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Confirmar solicitação'));
+
+    await waitFor(() => expect(solicitarRepasseImediatoMock).toHaveBeenCalled());
+    expect(await screen.findByText('Repasse imediato solicitado')).toBeInTheDocument();
+  });
+
+  it('não exibe a opção de repasse imediato quando não há saldo disponível', async () => {
+    fetchSaldoMedicoMock.mockResolvedValue(baseSaldo({ saldo_a_liberar: 0 }));
+
+    await renderEarnings();
+
+    expect(screen.queryByText('Solicitar repasse imediato')).not.toBeInTheDocument();
   });
 });
