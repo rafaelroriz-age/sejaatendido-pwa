@@ -277,6 +277,25 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        <div style={{ display: 'flex', gap: 8, marginBottom: Space.lg }}>
+          <button
+            onClick={() => navigate('/admin/risco')}
+            aria-label="Abrir revisão de risco e antifraude"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.card, borderRadius: Radius.lg, padding: 14, border: `1px solid ${Colors.border}`, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
+          >
+            <Icon name="alert-triangle" color={Colors.warning} size={18} />
+            <span style={{ fontSize: Font.xs + 1, fontWeight: 700, color: Colors.textPrimary }}>Revisão de risco</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin/denylist')}
+            aria-label="Abrir lista de bloqueio antifraude"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.card, borderRadius: Radius.lg, padding: 14, border: `1px solid ${Colors.border}`, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
+          >
+            <Icon name="lock" color={Colors.error} size={18} />
+            <span style={{ fontSize: Font.xs + 1, fontWeight: 700, color: Colors.textPrimary }}>Lista de bloqueio</span>
+          </button>
+        </div>
+
         <div style={{ display: 'flex', gap: 4, backgroundColor: Colors.inputBg, borderRadius: Radius.md, padding: 4, marginBottom: Space.lg, overflowX: 'auto' }}>
           {TABS.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)} style={{

@@ -14,6 +14,8 @@ const HomeScreen = lazy(() => import('./pages/HomeScreen'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DoctorDashboard = lazy(() => import('./pages/DoctorDashboard'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminFraudReview = lazy(() => import('./pages/AdminFraudReview'));
+const AdminDenylist = lazy(() => import('./pages/AdminDenylist'));
 const BookAppointment = lazy(() => import('./pages/BookAppointment'));
 const Payment = lazy(() => import('./pages/Payment'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -142,6 +144,8 @@ export default function App() {
         <Route path="/dashboard" element={<ProtectedRoute allow={['PACIENTE']}><Dashboard /></ProtectedRoute>} />
         <Route path="/doctor" element={<ProtectedRoute allow={['MEDICO']}><DoctorDashboard /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute allow={['ADMIN']}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/risco" element={<ProtectedRoute allow={['ADMIN']}><AdminFraudReview /></ProtectedRoute>} />
+        <Route path="/admin/denylist" element={<ProtectedRoute allow={['ADMIN']}><AdminDenylist /></ProtectedRoute>} />
         <Route path="/book" element={<ProtectedRoute allow={['PACIENTE']}><BookAppointment /></ProtectedRoute>} />
         <Route path="/payment" element={<ProtectedRoute allow={['PACIENTE']}><Payment /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

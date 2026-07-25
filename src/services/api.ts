@@ -7,6 +7,11 @@ import {
   saveRefreshToken,
   saveToken,
 } from '../storage/localStorage';
+import type {
+  CasoRevisaoStatus,
+  DenylistTipo,
+  RiscoFaixa,
+} from '../constants/riscoStatus';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -718,6 +723,110 @@ export async function deleteAdminUsuario(id: string): Promise<void> {
   await api.delete(`/admin/usuarios/${id}`);
 }
 
+// RISCO / ANTIFRAUDE (ver docs/arquitetura.md — subsistema de prevenção de
+// fraude e inadimplência). O frontend apenas exibe e aciona decisões; toda a
+// lógica de score/regras é responsabilidade do backend.
+export interface RiscoAvaliacaoResumo {
+  score?: number;
+  faixa?: RiscoFaixa;
+  sinais?: string[];
+}
+
+export interface CasoRisco {
+  id: string;
+  status: CasoRevisaoStatus;
+  motivo?: string;
+  criadoEm?: string;
+  decididoEm?: string;
+  pagamento?: {
+    id?: string;
+    consultaId?: string;
+    valor?: number; // já convertido para reais
+    metodo?: string;
+  };
+  paciente?: { id?: string; nome?: string; email?: string };
+  riscoAvaliacao?: RiscoAvaliacaoResumo;
+}
+
+function mapCasoRisco(raw: any): CasoRisco {
+  const pagamentoRaw = raw?.pagamento ?? raw?.riscoAvaliacao?.pagamento;
+  return {
+    id: String(raw?.id ?? ''),
+    status: (raw?.status ?? 'PENDENTE') as CasoRevisaoStatus,
+    motivo: raw?.motivo ?? undefined,
+    criadoEm: raw?.criadoEm ?? undefined,
+    decididoEm: raw?.decididoEm ?? undefined,
+    pagamento: pagamentoRaw
+      ? {
+          id: pagamentoRaw.id,
+          consultaId: pagamentoRaw.consultaId,
+          valor: typeof pagamentoRaw.valorCentavos === 'number' ? pagamentoRaw.valorCentavos / 100 : pagamentoRaw.valor,
+          metodo: pagamentoRaw.metodo ?? pagamentoRaw.metodoPagamento,
+        }
+      : undefined,
+    paciente: raw?.paciente
+      ? { id: raw.paciente.id, nome: raw.paciente.nome ?? raw.paciente.usuario?.nome, email: raw.paciente.email ?? raw.paciente.usuario?.email }
+      : undefined,
+    riscoAvaliacao: raw?.riscoAvaliacao
+      ? { score: raw.riscoAvaliacao.score, faixa: raw.riscoAvaliacao.faixa, sinais: raw.riscoAvaliacao.sinais }
+      : undefined,
+  };
+}
+
+export async function fetchCasosRisco(status: CasoRevisaoStatus | 'TODOS' = 'PENDENTE'): Promise<CasoRisco[]> {
+  const params = status === 'TODOS' ? undefined : { status };
+  const r = await api.get('/admin/risco/casos', { params });
+  const list = r.data?.casos ?? r.data ?? [];
+  return Array.isArray(list) ? list.map(mapCasoRisco) : [];
+}
+
+export async function decidirCasoRisco(id: string, decisao: 'APROVAR' | 'BLOQUEAR', motivo?: string): Promise<CasoRisco> {
+  const r = await api.post(`/admin/risco/casos/${id}/decisao`, { decisao, ...(motivo ? { motivo } : {}) });
+  return mapCasoRisco(r.data?.caso ?? r.data);
+}
+
+export interface DenylistEntry {
+  id: string;
+  tipo: DenylistTipo;
+  valor: string;
+  motivo?: string;
+  criadoEm?: string;
+  expiraEm?: string;
+}
+
+function mapDenylistEntry(raw: any): DenylistEntry {
+  return {
+    id: String(raw?.id ?? ''),
+    tipo: (raw?.tipo ?? 'CPF') as DenylistTipo,
+    valor: raw?.valor ?? raw?.valorHash ?? raw?.valor_hash ?? '',
+    motivo: raw?.motivo ?? undefined,
+    criadoEm: raw?.criadoEm ?? undefined,
+    expiraEm: raw?.expiraEm ?? undefined,
+  };
+}
+
+export async function fetchDenylist(): Promise<DenylistEntry[]> {
+  const r = await api.get('/admin/denylist');
+  const list = r.data?.entradas ?? r.data ?? [];
+  return Array.isArray(list) ? list.map(mapDenylistEntry) : [];
+}
+
+export interface CriarDenylistEntryRequest {
+  tipo: DenylistTipo;
+  valor: string;
+  motivo: string;
+  expiraEm?: string;
+}
+
+export async function criarDenylistEntry(data: CriarDenylistEntryRequest): Promise<DenylistEntry> {
+  const r = await api.post('/admin/denylist', data);
+  return mapDenylistEntry(r.data?.entrada ?? r.data);
+}
+
+export async function removerDenylistEntry(id: string): Promise<void> {
+  await api.delete(`/admin/denylist/${id}`);
+}
+
 // PAGAMENTOS
 export type MetodoPagamento = 'pix' | 'cartao' | 'card';
 export interface CriarPagamentoRequest {
@@ -1198,6 +1307,11 @@ export interface SaldoMedico {
   // Ver docs/decisions/adr-0002-estrategia-repasse-medico.md. Enquanto o backend nao
   // retorna esse valor, usamos DEFAULT_TAXA_REPASSE_IMEDIATO_PERCENTUAL como fallback.
   taxa_repasse_imediato_percentual?: number;
+  // Valor retido temporariamente por janela de seguranca antifraude antes de poder
+  // ser liberado para repasse imediato (ver docs/arquitetura.md, ADR-02). Undefined
+  // quando o backend ainda nao suporta o campo.
+  saldo_retido?: number;
+  previsao_liberacao?: string;
 }
 
 // Repasse padrao (automatico, ciclo semanal) nao cobra taxa. Repasse imediato
@@ -1257,6 +1371,8 @@ export async function fetchSaldoMedico(): Promise<SaldoMedico> {
     proximo_repasse: raw.proximoRepasse ?? '',
     ganhos_semana: raw.ganhosSemana ?? [0, 0, 0, 0, 0, 0, 0],
     taxa_repasse_imediato_percentual: raw.taxaRepasseImediatoPercentual ?? undefined,
+    saldo_retido: typeof raw.saldoRetidoCentavos === 'number' ? raw.saldoRetidoCentavos / 100 : undefined,
+    previsao_liberacao: raw.previsaoLiberacao ?? undefined,
   };
 }
 

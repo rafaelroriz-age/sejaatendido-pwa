@@ -10,7 +10,7 @@ related:
   - ../plans/duvidas-abertas.md
   - ../../GO-LIVE-CHECKLIST.md
 tags: [adr, repasse, pagamento, financeiro]
-last_updated: 2026-07-23
+last_updated: 2026-07-25
 ---
 
 <!-- ai-summary
@@ -52,17 +52,18 @@ Positivas:
 
 Negativas/riscos:
 
-- depende de endpoint de backend ainda nao confirmado para processar a antecipacao
-  (ver acoes de acompanhamento);
+- ~~depende de endpoint de backend ainda nao confirmado para processar a antecipacao~~
+  resolvido em 2026-07-25: contrato do endpoint confirmado com o backend (ver acoes de
+  acompanhamento);
 - a UI precisa deixar clara a taxa antes da confirmacao, para evitar reclamacao/chargeback
   de expectativa financeira.
 
 ## Acoes de acompanhamento
 
-- Confirmar com o backend o contrato definitivo do endpoint de repasse imediato
+- [x] Confirmar com o backend o contrato definitivo do endpoint de repasse imediato
   (rota, percentual/valor da taxa retornado pela API, e se o percentual e configuravel
-  por medico ou fixo globalmente). Ate a confirmacao, o frontend usa o contrato descrito em
-  [pagamentos-consulta.md](../processes/pagamentos-consulta.md) e o mock local em
-  `src/mocks/handlers.ts`.
-- Atualizar `docs/plans/roteiro-testes-producao.md` e `GO-LIVE-CHECKLIST.md` (feito nesta
+  por medico ou fixo globalmente). Confirmado em 2026-07-25: repasse automatico semanal
+  (toda segunda-feira) OU repasse imediato mediante taxa retida pela plataforma
+  (fica para a conta do aplicativo).
+- [x] Atualizar `docs/plans/roteiro-testes-producao.md` e `GO-LIVE-CHECKLIST.md` (feito nesta
   entrega) para remover o bloqueio de "em breve".

@@ -9,7 +9,7 @@ related:
   - divergencias.md
   - ../systems/pwa-build-e-deploy.md
 tags: [duvidas, bloqueios, validacao]
-last_updated: 2026-07-23
+last_updated: 2026-07-24
 ---
 
 <!-- ai-summary
@@ -30,7 +30,12 @@ Status: draft.
 3. Quais dados legais reais substituem os placeholders em src/config/legal.ts?
    - [x] CNPJ, endereco e canal de contato do titular (contato@sejaatendido.api.br) ja preenchidos em src/config/legal.ts.
    - [x] SLA de resposta ao titular definido em 48 horas (prazoResposta em src/config/legal.ts).
-   - [ ] Ainda pendente: razao social oficial, nome/contato do DPO, foro contratual e data de vigencia.
+   - [x] Decidido em 2026-07-24 (valores provisorios para destravar o soft release, sem depender de juridico):
+     - Data de vigencia: 24/07/2026 (data do soft release).
+     - Foro contratual: Goiania/GO (comarca da sede, mesma cidade do endereco ja preenchido).
+     - Encarregado/DPO: reaproveita o canal contato@sejaatendido.api.br ate indicacao formal de um responsavel dedicado.
+   - [x] Razao social confirmada em 2026-07-24 via Cartao CNPJ (raiz 65.773.915): RAFAEL MENEZES BENTO RORIZ.
+   - Todos os dados legais de src/config/legal.ts estao preenchidos. Duvida encerrada.
 4. Qual sera o contrato canonico do backend para envio WhatsApp (endpoint unico, payload oficial e formato de numero: local vs E.164)?
    - [x] Esclarecido em 2026-07-23: o envio da mensagem WhatsApp e feito diretamente pela API da Meta (WhatsApp Cloud API); a SALVY e usada apenas como fonte/validacao do numero de telefone, nao como integrador de envio.
    - [ ] Ainda pendente: endpoint canonico unico no backend (hoje o frontend usa fallback em 3 rotas), payload oficial aceito pela Meta API e formato de numero exigido (Meta Cloud API normalmente exige E.164, a confirmar com o backend).

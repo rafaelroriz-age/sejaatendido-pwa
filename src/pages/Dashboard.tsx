@@ -5,7 +5,7 @@ import { cancelConsulta, fetchMinhasConsultas, Consulta, fetchPerfil, sendFronte
 import { clearAuthSession, getUser } from '../storage/localStorage';
 import { handleApiError } from '../utils/errorHandler';
 import { formatConsultaDateTime } from '../utils/datetime';
-import { isConsultaCancelada, isConsultaConcluida, isConsultaRecusada, podeEntrarNaConsulta } from '../constants/consultaStatus';
+import { isConsultaAceita, isConsultaCancelada, isConsultaConcluida, isConsultaRecusada, podeEntrarNaConsulta } from '../constants/consultaStatus';
 import Colors, { Font, Space, Radius } from '../theme/colors';
 import Avatar from '../components/Avatar';
 import Badge from '../components/Badge';
@@ -309,6 +309,14 @@ export default function Dashboard() {
                 width: '100%', backgroundColor: Colors.accent, padding: 14, borderRadius: Radius.md,
                 marginTop: Space.md, border: 'none', color: Colors.primary, fontWeight: 700, cursor: 'pointer',
               }}>Entrar na consulta</button>
+            )}
+            {/* Consulta já aceita pelo médico, mas o backend ainda não gerou o link
+                da videochamada (meetLink). Antes disso ficava silencioso — o botão
+                simplesmente não aparecia, sem explicar o motivo ao paciente. */}
+            {!c.meetLink && (isConsultaAceita(c.status) || isConsultaConcluida(c.status)) && (
+              <div style={{ backgroundColor: Colors.infoLight, borderRadius: Radius.md, padding: '10px 12px', marginTop: Space.md, fontSize: Font.xs, color: Colors.info, fontWeight: 600 }}>
+                O link da videochamada ainda não está disponível. Você pode conversar com o médico pelo chat enquanto isso.
+              </div>
             )}
             {canCancel(c.status) && (
               <button

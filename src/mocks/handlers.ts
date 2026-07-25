@@ -129,6 +129,9 @@ const MOCK_SALDO = {
   proximoRepasse: '2026-05-15',
   ganhosSemana: [0, 0, LOW_COST_CONSULTA_VALOR_CENTAVOS, 0, 0, 0, 0],
   taxaRepasseImediatoPercentual: 5,
+  // Valor retido por janela de seguranca antifraude (ver docs/arquitetura.md, ADR-02).
+  saldoRetidoCentavos: 0,
+  previsaoLiberacao: undefined as string | undefined,
 };
 
 const MOCK_REPASSES = {
@@ -203,6 +206,23 @@ const MOCK_MEDICOS_PENDENTES = [
     usuario: { id: 'usr-pending', nome: 'Dr. Lucas Fernandes', email: 'lucas@mock.com', telefone: '+5511999994444' },
   },
 ];
+
+// ── RISCO / ANTIFRAUDE (mock) ───────────────────────────────────────────────
+
+let MOCK_CASOS_RISCO = [
+  {
+    id: 'caso-risco-001',
+    status: 'PENDENTE',
+    motivo: undefined as string | undefined,
+    criadoEm: new Date().toISOString(),
+    decididoEm: undefined as string | undefined,
+    pagamento: { id: 'pag-risco-001', consultaId: 'consulta-001', valorCentavos: 15000, metodo: 'cartao' },
+    paciente: { id: 'paciente-risco-001', nome: 'Fulano de Tal (Mock)', email: 'fulano@mock.com' },
+    riscoAvaliacao: { score: 82, faixa: 'ALTO', sinais: ['velocity_alta', 'dispositivo_novo'] },
+  },
+];
+
+let MOCK_DENYLIST: Array<{ id: string; tipo: string; valor: string; motivo?: string; criadoEm: string; expiraEm?: string }> = [];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -634,6 +654,49 @@ export const handlers = [
   ),
 
   http.delete(`${BASE}/admin/usuarios/:id`, () => HttpResponse.json({ ok: true })),
+
+  // ── RISCO / ANTIFRAUDE ──────────────────────────────────────────────────────
+
+  http.get(`${BASE}/admin/risco/casos`, ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const casos = status ? MOCK_CASOS_RISCO.filter(c => c.status === status) : MOCK_CASOS_RISCO;
+    return HttpResponse.json({ casos });
+  }),
+
+  http.post(`${BASE}/admin/risco/casos/:id/decisao`, async ({ request, params }) => {
+    const body = (await request.json().catch(() => ({}))) as { decisao?: 'APROVAR' | 'BLOQUEAR'; motivo?: string };
+    const caso = MOCK_CASOS_RISCO.find(c => c.id === params.id);
+    if (!caso) return HttpResponse.json({ erro: 'Caso não encontrado' }, { status: 404 });
+    caso.status = body.decisao === 'BLOQUEAR' ? 'BLOQUEADO' : 'APROVADO';
+    caso.motivo = body.motivo;
+    caso.decididoEm = new Date().toISOString();
+    return HttpResponse.json({ caso });
+  }),
+
+  http.get(`${BASE}/admin/denylist`, () => HttpResponse.json({ entradas: MOCK_DENYLIST })),
+
+  http.post(`${BASE}/admin/denylist`, async ({ request }) => {
+    const body = (await request.json().catch(() => ({}))) as { tipo?: string; valor?: string; motivo?: string; expiraEm?: string };
+    if (!body.tipo || !body.valor || !body.motivo) {
+      return HttpResponse.json({ erro: 'tipo, valor e motivo são obrigatórios' }, { status: 400 });
+    }
+    const entrada = {
+      id: `denylist-${Date.now()}`,
+      tipo: body.tipo,
+      valor: body.valor,
+      motivo: body.motivo,
+      criadoEm: new Date().toISOString(),
+      expiraEm: body.expiraEm,
+    };
+    MOCK_DENYLIST = [entrada, ...MOCK_DENYLIST];
+    return HttpResponse.json({ entrada }, { status: 201 });
+  }),
+
+  http.delete(`${BASE}/admin/denylist/:id`, ({ params }) => {
+    MOCK_DENYLIST = MOCK_DENYLIST.filter(e => e.id !== params.id);
+    return HttpResponse.json({ ok: true });
+  }),
 
   // ── NOTIFICAÇÕES ──────────────────────────────────────────────────────────
 

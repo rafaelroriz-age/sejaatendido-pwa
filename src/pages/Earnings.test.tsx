@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import Earnings from './Earnings';
-import type { Repasse, SaldoMedico } from '../services/api';
+import type { Consulta, Repasse, SaldoMedico } from '../services/api';
 
 const fetchSaldoMedicoMock = vi.fn();
 const fetchRepassesMock = vi.fn();
@@ -51,6 +51,21 @@ function baseRepasse(overrides: Partial<Repasse> = {}): Repasse {
     data_repasse: '2026-05-10T23:59:59.000Z',
     ...overrides,
   };
+}
+
+// dataHora fixado em "agora" para sempre cair dentro da semana ISO corrente
+// filtrada por Earnings.tsx (Monday..Monday), independente da data de execução do teste.
+function baseConsultaSemana(overrides: Partial<Consulta> = {}): Consulta {
+  return {
+    id: 'consulta-1',
+    medicoId: 'medico-1',
+    pacienteId: 'paciente-1',
+    dataHora: new Date().toISOString(),
+    status: 'CONCLUIDA',
+    pacienteNome: 'Paciente Teste',
+    valor: 10000,
+    ...overrides,
+  } as Consulta;
 }
 
 async function renderEarnings() {
@@ -128,5 +143,60 @@ describe('Earnings — repasse imediato (antecipação mediante taxa)', () => {
     await renderEarnings();
 
     expect(screen.queryByText('Solicitar repasse imediato')).not.toBeInTheDocument();
+  });
+});
+
+describe('Earnings — valor e status de pagamento das consultas da semana', () => {
+  beforeEach(() => {
+    fetchSaldoMedicoMock.mockReset().mockResolvedValue(baseSaldo());
+    fetchRepassesMock.mockReset().mockResolvedValue([]);
+    fetchConsultasMedicoMock.mockReset();
+    fetchDadosBancariosMock.mockReset().mockResolvedValue({ tipoChavePix: 'CPF', chavePix: '000.000.000-00' });
+    solicitarRepasseImediatoMock.mockReset();
+    navigateMock.mockReset();
+  });
+
+  it('exibe o valor da consulta (convertido de centavos) e "Pago" quando concluída e paga', async () => {
+    fetchConsultasMedicoMock.mockResolvedValue([
+      baseConsultaSemana({ status: 'CONCLUIDA', pagamentoStatus: 'PAGO', valor: 10000 }),
+    ]);
+
+    await renderEarnings();
+
+    expect(await screen.findByText('R$ 100,00')).toBeInTheDocument();
+    expect(screen.getByText('Pago')).toBeInTheDocument();
+  });
+
+  it('exibe "Aguardando pagamento" quando a consulta está concluída mas ainda não foi paga', async () => {
+    fetchConsultasMedicoMock.mockResolvedValue([
+      baseConsultaSemana({ status: 'CONCLUIDA', pagamentoStatus: undefined, valor: 5000 }),
+    ]);
+
+    await renderEarnings();
+
+    expect(await screen.findByText('R$ 50,00')).toBeInTheDocument();
+    expect(screen.getByText('Aguardando pagamento')).toBeInTheDocument();
+  });
+
+  it('exibe "Confirmada" quando a consulta foi aceita mas ainda não concluída', async () => {
+    fetchConsultasMedicoMock.mockResolvedValue([
+      baseConsultaSemana({ status: 'ACEITA', pagamentoStatus: undefined, valor: 8000 }),
+    ]);
+
+    await renderEarnings();
+
+    expect(await screen.findByText('R$ 80,00')).toBeInTheDocument();
+    expect(screen.getByText('Confirmada')).toBeInTheDocument();
+  });
+
+  it('exibe "Pendente" quando a consulta ainda não foi aceita pelo médico', async () => {
+    fetchConsultasMedicoMock.mockResolvedValue([
+      baseConsultaSemana({ status: 'PENDENTE', valor: 12000 }),
+    ]);
+
+    await renderEarnings();
+
+    expect(await screen.findByText('R$ 120,00')).toBeInTheDocument();
+    expect(screen.getByText('Pendente')).toBeInTheDocument();
   });
 });
