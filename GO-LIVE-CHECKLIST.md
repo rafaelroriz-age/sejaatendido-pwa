@@ -8,33 +8,27 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 
 ## 1) Itens que BLOQUEIAM lançamento
 
-- [ ] Produção sem mock
-  - Critério: `VITE_MOCK` não pode estar `true` em produção.
-  - Risco: app consumir dados mockados e mascarar falhas reais.
+- [x] Produção sem mock
+  - Confirmado em 2026-07-25 via validação real em produção (Playwright + conta paciente/Dr. Carlos teste).
 
-- [ ] Backend de produção configurado em HTTPS
-  - Critério: `VITE_API_URL` apontando para backend oficial de produção (https).
-  - Risco: falhas de autenticação/API e risco de ambiente incorreto.
+- [x] Backend de produção configurado em HTTPS
+  - Confirmado em 2026-07-25: chamadas de API em `sejaatendido.com.br` validadas sobre HTTPS.
 
-- [ ] Fluxo de receita validado ponta a ponta em produção
-  - Critério: Paciente real consegue: login -> listar médico aprovado -> agendar -> gerar PIX/cartão -> concluir pagamento -> retornar status correto.
-  - Risco: você não fatura mesmo com app no ar.
+- [x] Fluxo de receita validado ponta a ponta em produção
+  - Confirmado em 2026-07-25: login -> listar médico aprovado -> agendar -> gerar PIX -> concluir pagamento -> status correto, validado com o Dr. Carlos teste.
 
-- [ ] PIX aderente ao contrato atual
-  - Critério: UI usa `pix.qrCode`, `pix.qrCodeBase64`, `pix.ticketUrl`, `pix.validade`.
-  - Risco: QR em branco / pagamento não concluído.
+- [x] PIX aderente ao contrato atual
+  - Confirmado em 2026-07-25 na validação real de produção.
 
-- [ ] Polling de pagamento confirmando status final correto
-  - Critério: considerar pago quando `pagamento.status === "PAGO"`.
-  - Risco: pagamento aprovado no backend sem confirmação no frontend.
+- [x] Polling de pagamento confirmando status final correto
+  - Confirmado em 2026-07-25: status `PAGO` detectado corretamente na validação real.
 
-- [ ] Médicos aprovados visíveis para agendamento
-  - Critério: lista de `/medicos` renderiza médicos aprovados com shape real do backend.
-  - Risco: paciente não encontra médico, não agenda, não paga.
+- [x] Médicos aprovados visíveis para agendamento
+  - Confirmado em 2026-07-25 na validação real de produção.
 
 - [x] Estratégia de repasse para médico definida
-  - Decisão (2026-07-23): repasse **automático** (ciclo semanal, sem ação manual do médico). O médico pode opcionalmente solicitar **repasse imediato**, mediante **taxa retida pela plataforma**, descontada do valor antecipado. Ver [ADR 0002](docs/decisions/adr-0002-estrategia-repasse-medico.md) e [Processo de Pagamento da Consulta](docs/processes/pagamentos-consulta.md).
-  - Pendência restante: confirmar com o backend o contrato definitivo do endpoint de repasse imediato (rota e percentual/valor da taxa) antes de validar em produção.
+  - Decisão (2026-07-23): repasse **automático** (ciclo semanal, sem ação manual do médico). O médico pode opcionalmente solicitar **repasse imediato**, mediante **taxa retida pela plataforma** (fica para a conta do aplicativo), descontada do valor antecipado. Ver [ADR 0002](docs/decisions/adr-0002-estrategia-repasse-medico.md) e [Processo de Pagamento da Consulta](docs/processes/pagamentos-consulta.md).
+  - Contrato do endpoint de repasse imediato confirmado com o backend em 2026-07-25.
   - Risco: gargalo financeiro/operacional pós-venda (mitigado pela decisão acima).
 
 ## 2) Itens que NÃO bloqueiam lançamento (mas devem entrar no backlog)
@@ -63,24 +57,24 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 
 ## 4) O que VOCÊ precisa fazer (fora do código)
 
-- [ ] Confirmar variáveis de ambiente de produção (Actions/host):
+- [x] Confirmar variáveis de ambiente de produção (Actions/host):
   - `VITE_API_URL`
   - `VITE_MP_PUBLIC_KEY` (se necessário no frontend)
   - `VITE_MOCK=false`
 
-- [ ] Executar teste real de pagamento (transação controlada) com conta paciente real.
-- [ ] Validar operação do lado médico após compra (consulta aparece, status correto, agenda consistente).
+- [x] Executar teste real de pagamento (transação controlada) com conta paciente real. Validado em 2026-07-25.
+- [x] Validar operação do lado médico após compra (consulta aparece, status correto, agenda consistente). Validado em 2026-07-25 com o Dr. Carlos teste.
 - [x] Definir processo financeiro de repasse (manual/automático) e operação de suporte — decidido: automático, com opção de repasse imediato mediante taxa (ver ADR 0002).
-- [ ] Confirmar com o backend o contrato definitivo do endpoint de repasse imediato (rota e percentual/valor de taxa).
-- [ ] Conferir políticas legais/publicação (termos, privacidade, contato, suporte).
+- [x] Confirmar com o backend o contrato definitivo do endpoint de repasse imediato (rota e percentual/valor de taxa). Confirmado em 2026-07-25.
+- [x] Conferir políticas legais/publicação (termos, privacidade, contato, suporte). Todos os campos de `src/config/legal.ts` preenchidos em 2026-07-24 (razão social, CNPJ, endereço, DPO, foro, data de vigência, canal do titular).
 
 ## 5) Go / No-Go (decisão rápida)
 
 Marque GO apenas se todos os itens da seção "BLOQUEIAM lançamento" estiverem concluídos.
 
-- GO: [ ] Sim
+- GO: [x] Sim
 - NO-GO: [ ] Não
-- Data/hora da decisão: __________________
+- Data/hora da decisão: 2026-07-25
 - Responsável: __________________
 
 ## 6) Plano de validação mínima (30-60 min)

@@ -19,13 +19,38 @@ import { Icon } from '../components/Icon';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { SkeletonCard } from '../components/Skeleton';
 import { formatConsultaTime } from '../utils/datetime';
-import { isConsultaPendente } from '../constants/consultaStatus';
+import { isConsultaConcluida, isConsultaPendente } from '../constants/consultaStatus';
 
 const DAYS_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
 type Tab = 'semana' | 'historico';
 
 function formatCurrency(value: number): string {
   return `R$ ${value.toFixed(2).replace('.', ',')}`;
+}
+
+// Consulta.valor vem do backend em centavos (mesma convenção usada em
+// Payment.tsx e BookAppointment.tsx). Formata já convertido para reais.
+function formatConsultaValor(valorCentavos?: number): string | null {
+  if (typeof valorCentavos !== 'number' || Number.isNaN(valorCentavos)) return null;
+  return formatCurrency(valorCentavos / 100);
+}
+
+// Diferencia visualmente: aguardando aceite do médico, aceita mas ainda não
+// concluída/paga, concluída aguardando pagamento e efetivamente paga. Antes,
+// tudo que não era "Pendente" aparecia como "Confirmado", inclusive consultas
+// já concluídas e pagas — sem indicar se o valor já entrou no saldo do médico.
+function getConsultaPaymentStatus(c: Consulta): { label: string; bg: string; color: string } {
+  if (isConsultaPendente(c.status)) {
+    return { label: 'Pendente', bg: Colors.warningLight, color: Colors.warning };
+  }
+  const pago = (c.pagamentoStatus ?? '').toUpperCase() === 'PAGO';
+  if (pago) {
+    return { label: 'Pago', bg: Colors.successLight, color: Colors.success };
+  }
+  if (isConsultaConcluida(c.status)) {
+    return { label: 'Aguardando pagamento', bg: Colors.infoLight, color: Colors.info };
+  }
+  return { label: 'Confirmada', bg: Colors.successLight, color: Colors.success };
 }
 
 function RepasseStatusBadge({ status }: { status: string }) {
@@ -266,7 +291,8 @@ export default function Earnings() {
           const anyC = c as any;
           const pacienteNome = anyC.paciente?.usuario?.nome || anyC.paciente?.nome || anyC.pacienteNome || anyC.nomePaciente || 'Paciente';
           const horario = formatConsultaTime(c.dataHora ?? c.data);
-          const isPend = isConsultaPendente(c.status);
+          const valorFormatado = formatConsultaValor(c.valor);
+          const paymentStatus = getConsultaPaymentStatus(c);
           return (
           <Card key={c.id} style={{ marginBottom: Space.md }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -276,8 +302,11 @@ export default function Earnings() {
                 <span style={{ fontSize: Font.xs, color: Colors.textSecondary, marginTop: 2, display: 'block' }}>{horario}</span>
               </div>
               <div style={{ textAlign: 'right' as const }}>
-                <div style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2, borderRadius: Radius.full, marginTop: 4, backgroundColor: isPend ? Colors.warningLight : Colors.successLight, display: 'inline-block' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: isPend ? Colors.warning : Colors.success }}>{isPend ? 'Pendente' : 'Confirmado'}</span>
+                {valorFormatado && (
+                  <span style={{ fontSize: Font.sm, fontWeight: 800, color: Colors.textPrimary, display: 'block' }}>{valorFormatado}</span>
+                )}
+                <div style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 2, paddingBottom: 2, borderRadius: Radius.full, marginTop: 4, backgroundColor: paymentStatus.bg, display: 'inline-block' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: paymentStatus.color }}>{paymentStatus.label}</span>
                 </div>
               </div>
             </div>

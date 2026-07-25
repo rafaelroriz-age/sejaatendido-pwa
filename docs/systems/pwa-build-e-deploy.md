@@ -52,3 +52,4 @@ Status: review.
 
 - Push web registra sw.js em runtime da tela de notificacoes, enquanto PWA gera worker pelo plugin.
 - Necessario validar estrategia unica de service worker para evitar inconsistencias.
+- `VITE_API_URL` nao esta configurado como secret explicito no workflow de producao (`.github/workflows/deploy.yml`). O build cai no fallback hardcoded de `src/config/api.ts` (`DEFAULT_API_URL`), que hoje coincide com o backend correto de producao — mas isso e fragil: se o backend de producao mudar de URL sem atualizar o fallback no codigo, o build continuaria "verde" apontando para o backend errado silenciosamente. Um preflight no workflow (`Preflight (VITE_API_URL)`) agora emite um aviso (`::warning::`) quando o secret nao esta configurado; a correcao definitiva e configurar o secret `VITE_API_URL` (ou `NEXT_PUBLIC_API_URL`) em Settings > Secrets and variables > Actions do repositorio.

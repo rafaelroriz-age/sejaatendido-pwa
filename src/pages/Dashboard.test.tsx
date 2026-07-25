@@ -90,6 +90,19 @@ describe('Dashboard — botão "Entrar na consulta"', () => {
 
     expect(await screen.findByText('Entrar na consulta')).toBeInTheDocument();
   });
+
+  it('exibe mensagem informativa quando a consulta foi ACEITA mas o backend ainda não gerou o meetLink', async () => {
+    // Cobre o bug conhecido em que o PATCH de aceite não persiste no backend e o
+    // meetLink nunca é gerado: o paciente não deve ficar sem nenhum feedback.
+    fetchMinhasConsultasMock.mockResolvedValue([
+      baseConsulta({ status: 'ACEITA', meetLink: undefined }),
+    ]);
+
+    await renderDashboard();
+
+    expect(await screen.findByText(/link da videochamada ainda não está disponível/i)).toBeInTheDocument();
+    expect(screen.queryByText('Entrar na consulta')).not.toBeInTheDocument();
+  });
 });
 
 describe('Dashboard — botão "Pagar consulta" (gate de pagamento pós-CONCLUIDA)', () => {

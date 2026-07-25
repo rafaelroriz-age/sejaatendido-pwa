@@ -303,9 +303,9 @@ export default function LandingPage() {
         <div style={{ ...s.footerInner, ...(isMobile ? { flexDirection: 'column' as const, textAlign: 'center' as const } : {}) }}>
           <div style={s.footerBrand}>Seja Atendido</div>
           <ul style={s.footerLinks}>
-            <li><a href="mailto:contato@sejaatendido.com.br" style={s.footerLink}>Contato</a></li>
-            <li><a href="#" style={s.footerLink}>Privacidade</a></li>
-            <li><a href="#" style={s.footerLink}>Termos de uso</a></li>
+            <li><a href="mailto:contato@sejaatendido.api.br" style={s.footerLink}>Contato</a></li>
+            <li><a href="/politica-de-privacidade" style={s.footerLink}>Privacidade</a></li>
+            <li><a href="/termos-de-uso" style={s.footerLink}>Termos de uso</a></li>
           </ul>
           <p style={s.footerCopy}>© 2026 Seja Atendido. Todos os direitos reservados.</p>
         </div>
