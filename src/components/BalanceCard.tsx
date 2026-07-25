@@ -85,6 +85,18 @@ export default function BalanceCard({ onClick, onLoaded }: Props) {
             {getNextMondayLabel(saldo?.proximo_repasse)}
           </span>
         </div>
+
+        {(saldo?.saldo_retido ?? 0) > 0 && (
+          <div style={{ marginTop: Space.sm }} role="status">
+            <span style={{
+              backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.md,
+              padding: `${Space.xs}px ${Space.md}px`, fontSize: Font.xs, fontWeight: 600, display: 'inline-block',
+            }}>
+              {formatCurrency(saldo?.saldo_retido ?? 0)} em análise de segurança
+              {saldo?.previsao_liberacao ? ` · previsão de liberação em ${new Date(saldo.previsao_liberacao).toLocaleDateString('pt-BR')}` : ''}
+            </span>
+          </div>
+        )}
       </div>
 
       <div style={{
