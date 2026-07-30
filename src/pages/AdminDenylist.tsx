@@ -18,7 +18,7 @@ const TIPOS: { value: DenylistTipo; label: string; placeholder: string }[] = [
   { value: DENYLIST_TIPO.CPF, label: DENYLIST_TIPO_LABEL.CPF, placeholder: '000.000.000-00' },
   { value: DENYLIST_TIPO.EMAIL, label: DENYLIST_TIPO_LABEL.EMAIL, placeholder: 'email@exemplo.com' },
   { value: DENYLIST_TIPO.CARTAO_HASH, label: DENYLIST_TIPO_LABEL.CARTAO_HASH, placeholder: 'hash do cartão fornecido pelo backend' },
-  { value: DENYLIST_TIPO.DEVICE_ID, label: DENYLIST_TIPO_LABEL.DEVICE_ID, placeholder: 'device id do Mercado Pago' },
+  { value: DENYLIST_TIPO.DEVICE_ID, label: DENYLIST_TIPO_LABEL.DEVICE_ID, placeholder: 'device id do gateway de pagamento' },
 ];
 
 function validateValor(tipo: DenylistTipo, valor: string): string | null {

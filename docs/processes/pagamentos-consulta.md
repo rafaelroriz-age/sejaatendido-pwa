@@ -9,8 +9,8 @@ related:
   - ../systems/api-backend-e-contratos.md
   - ../plans/divergencias.md
   - ../decisions/adr-0002-estrategia-repasse-medico.md
-tags: [pagamento, pix, cartao, mercadopago, repasse]
-last_updated: 2026-07-23
+tags: [pagamento, pix, cartao, asaas, repasse]
+last_updated: 2026-07-30
 ---
 
 <!-- ai-summary
@@ -42,7 +42,7 @@ Status: review.
 ## Fluxo Cartao
 
 1. criarPagamento({ consultaId, metodoPagamento: 'card' }) chama POST /v1/pagamentos/cartao.
-2. UI redireciona para initPoint/sandboxInitPoint do Mercado Pago.
+2. UI redireciona para o link de checkout retornado pelo backend (campo normalizado `linkPagamento`/`paymentUrl`, preenchido a partir de `asaas.invoiceUrl`/`asaas.checkoutUrl`).
 3. No retorno para /payment/success, /payment/pending ou /payment/failure, a tela executa syncPagamento(consultaId) uma vez para reconciliar status.
 4. Se o backend retornar status PAGO no retorno pending/failure, a UI redireciona automaticamente para /payment/success.
 
@@ -76,3 +76,15 @@ Status: review.
 
 - O gap de sincronizacao no retorno de checkout foi resolvido em 2026-06-17 com sync imediato nas telas de retorno.
 - Estrategia de repasse ao medico definida em 2026-07-23 (ver ADR 0002) — deixa de ser um item "em breve" do go-live.
+
+## Migracao de gateway: Mercado Pago -> Asaas (2026-07-30)
+
+- Backend trocou o provedor de pagamento de **Mercado Pago** para **Asaas**.
+- Frontend foi desacoplado do contrato do Mercado Pago:
+  - Removida a dependencia `@mercadopago/sdk-react` e a inicializacao em `main.tsx`.
+  - `services/api.ts` (`PagamentoResponse`, `normalizePagamentoResponse`) agora usa um objeto `asaas` (`paymentId`, `invoiceUrl`, `checkoutUrl`, `billingType`) e mantem os campos genericos ja existentes (`linkPagamento`, `paymentUrl`) como fonte de verdade para o redirecionamento do checkout de cartao, tolerando tanto `invoiceUrl` quanto `checkoutUrl`.
+  - `Payment.tsx` nao le mais campos especificos de gateway diretamente: usa `data.linkPagamento`/`data.paymentUrl` (ja normalizados), com fallback para `data.asaas.invoiceUrl`/`data.asaas.checkoutUrl`.
+  - Mocks MSW (`src/mocks/handlers.ts`) e testes (`Payment.test.tsx`) atualizados para o novo contrato.
+- Contrato de PIX (`pix.qrCode`, `pix.qrCodeBase64`, `pix.ticketUrl`, `pix.validade`) ja era agnostico de gateway e nao precisou mudar.
+- **Pendente**: confirmar em ambiente real (staging/producao) que o backend efetivamente retorna os nomes de campo assumidos acima (`asaas.invoiceUrl`/`asaas.checkoutUrl`, ou o generico `linkPagamento`/`paymentUrl`/`checkoutUrl`/`invoiceUrl` no nivel raiz). Se o backend usar nomes diferentes, ajustar `normalizePagamentoResponse` em `services/api.ts`.
+- Ver [GO-LIVE-CHECKLIST.md](../../GO-LIVE-CHECKLIST.md), secao 8.

@@ -17,7 +17,6 @@
     "sandbox:build": "docker compose -f docker-compose.staging.yml build"
   },
   "dependencies": {
-    "@mercadopago/sdk-react": "^1.0.7",
     "axios": "^1.7.9",
     "jsqr": "^1.4.0",
     "react": "^18.3.1",

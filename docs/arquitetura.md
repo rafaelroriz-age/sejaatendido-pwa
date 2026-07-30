@@ -331,12 +331,18 @@ src/
 - **Consequencias:** dependencia adicional do SDK do Mercado Pago no fluxo de pagamento por
   cartao (ja existente); reavaliar solucao propria/terceirizada apenas se a cobertura do MP
   se mostrar insuficiente.
+- **[DESATUALIZADO em 2026-07-30]:** o backend migrou o gateway de pagamento de Mercado Pago
+  para Asaas, e a dependencia `@mercadopago/sdk-react` foi removida do frontend (ver
+  [GO-LIVE-CHECKLIST.md](../GO-LIVE-CHECKLIST.md), secao 8). A premissa desta ADR (usar o
+  Device ID/SDK antifraude do MP) nao se aplica mais. **Pendente de nova decisao:** avaliar
+  se o Asaas oferece um sinal de dispositivo equivalente, ou se o modulo de Risco precisa de
+  fingerprinting proprio para substituir esse sinal.
 
 ## 10. Requisitos nao funcionais atendidos
 
 | RNF | Como e atendido |
 |---|---|
-| RNF01 (PCI-DSS minimo) | Nenhum dado de cartao trafega ou e armazenado fora do checkout do Mercado Pago; `DenylistEntry` guarda apenas hash de cartao, nunca o PAN |
+| RNF01 (PCI-DSS minimo) | Nenhum dado de cartao trafega ou e armazenado fora do checkout do gateway de pagamento (Asaas); `DenylistEntry` guarda apenas hash de cartao, nunca o PAN |
 | RNF02 (LGPD) | Sinais de risco tem finalidade declarada (prevencao a fraude, ja citada em [Lgpd.tsx](../src/pages/Lgpd.tsx)); `DenylistEntry` tem `expira_em` para evitar retencao indefinida |
 | RNF03 (latencia) | Checagens sincronas limitadas a denylist + rate limit (cache); score elaborado pode ser assincrono (ADR-03) |
 | RNF04 (resiliencia) | Estrategia fail-open controlada (ADR-03) |

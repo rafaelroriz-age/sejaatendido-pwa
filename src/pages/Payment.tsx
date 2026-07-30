@@ -37,10 +37,14 @@ type PaymentResponse = {
     valor?: number;
   };
   pix?: PixData;
-  mercadopago?: {
-    initPoint?: string;
-    sandboxInitPoint?: string;
-    preferenceId?: string;
+  /** Campos ja normalizados por services/api.ts, independentes do gateway atual (Asaas). */
+  linkPagamento?: string;
+  paymentUrl?: string;
+  asaas?: {
+    paymentId?: string;
+    invoiceUrl?: string;
+    checkoutUrl?: string;
+    billingType?: string;
   };
 };
 
@@ -107,8 +111,8 @@ export default function Payment() {
   const [copied, setCopied] = useState(false);
   // pixExpired: o QR/codigo copia-e-cola realmente venceu (campo `validade`).
   // pollTimedOut: o polling automatico desistiu (10min) mas o pagamento pode
-  // ainda estar valido no Mercado Pago — nesse caso oferecemos apenas uma
-  // verificacao manual, para nao criar uma preference/QR duplicado.
+  // ainda estar valido no gateway de pagamento — nesse caso oferecemos apenas
+  // uma verificacao manual, para nao criar uma cobranca/QR duplicado.
   const [pixExpired, setPixExpired] = useState(false);
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(false);
@@ -280,7 +284,7 @@ export default function Payment() {
         const startedAt = pollStartedAt.current ?? Date.now();
         if (Date.now() - startedAt >= POLL_TIMEOUT_MS) {
           // O polling automatico desiste, mas o pagamento pode continuar valido
-          // no Mercado Pago (webhook so demorou). Nao marcamos como "expirado":
+          // no gateway (webhook so demorou). Nao marcamos como "expirado":
           // isso evita oferecer "gerar novo QR" e criar uma cobranca duplicada.
           stopPolling();
           setPollTimedOut(true);
@@ -370,9 +374,7 @@ export default function Payment() {
     setBlockedReason(null);
     try {
       const data = (await criarPagamento({ consultaId, metodoPagamento: 'card', valorCentavos: state?.valor })) as PaymentResponse;
-      const checkoutUrl = import.meta.env.PROD
-        ? data?.mercadopago?.initPoint
-        : data?.mercadopago?.sandboxInitPoint || data?.mercadopago?.initPoint;
+      const checkoutUrl = data?.linkPagamento || data?.paymentUrl || data?.asaas?.invoiceUrl || data?.asaas?.checkoutUrl;
       if (!checkoutUrl) {
         setErrorText('Checkout do cartão não retornou link de pagamento.');
         return;
@@ -504,14 +506,14 @@ export default function Payment() {
 
                 {pix.ticketUrl && (
                   <a href={pix.ticketUrl} target="_blank" rel="noreferrer" style={{ width: '100%', textAlign: 'center', backgroundColor: '#00B3FF22', color: '#0077AA', borderRadius: 12, padding: '14px 0', display: 'block', fontWeight: 700, fontSize: 15, textDecoration: 'none' }}>
-                    Pagar pelo Mercado Pago ↗
+                    Abrir link de pagamento ↗
                   </a>
                 )}
 
                 {pollTimedOut && !pixExpired && (
                   <div style={{ width: '100%', textAlign: 'center' }}>
                     <p style={{ fontSize: 12, color: Colors.textMuted, marginBottom: 8 }}>
-                      Ainda não recebemos a confirmação do Mercado Pago. Isso pode levar alguns minutos — você pode continuar aguardando ou verificar manualmente.
+                      Ainda não recebemos a confirmação do pagamento. Isso pode levar alguns minutos — você pode continuar aguardando ou verificar manualmente.
                     </p>
                     <button type="button" onClick={handleManualCheck} disabled={manualChecking} style={{ width: '100%', backgroundColor: Colors.card, borderRadius: Radius.md, padding: 14, border: `1px solid ${Colors.border}`, cursor: manualChecking ? 'not-allowed' : 'pointer', color: Colors.textPrimary, fontWeight: 700, fontSize: 14 }}>
                       {manualChecking ? 'Verificando…' : 'Verificar pagamento agora'}

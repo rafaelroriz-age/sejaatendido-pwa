@@ -861,15 +861,17 @@ export interface PagamentoResponse {
     ticketUrl?: string;
     validade?: string;
   };
-  mercadopago?: {
-    publicKey?: string;
-    preferenceId?: string;
-    initPoint?: string;
-    sandboxInitPoint?: string;
+  /** Dados especificos do gateway Asaas (checkout de cartao). */
+  asaas?: {
+    paymentId?: string;
+    invoiceUrl?: string;
+    checkoutUrl?: string;
+    billingType?: string;
   };
 }
 
 function normalizePagamentoResponse(res: any): PagamentoResponse {
+  const asaasCheckoutUrl = res?.asaas?.invoiceUrl ?? res?.asaas?.checkoutUrl;
   return {
     ...res,
     id: res?.pagamento?.id ?? res?.id ?? '',
@@ -877,9 +879,9 @@ function normalizePagamentoResponse(res: any): PagamentoResponse {
     qrCode: res?.pix?.qrCode ?? res?.qrCode,
     qrCodeBase64: res?.pix?.qrCodeBase64 ?? res?.qrCodeBase64,
     copiaCola: res?.pix?.qrCode ?? res?.copiaCola ?? res?.copiaECola,
-    preferenceId: res?.mercadopago?.preferenceId ?? res?.preferenceId,
-    linkPagamento: res?.mercadopago?.initPoint ?? res?.linkPagamento ?? res?.paymentUrl,
-    paymentUrl: res?.mercadopago?.initPoint ?? res?.paymentUrl ?? res?.linkPagamento,
+    preferenceId: res?.asaas?.paymentId ?? res?.preferenceId,
+    linkPagamento: asaasCheckoutUrl ?? res?.linkPagamento ?? res?.paymentUrl ?? res?.checkoutUrl ?? res?.invoiceUrl,
+    paymentUrl: asaasCheckoutUrl ?? res?.paymentUrl ?? res?.linkPagamento ?? res?.checkoutUrl ?? res?.invoiceUrl,
   };
 }
 

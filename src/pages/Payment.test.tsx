@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import Payment from './Payment';
 
 const criarPagamentoMock = vi.fn();
@@ -173,5 +173,77 @@ describe('Payment — polling de status', () => {
     expect(syncPagamentoMock.mock.calls.length).toBe(callsAfterFalhou);
 
     vi.useRealTimers();
+  });
+});
+
+describe('Payment — checkout de cartão (gateway Asaas)', () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    criarPagamentoMock.mockReset();
+    syncPagamentoMock.mockReset();
+    navigateMock.mockReset();
+    window.sessionStorage.clear();
+    syncPagamentoMock.mockRejectedValue(semPagamentoExistenteError());
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, href: '' },
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation,
+    });
+  });
+
+  async function selecionarCartao() {
+    const cartaoTab = await screen.findByRole('button', { name: 'Cartão' });
+    fireEvent.click(cartaoTab);
+    return screen.findByRole('button', { name: /pagar com cartao/i });
+  }
+
+  it('redireciona para o link de pagamento retornado pelo backend (campo normalizado linkPagamento)', async () => {
+    criarPagamentoMock.mockResolvedValue({
+      pagamento: { id: 'pag-asaas-1', status: 'AGUARDANDO' },
+      linkPagamento: 'https://sandbox.asaas.com/i/mock-invoice',
+      asaas: { paymentId: 'pay_123', invoiceUrl: 'https://sandbox.asaas.com/i/mock-invoice' },
+    });
+
+    renderPayment();
+
+    const pagarBtn = await selecionarCartao();
+    await act(async () => { fireEvent.click(pagarBtn); });
+
+    await waitFor(() => expect(window.location.href).toBe('https://sandbox.asaas.com/i/mock-invoice'));
+  });
+
+  it('usa asaas.invoiceUrl como alternativa quando linkPagamento não vem preenchido', async () => {
+    criarPagamentoMock.mockResolvedValue({
+      pagamento: { id: 'pag-asaas-2', status: 'AGUARDANDO' },
+      asaas: { paymentId: 'pay_456', invoiceUrl: 'https://sandbox.asaas.com/i/outro-invoice' },
+    });
+
+    renderPayment();
+
+    const pagarBtn = await selecionarCartao();
+    await act(async () => { fireEvent.click(pagarBtn); });
+
+    await waitFor(() => expect(window.location.href).toBe('https://sandbox.asaas.com/i/outro-invoice'));
+  });
+
+  it('exibe mensagem de erro quando o backend não retorna nenhum link de checkout', async () => {
+    criarPagamentoMock.mockResolvedValue({
+      pagamento: { id: 'pag-asaas-3', status: 'AGUARDANDO' },
+    });
+
+    renderPayment();
+
+    const pagarBtn = await selecionarCartao();
+    await act(async () => { fireEvent.click(pagarBtn); });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não retornou link de pagamento/i);
+    expect(window.location.href).toBe('');
   });
 });

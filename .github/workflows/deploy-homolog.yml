@@ -42,8 +42,6 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL_STAGING || 'https://sejaatendido-staging-backend.onrender.com' }}
           VITE_MOCK: 'false'
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
-          # Use a chave TESTE do Mercado Pago em homologação, nunca a de produção
-          VITE_MP_PUBLIC_KEY: ${{ secrets.VITE_MP_PUBLIC_KEY_STAGING || secrets.VITE_MP_PUBLIC_KEY }}
 
       - name: Preparar dist (CNAME + 404 fallback)
         run: |

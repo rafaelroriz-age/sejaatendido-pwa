@@ -573,7 +573,7 @@ export const handlers = [
       pix: {
         qrCode: pixCode,
         qrCodeBase64: '',  // mock: empty; real backend returns PNG base64
-        ticketUrl: 'https://www.mercadopago.com.br/payments/mock/ticket',
+        ticketUrl: 'https://sandbox.asaas.com/payments/mock/ticket',
         validade: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       },
     });
@@ -582,7 +582,7 @@ export const handlers = [
   http.post(`${BASE}/v1/pagamentos/cartao`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const valor = getConsultaValorCentavos(body.consultaId);
-    const pagId = `pag-mp-${Date.now()}`;
+    const pagId = `pag-asaas-${Date.now()}`;
     return HttpResponse.json({
       pagamento: {
         id: pagId,
@@ -592,11 +592,10 @@ export const handlers = [
         metodo: 'CARTAO',
         criadoEm: new Date().toISOString(),
       },
-      mercadopago: {
-        publicKey: 'APP_USR-mock-public-key',
-        preferenceId: 'mock-preference-id',
-        initPoint: 'https://www.mercadopago.com.br/checkout/mock',
-        sandboxInitPoint: 'https://sandbox.mercadopago.com.br/checkout/mock',
+      asaas: {
+        paymentId: 'pay_mock123456',
+        invoiceUrl: 'https://sandbox.asaas.com/i/mock-invoice',
+        billingType: 'CREDIT_CARD',
       },
     });
   }),
