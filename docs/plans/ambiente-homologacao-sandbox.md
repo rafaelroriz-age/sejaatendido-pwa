@@ -88,7 +88,7 @@ Para `main` (e idealmente `homolog`):
 Arquivos criados por este plano:
 
 - `docker-compose.staging.yml` — sobe o build de produção apontando para o backend de staging, na **porta 3001** (produção local usa 3000, então não conflita).
-- `Dockerfile` — passa a aceitar args extras (`VITE_MP_PUBLIC_KEY`, `VITE_VAPID_PUBLIC_KEY`) além de `VITE_API_URL`.
+- `Dockerfile` — passa a aceitar args extras (`VITE_VAPID_PUBLIC_KEY`) além de `VITE_API_URL`.
 - Scripts npm `sandbox:*` para subir/derrubar/ver logs.
 
 ### Variáveis de ambiente (arquivo `.env` local — NUNCA commitado)
@@ -99,13 +99,13 @@ O `.gitignore` já ignora `.env` e `.env.*`. Crie um `.env` na raiz com:
 # URL do backend de STAGING (instância separada da produção)
 VITE_API_URL=https://sejaatendido-staging-backend.onrender.com
 
-# Chaves de TESTE / sandbox (não usar chaves de produção em homolog!)
-VITE_MP_PUBLIC_KEY=TEST-xxxxxxxx-xxxx-xxxx       # Mercado Pago: credencial de TESTE
 VITE_VAPID_PUBLIC_KEY=                            # opcional (push web)
 ```
 
-> Importante: em homologação use **credenciais de teste do Mercado Pago** para não gerar
-> cobranças reais. Use também usuário/dados de teste no backend de staging.
+> Importante: o checkout de pagamento (PIX/cartão) usa o gateway **Asaas**, configurado
+> inteiramente no backend (chave de API do Asaas fica só no servidor, nunca no frontend).
+> Em homologação use as **credenciais de teste/sandbox do Asaas** no backend de staging
+> para não gerar cobranças reais.
 
 ### Como usar o sandbox
 

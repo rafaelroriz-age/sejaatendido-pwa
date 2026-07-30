@@ -3,7 +3,7 @@
 # Uso: npm run sandbox:up  (ou: docker compose -f docker-compose.staging.yml up -d --build)
 #
 # As variáveis abaixo são lidas de um arquivo .env local (NUNCA commitado).
-# Use credenciais de TESTE (Mercado Pago sandbox, etc.) em homologação.
+# Use credenciais de TESTE (Asaas sandbox, etc.) em homologação.
 services:
   sejaatendido-pwa-staging:
     container_name: sejaatendido-pwa-staging
@@ -12,7 +12,6 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-https://sejaatendido-staging-backend.onrender.com}
-        VITE_MP_PUBLIC_KEY: ${VITE_MP_PUBLIC_KEY:-}
         VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
     ports:
       - "3001:80"

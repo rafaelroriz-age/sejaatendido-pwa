@@ -107,6 +107,12 @@ Referência: [Processo de Agendamento de Consulta](../processes/agendamento-cons
 
 Referência: [Processo de Pagamento da Consulta](../processes/pagamentos-consulta.md)
 
+> **ATENÇÃO (2026-07-30):** o backend trocou o gateway de pagamento de Mercado Pago para
+> **Asaas**. O frontend já foi desacoplado do Mercado Pago e adaptado ao contrato genérico
+> assumido do Asaas (ver [GO-LIVE-CHECKLIST.md](../../GO-LIVE-CHECKLIST.md), seção 8), mas
+> todos os itens desta fase ainda precisam ser reexecutados em staging/produção real para
+> confirmar que os nomes de campo assumidos batem com a resposta real do backend.
+
 ### 4.1 PIX
 - [ ] Gerar PIX em `/payment` chama `POST /v1/pagamentos/pix` e exibe QR code + copia-e-cola (`qrCode`/`qrCodeBase64`/`ticketUrl`) e validade.
 - [ ] Clicar rapidamente duas vezes em "Gerar código PIX" **não** gera cobrança duplicada (idempotência).
@@ -114,8 +120,8 @@ Referência: [Processo de Pagamento da Consulta](../processes/pagamentos-consult
 - [ ] Polling detecta `pagamento.status === "PAGO"` em até ~5s de intervalo e redireciona para `/dashboard`.
 - [ ] QR expirado (validade vencida) exibe mensagem/ação de gerar novo código, sem travar a tela.
 
-### 4.2 Cartão (Mercado Pago)
-- [ ] Gerar cobrança de cartão chama `POST /v1/pagamentos/cartao` e redireciona para o checkout do Mercado Pago (`initPoint`/`sandboxInitPoint`).
+### 4.2 Cartão (gateway Asaas)
+- [ ] Gerar cobrança de cartão chama `POST /v1/pagamentos/cartao` e redireciona para o checkout hospedado do Asaas (`linkPagamento`/`paymentUrl`, a partir de `asaas.invoiceUrl`/`checkoutUrl`).
 - [ ] Completar pagamento com sucesso → retorno em `/payment/success`, sincroniza status e mostra confirmação.
 - [ ] Simular pagamento pendente → retorno em `/payment/pending` sincroniza e, se o backend já confirmar `PAGO`, redireciona automaticamente para `/payment/success`.
 - [ ] Simular falha/recusa → retorno em `/payment/failure` com mensagem clara e opção de tentar novamente.

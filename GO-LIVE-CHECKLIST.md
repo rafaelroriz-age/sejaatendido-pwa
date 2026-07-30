@@ -14,14 +14,14 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 - [x] Backend de produção configurado em HTTPS
   - Confirmado em 2026-07-25: chamadas de API em `sejaatendido.com.br` validadas sobre HTTPS.
 
-- [x] Fluxo de receita validado ponta a ponta em produção
-  - Confirmado em 2026-07-25: login -> listar médico aprovado -> agendar -> gerar PIX -> concluir pagamento -> status correto, validado com o Dr. Carlos teste.
+- [ ] Fluxo de receita validado ponta a ponta em produção
+  - Confirmado em 2026-07-25 (login -> listar médico aprovado -> agendar -> gerar PIX -> concluir pagamento -> status correto), **porém a validação foi feita com o gateway Mercado Pago**. Gateway trocado para **Asaas** em 2026-07-30 — revalidação completa pendente (ver seção 8).
 
-- [x] PIX aderente ao contrato atual
-  - Confirmado em 2026-07-25 na validação real de produção.
+- [ ] PIX aderente ao contrato atual
+  - Confirmado em 2026-07-25 para o contrato Mercado Pago. Contrato do Asaas ainda não confirmado/documentado — pendente.
 
-- [x] Polling de pagamento confirmando status final correto
-  - Confirmado em 2026-07-25: status `PAGO` detectado corretamente na validação real.
+- [ ] Polling de pagamento confirmando status final correto
+  - Confirmado em 2026-07-25 (Mercado Pago). Precisa ser reconfirmado com as respostas reais do Asaas (`syncPagamento`).
 
 - [x] Médicos aprovados visíveis para agendamento
   - Confirmado em 2026-07-25 na validação real de produção.
@@ -59,7 +59,7 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 
 - [x] Confirmar variáveis de ambiente de produção (Actions/host):
   - `VITE_API_URL`
-  - `VITE_MP_PUBLIC_KEY` (se necessário no frontend)
+  - ~~`VITE_MP_PUBLIC_KEY`~~ (removida em 2026-07-30 — não é mais usada após a migração para Asaas, ver seção 8)
   - `VITE_MOCK=false`
 
 - [x] Executar teste real de pagamento (transação controlada) com conta paciente real. Validado em 2026-07-25.
@@ -72,9 +72,9 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 
 Marque GO apenas se todos os itens da seção "BLOQUEIAM lançamento" estiverem concluídos.
 
-- GO: [x] Sim
-- NO-GO: [ ] Não
-- Data/hora da decisão: 2026-07-25
+- GO: [ ] Sim
+- NO-GO: [x] Não (reaberto em 2026-07-30 — troca de gateway de pagamento para Asaas invalida a validação de 2026-07-25, feita com Mercado Pago)
+- Data/hora da decisão: 2026-07-25 (GO original) — revogado em 2026-07-30
 - Responsável: __________________
 
 ## 6) Plano de validação mínima (30-60 min)
@@ -91,3 +91,15 @@ Marque GO apenas se todos os itens da seção "BLOQUEIAM lançamento" estiverem 
 
 - Se houver qualquer falha em autenticação, listagem de médicos ou pagamento, classificar como NO-GO.
 - Após GO, monitorar primeiras transações em janela de observação (ex.: primeiras 24h).
+
+## 8) Migração de gateway: Mercado Pago -> Asaas (2026-07-30)
+
+- [x] Backend passou a usar Asaas como provedor de pagamento (PIX/cartão) no lugar do Mercado Pago.
+- [x] Frontend desacoplado do contrato Mercado Pago (2026-07-30):
+  - Removida a dependência `@mercadopago/sdk-react` (`package.json`, `src/main.tsx`, `src/vite-env.d.ts`) e as variáveis `VITE_MP_PUBLIC_KEY` do Dockerfile/CI/docker-compose.
+  - `src/services/api.ts`: `PagamentoResponse`/`normalizePagamentoResponse` passam a expor um objeto `asaas` (`paymentId`, `invoiceUrl`, `checkoutUrl`, `billingType`) e continuam alimentando os campos genéricos `linkPagamento`/`paymentUrl` usados pela UI.
+  - `src/pages/Payment.tsx`: o checkout de cartão agora usa `data.linkPagamento`/`data.paymentUrl` (com fallback para `data.asaas.invoiceUrl`/`checkoutUrl`) em vez de campos específicos do Mercado Pago; textos de UI que citavam "Mercado Pago" foram generalizados.
+  - `src/mocks/handlers.ts` e `src/pages/Payment.test.tsx` atualizados para o novo contrato (inclui novos testes de checkout de cartão via Asaas).
+  - `npm run typecheck`, `npm test -- --run` e `npm run build` executados com sucesso após a migração.
+- [ ] **Pendente de validação real**: confirmar contra o backend/staging que os nomes de campo assumidos (`asaas.invoiceUrl`/`checkoutUrl`, contrato de PIX inalterado) batem com a resposta real do Asaas. Se divergirem, ajustar apenas `normalizePagamentoResponse` em `services/api.ts`.
+- [ ] Reexecutar o roteiro da Fase 4 de [roteiro-testes-producao.md](docs/plans/roteiro-testes-producao.md) (PIX + cartão) em staging/produção real antes de reabrir o GO.
