@@ -1,23 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { criarPagamento, syncPagamento } from '../services/api';
+import { getUser } from '../storage/localStorage';
 import Colors, { Radius } from '../theme/colors';
 
 type PaymentMethod = 'pix' | 'cartao';
-
-type SavedCard = {
-  brand: string;
-  last4: string;
-  holder: string;
-  exp: string;
-};
-
-type PaymentPrefs = {
-  useSavedCard?: boolean;
-  savedCard?: SavedCard;
-};
-
-const PAYMENT_PREFS_KEY = '@payment:preferences';
 
 type PixData = {
   qrCode?: string;
@@ -86,6 +73,61 @@ function isConsultaNaoConcluidaError(error: unknown): boolean {
   return msg.includes('conclu') || msg.includes('finaliz');
 }
 
+// Sem CPF cadastrado o backend responde 422 antes de chamar o gateway Asaas
+// (correcao aplicada no backend em 2026-07-30). Tratamos separado do erro
+// generico para orientar o paciente a completar o cadastro, em vez de expor
+// o texto tecnico da API.
+function isCpfObrigatorioError(error: unknown): boolean {
+  const anyErr = error as any;
+  if (anyErr?.response?.status !== 422) return false;
+  const payload = anyErr?.response?.data;
+  const msg = String(payload?.erro ?? payload?.mensagem ?? payload?.message ?? '').toLowerCase();
+  return msg.includes('cpf');
+}
+
+function isConsultaJaPagaError(error: unknown): boolean {
+  return (error as any)?.response?.status === 409;
+}
+
+// 403 tambem e usado pelo backend para "consulta ainda nao concluida" (ver
+// isConsultaNaoConcluidaError); aqui cobrimos o outro caso de 403: consulta
+// pertence a outro paciente. Bloqueia o acesso a tela inteira.
+function isAcessoNegadoError(error: unknown): boolean {
+  const anyErr = error as any;
+  if (anyErr?.response?.status !== 403) return false;
+  return !isConsultaNaoConcluidaError(error);
+}
+
+type BlockedReason = 'consulta_nao_concluida' | 'cpf_obrigatorio' | 'consulta_ja_paga' | 'acesso_negado';
+
+// Classifica os erros conhecidos do fluxo de pagamento (ver tabela de casos de
+// erro do checklist de validacao) em um blockedReason + mensagem amigavel, sem
+// expor o texto tecnico cru da API ao paciente.
+function classifyPaymentError(error: unknown, fallback: string): { blockedReason: BlockedReason | null; message: string } {
+  if (isCpfObrigatorioError(error)) {
+    return {
+      blockedReason: 'cpf_obrigatorio',
+      message: 'Para pagar, complete seu cadastro com CPF.',
+    };
+  }
+  if (isConsultaJaPagaError(error)) {
+    return { blockedReason: 'consulta_ja_paga', message: 'Esta consulta já foi paga.' };
+  }
+  if (isAcessoNegadoError(error)) {
+    return {
+      blockedReason: 'acesso_negado',
+      message: 'Você não tem permissão para acessar o pagamento desta consulta.',
+    };
+  }
+  if (isConsultaNaoConcluidaError(error)) {
+    return {
+      blockedReason: 'consulta_nao_concluida',
+      message: 'O pagamento só é liberado depois que a consulta é marcada como concluída. Isso costuma levar alguns minutos após o horário marcado — volte ao painel, que o botão de pagamento aparece automaticamente.',
+    };
+  }
+  return { blockedReason: null, message: getErrorMessage(error, fallback) };
+}
+
 export default function Payment() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -117,10 +159,12 @@ export default function Payment() {
   const [pollTimedOut, setPollTimedOut] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(false);
   const [manualChecking, setManualChecking] = useState(false);
-  const [blockedReason, setBlockedReason] = useState<'consulta_nao_concluida' | null>(null);
-  const [useSavedCardPreference, setUseSavedCardPreference] = useState(true);
-  const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
-  const [useSavedCard, setUseSavedCard] = useState(true);
+  const [blockedReason, setBlockedReason] = useState<
+    'consulta_nao_concluida' | 'cpf_obrigatorio' | 'consulta_ja_paga' | 'acesso_negado' | null
+  >(null);
+  // Paciente sem CPF cadastrado: bloqueia o botao de pagar proativamente, antes
+  // de tentar criar o pagamento e receber o 422 do backend.
+  const [patientCpfMissing, setPatientCpfMissing] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartedAt = useRef<number | null>(null);
@@ -137,20 +181,14 @@ export default function Payment() {
   }, [consultaId]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = window.localStorage.getItem(PAYMENT_PREFS_KEY);
-      if (!raw) return;
-      const prefs = JSON.parse(raw) as PaymentPrefs;
-      const nextUseSavedCard = prefs.useSavedCard !== false;
-      setUseSavedCardPreference(nextUseSavedCard);
-      if (prefs.savedCard) {
-        setSavedCard(prefs.savedCard);
-        setUseSavedCard(nextUseSavedCard);
-      }
-    } catch {
-      // ignore invalid local preferences
+    let active = true;
+    async function checkPatientCpf() {
+      const user = await getUser();
+      if (!active) return;
+      setPatientCpfMissing(user?.tipo === 'PACIENTE' && !user.cpf);
     }
+    void checkPatientCpf();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -202,9 +240,14 @@ export default function Payment() {
             startPolling(consultaId);
           }
         }
-      } catch {
-        // Sem pagamento existente ainda (ou falha transitoria na verificacao) —
-        // segue o fluxo normal, deixando o usuario iniciar um novo pagamento.
+      } catch (error) {
+        if (isAcessoNegadoError(error)) {
+          setBlockedReason('acesso_negado');
+          setErrorText('Você não tem permissão para acessar o pagamento desta consulta.');
+        }
+        // Demais casos: sem pagamento existente ainda (ou falha transitoria na
+        // verificacao) — segue o fluxo normal, deixando o usuario iniciar um
+        // novo pagamento.
       } finally {
         if (active) setCheckingExisting(false);
       }
@@ -349,12 +392,9 @@ export default function Payment() {
       setPixExpired(false);
       startPolling(consultaId);
     } catch (error) {
-      if (isConsultaNaoConcluidaError(error)) {
-        setBlockedReason('consulta_nao_concluida');
-        setErrorText('O pagamento só é liberado depois que a consulta é marcada como concluída. Isso costuma levar alguns minutos após o horário marcado — volte ao painel, que o botão de pagamento aparece automaticamente.');
-      } else {
-        setErrorText(getErrorMessage(error, 'Falha ao gerar pagamento PIX.'));
-      }
+      const { blockedReason: reason, message } = classifyPaymentError(error, 'Falha ao gerar pagamento PIX.');
+      setBlockedReason(reason);
+      setErrorText(message);
     } finally {
       setLoading(false);
       submittingRef.current = false;
@@ -381,12 +421,9 @@ export default function Payment() {
       }
       window.location.href = checkoutUrl;
     } catch (error) {
-      if (isConsultaNaoConcluidaError(error)) {
-        setBlockedReason('consulta_nao_concluida');
-        setErrorText('O pagamento só é liberado depois que a consulta é marcada como concluída. Isso costuma levar alguns minutos após o horário marcado — volte ao painel, que o botão de pagamento aparece automaticamente.');
-      } else {
-        setErrorText(getErrorMessage(error, 'Falha ao iniciar pagamento com cartão.'));
-      }
+      const { blockedReason: reason, message } = classifyPaymentError(error, 'Falha ao iniciar pagamento com cartão.');
+      setBlockedReason(reason);
+      setErrorText(message);
     } finally {
       setLoading(false);
       submittingRef.current = false;
@@ -395,6 +432,30 @@ export default function Payment() {
 
   const pix = paymentData?.pix;
   const validadeText = pix?.validade ? new Date(pix.validade).toLocaleString('pt-BR') : null;
+
+  // Consulta de outro paciente (403): bloqueia o acesso à tela inteira, sem
+  // oferecer nenhuma opção de pagamento.
+  if (blockedReason === 'acesso_negado') {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ backgroundColor: Colors.primary, padding: '28px 16px 16px', borderRadius: '0 0 20px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button onClick={() => navigate(-1)} style={{ color: '#fff', fontSize: 15, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar</button>
+          <span style={{ color: '#fff', fontSize: 18, fontWeight: 800 }}>Pagamento</span>
+          <div style={{ width: 50 }} />
+        </div>
+        <div style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <p role="alert" style={{ fontSize: 15, color: Colors.error, fontWeight: 700, marginBottom: 16 }}>
+              {errorText || 'Você não tem permissão para acessar o pagamento desta consulta.'}
+            </p>
+            <button type="button" onClick={() => navigate('/dashboard')} style={{ backgroundColor: Colors.primary, color: '#fff', border: 'none', borderRadius: Radius.md, padding: '12px 20px', fontWeight: 700, cursor: 'pointer' }}>
+              Voltar ao painel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const btnBase: React.CSSProperties = {
     flex: 1, padding: '13px 0', border: 'none', cursor: 'pointer',
@@ -446,6 +507,31 @@ export default function Payment() {
           </div>
         )}
 
+        {/* CPF obrigatorio: bloqueia o pagamento (proativamente ou apos 422 do backend) ate o paciente completar o cadastro. */}
+        {(patientCpfMissing || blockedReason === 'cpf_obrigatorio') && (
+          <div style={{ backgroundColor: Colors.warningLight, borderRadius: 12, padding: '12px 16px', marginBottom: 16, border: '1px solid #FFB74D' }}>
+            {!errorText && (
+              <span style={{ fontSize: 14, color: '#E65100', fontWeight: 600, display: 'block', marginBottom: 10 }}>
+                Para pagar, complete seu cadastro com CPF.
+              </span>
+            )}
+            <button type="button" onClick={() => navigate('/profile')} style={{ backgroundColor: '#E65100', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              Completar cadastro
+            </button>
+          </div>
+        )}
+
+        {/* Consulta ja paga: nada mais a fazer, so voltar ao painel. */}
+        {blockedReason === 'consulta_ja_paga' && (
+          <button type="button" onClick={() => navigate('/dashboard')} style={{
+            width: '100%', backgroundColor: Colors.card, borderRadius: Radius.md, padding: 16,
+            border: `1px solid ${Colors.border}`, cursor: 'pointer',
+            color: Colors.textSecondary, fontSize: 15, fontWeight: 700, marginBottom: 16,
+          }}>
+            Voltar ao painel
+          </button>
+        )}
+
         {method === 'pix' ? (
           <>
             {checkingExisting && !paymentData && (
@@ -454,11 +540,11 @@ export default function Payment() {
               </div>
             )}
 
-            {!paymentData && !checkingExisting && blockedReason !== 'consulta_nao_concluida' && (
-              <button type="button" onClick={createPixPayment} disabled={loading || !consultaId} style={{
+            {!paymentData && !checkingExisting && blockedReason !== 'consulta_nao_concluida' && blockedReason !== 'consulta_ja_paga' && (
+              <button type="button" onClick={createPixPayment} disabled={loading || !consultaId || patientCpfMissing} style={{
                 width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
-                border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
-                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId) ? 0.6 : 1,
+                border: 'none', cursor: (loading || !consultaId || patientCpfMissing) ? 'not-allowed' : 'pointer',
+                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId || patientCpfMissing) ? 0.6 : 1,
                 boxShadow: `0 6px 12px ${Colors.primary}59`,
               }}>
                 {loading ? 'Gerando PIX…' : 'Gerar código PIX'}
@@ -537,31 +623,19 @@ export default function Payment() {
           </>
         ) : (
             <>
-              {savedCard && useSavedCardPreference && (
-                <div style={{ backgroundColor: Colors.card, borderRadius: 14, border: `1px solid ${Colors.border}`, padding: 14, marginBottom: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: Colors.textPrimary }}>
-                      {savedCard.brand} •••• {savedCard.last4}
-                    </span>
-                    <span style={{ fontSize: 12, color: Colors.textMuted }}>{savedCard.exp}</span>
-                  </div>
-                  <span style={{ fontSize: 12, color: Colors.textSecondary, display: 'block', marginBottom: 10 }}>
-                    {savedCard.holder}
-                  </span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: Colors.textSecondary, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={useSavedCard} onChange={e => setUseSavedCard(e.target.checked)} />
-                    Usar cartao salvo neste pagamento
-                  </label>
-                </div>
-              )}
+              <div style={{ backgroundColor: Colors.card, borderRadius: 14, border: `1px solid ${Colors.border}`, padding: 14, marginBottom: 12 }}>
+                <span style={{ fontSize: 13, color: Colors.textSecondary }}>
+                  Você será redirecionado para o checkout seguro para inserir os dados do cartão. Cartão salvo ainda não está disponível neste método de pagamento.
+                </span>
+              </div>
 
-              <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId || blockedReason === 'consulta_nao_concluida'} style={{
+              <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId || Boolean(blockedReason) || patientCpfMissing} style={{
             width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
                 border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
-                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId || blockedReason === 'consulta_nao_concluida') ? 0.6 : 1,
+                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId || Boolean(blockedReason) || patientCpfMissing) ? 0.6 : 1,
             boxShadow: `0 6px 12px ${Colors.primary}59`,
           }}>
-                {loading ? 'Iniciando checkout…' : useSavedCard && savedCard ? 'Pagar com cartao salvo' : 'Pagar com cartao'}
+                {loading ? 'Iniciando checkout…' : 'Pagar com cartao'}
               </button>
             </>
         )}

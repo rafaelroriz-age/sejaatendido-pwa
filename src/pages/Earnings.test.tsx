@@ -144,6 +144,31 @@ describe('Earnings — repasse imediato (antecipação mediante taxa)', () => {
 
     expect(screen.queryByText('Solicitar repasse imediato')).not.toBeInTheDocument();
   });
+
+  it('exibe a data de liberação (previsaoLiberacao) em vez de um erro genérico quando o valor está retido por antifraude', async () => {
+    solicitarRepasseImediatoMock.mockRejectedValue({
+      response: { status: 400, data: { erro: 'Valor retido por antifraude', previsaoLiberacao: '2026-08-01T12:00:00.000Z' } },
+    });
+
+    await renderEarnings();
+
+    fireEvent.click(await screen.findByText('Solicitar repasse imediato'));
+    fireEvent.click(screen.getByText('Confirmar solicitação'));
+
+    expect(await screen.findByText(/retido por segurança \(antifraude\)/i)).toBeInTheDocument();
+    expect(screen.queryByText('Não foi possível solicitar o repasse imediato agora. Tente novamente em instantes.')).not.toBeInTheDocument();
+  });
+
+  it('mostra a mensagem genérica quando o erro do repasse imediato não traz previsaoLiberacao', async () => {
+    solicitarRepasseImediatoMock.mockRejectedValue({ response: { status: 500, data: {} } });
+
+    await renderEarnings();
+
+    fireEvent.click(await screen.findByText('Solicitar repasse imediato'));
+    fireEvent.click(screen.getByText('Confirmar solicitação'));
+
+    expect(await screen.findByText('Não foi possível solicitar o repasse imediato agora. Tente novamente em instantes.')).toBeInTheDocument();
+  });
 });
 
 describe('Earnings — valor e status de pagamento das consultas da semana', () => {

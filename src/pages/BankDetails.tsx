@@ -6,20 +6,6 @@ import Colors from '../theme/colors';
 
 type TipoChavePix = 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';
 
-type SavedCard = {
-  brand: string;
-  last4: string;
-  holder: string;
-  exp: string;
-};
-
-type PaymentPrefs = {
-  useSavedCard: boolean;
-  savedCard?: SavedCard;
-};
-
-const PAYMENT_PREFS_KEY = '@payment:preferences';
-
 const TIPOS_CHAVE: { value: TipoChavePix; label: string }[] = [
   { value: 'CPF', label: 'CPF' },
   { value: 'CNPJ', label: 'CNPJ' },
@@ -68,26 +54,6 @@ function maskPhone(v: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-function maskCardNumber(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 16);
-  return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-}
-
-function maskCardExpiry(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
-
-function detectCardBrand(cardNumber: string): string {
-  const digits = cardNumber.replace(/\D/g, '');
-  if (digits.startsWith('4')) return 'Visa';
-  if (/^5[1-5]/.test(digits)) return 'Mastercard';
-  if (/^3[47]/.test(digits)) return 'Amex';
-  if (digits.startsWith('6')) return 'Elo';
-  return 'Cartao';
-}
-
 function applyMask(tipo: TipoChavePix, value: string): string {
   switch (tipo) {
     case 'CPF': return maskCPF(value);
@@ -108,29 +74,6 @@ function validateChave(tipo: TipoChavePix, value: string): string | null {
   }
 }
 
-function loadPaymentPrefs(): PaymentPrefs {
-  if (typeof window === 'undefined') {
-    return { useSavedCard: true };
-  }
-
-  try {
-    const raw = window.localStorage.getItem(PAYMENT_PREFS_KEY);
-    if (!raw) return { useSavedCard: true };
-    const parsed = JSON.parse(raw) as PaymentPrefs;
-    return {
-      useSavedCard: parsed.useSavedCard !== false,
-      savedCard: parsed.savedCard,
-    };
-  } catch {
-    return { useSavedCard: true };
-  }
-}
-
-function savePaymentPrefs(prefs: PaymentPrefs): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(PAYMENT_PREFS_KEY, JSON.stringify(prefs));
-}
-
 export default function BankDetails() {
   const navigate = useNavigate();
   const [perfil, setPerfil] = useState<DadosBancariosPerfil>('MEDICO');
@@ -144,14 +87,6 @@ export default function BankDetails() {
   const [agencia, setAgencia] = useState('');
   const [conta, setConta] = useState('');
   const [showBancoList, setShowBancoList] = useState(false);
-
-  // Paciente flow (pagamento)
-  const [useSavedCard, setUseSavedCard] = useState(true);
-  const [savedCard, setSavedCard] = useState<SavedCard | undefined>(undefined);
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -170,10 +105,6 @@ export default function BankDetails() {
         setPerfil(nextPerfil);
 
         if (nextPerfil === 'PACIENTE') {
-          const prefs = loadPaymentPrefs();
-          if (!active) return;
-          setUseSavedCard(prefs.useSavedCard);
-          setSavedCard(prefs.savedCard);
           setLoadingData(false);
           return;
         }
@@ -219,77 +150,9 @@ export default function BankDetails() {
     setChaveError(null);
   }
 
-  function resetCardForm() {
-    setCardNumber('');
-    setCardHolder('');
-    setCardExpiry('');
-    setCardCvv('');
-  }
-
-  function savePatientPreferences(): boolean {
-    const numberDigits = cardNumber.replace(/\D/g, '');
-    const cvvDigits = cardCvv.replace(/\D/g, '');
-
-    if (!savedCard && numberDigits.length === 0) {
-      setSaveError('Adicione um cartao para usar como opcao rapida.');
-      return false;
-    }
-
-    let nextCard = savedCard;
-
-    if (numberDigits.length > 0 || cardHolder.trim() || cardExpiry || cvvDigits.length > 0) {
-      if (numberDigits.length < 13 || numberDigits.length > 16) {
-        setSaveError('Numero do cartao invalido.');
-        return false;
-      }
-      if (!cardHolder.trim()) {
-        setSaveError('Informe o nome impresso no cartao.');
-        return false;
-      }
-      if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) {
-        setSaveError('Validade invalida. Use MM/AA.');
-        return false;
-      }
-      if (cvvDigits.length < 3 || cvvDigits.length > 4) {
-        setSaveError('CVV invalido.');
-        return false;
-      }
-
-      nextCard = {
-        brand: detectCardBrand(cardNumber),
-        last4: numberDigits.slice(-4),
-        holder: cardHolder.trim(),
-        exp: cardExpiry,
-      };
-      setSavedCard(nextCard);
-      resetCardForm();
-    }
-
-    const prefs: PaymentPrefs = {
-      useSavedCard,
-      savedCard: nextCard,
-    };
-
-    savePaymentPrefs(prefs);
-    setSaveMsg('Preferencias de pagamento salvas com sucesso!');
-    setSaveError('');
-    setTimeout(() => setSaveMsg(''), 3000);
-    return true;
-  }
-
   async function handleSave() {
     setSaveError('');
     setSaveMsg('');
-
-    if (perfil === 'PACIENTE') {
-      setLoading(true);
-      try {
-        savePatientPreferences();
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
 
     const error = validateChave(tipoChave, chavePix);
     if (error) {
@@ -315,16 +178,6 @@ export default function BankDetails() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function removeSavedCard() {
-    const prefs = loadPaymentPrefs();
-    const nextPrefs: PaymentPrefs = {
-      useSavedCard,
-      savedCard: undefined,
-    };
-    setSavedCard(undefined);
-    savePaymentPrefs({ ...prefs, ...nextPrefs });
   }
 
   const inputStyle: React.CSSProperties = {
@@ -354,7 +207,7 @@ export default function BankDetails() {
       <div style={{ backgroundColor: Colors.doctor, padding: '28px 16px 16px', borderRadius: '0 0 20px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={() => navigate(-1)} style={{ color: '#fff', fontSize: 15, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar</button>
         <span style={{ color: '#fff', fontSize: 18, fontWeight: 800, letterSpacing: -0.3, display: 'block', textAlign: 'center' }}>
-          {isPaciente ? 'Metodos de Pagamento' : 'Dados para Recebimento'}
+          {isPaciente ? 'Pagamento' : 'Dados para Recebimento'}
         </span>
         <div style={{ width: 50 }} />
       </div>
@@ -367,78 +220,22 @@ export default function BankDetails() {
               <div>
                 <span style={{ fontSize: 15, fontWeight: 700, color: Colors.primary, display: 'block' }}>Pagamento da consulta</span>
                 <span style={{ fontSize: 13, color: Colors.textSecondary, marginTop: 2, display: 'block' }}>
-                  Escolha entre Pix e cartao salvo para finalizar mais rapido.
+                  O pagamento é feito na tela da consulta, via Pix ou cartão de crédito.
                 </span>
               </div>
             </div>
 
             <div style={{ backgroundColor: Colors.card, borderRadius: 20, padding: 20, marginBottom: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-              <span style={{ fontSize: 17, fontWeight: 800, color: Colors.textPrimary, letterSpacing: -0.3, display: 'block', marginBottom: 14 }}>
-                Opcoes
+              <span style={{ fontSize: 17, fontWeight: 800, color: Colors.textPrimary, letterSpacing: -0.3, display: 'block', marginBottom: 10 }}>
+                Como pagar
               </span>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                <input type="checkbox" checked={useSavedCard} onChange={e => setUseSavedCard(e.target.checked)} />
-                <span style={{ fontSize: 14, color: Colors.textPrimary, fontWeight: 600 }}>Usar cartao salvo como opcao rapida</span>
-              </label>
-            </div>
-
-            <div style={{ backgroundColor: Colors.card, borderRadius: 20, padding: 20, marginBottom: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
-              <span style={{ fontSize: 17, fontWeight: 800, color: Colors.textPrimary, letterSpacing: -0.3, display: 'block' }}>Cartao salvo</span>
-
-              {savedCard ? (
-                <div style={{ marginTop: 12, padding: 14, borderRadius: 12, border: `1px solid ${Colors.border}`, backgroundColor: Colors.inputBg }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: Colors.textPrimary, display: 'block' }}>
-                    {savedCard.brand} •••• {savedCard.last4}
-                  </span>
-                  <span style={{ fontSize: 12, color: Colors.textSecondary, display: 'block', marginTop: 4 }}>
-                    {savedCard.holder} • Validade {savedCard.exp}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={removeSavedCard}
-                    style={{ marginTop: 10, backgroundColor: Colors.errorLight, border: `1px solid ${Colors.error}`, color: Colors.error, borderRadius: 10, padding: '8px 12px', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Remover cartao salvo
-                  </button>
-                </div>
-              ) : (
-                <span style={{ fontSize: 13, color: Colors.textMuted, display: 'block', marginTop: 10 }}>
-                  Nenhum cartao salvo. Adicione abaixo.
+              <span style={{ fontSize: 14, color: Colors.textSecondary, display: 'block', marginBottom: 14 }}>
+                <strong>Pix</strong> é o método recomendado: gere o QR Code na tela da consulta, sem precisar cadastrar nada aqui antes. Para pagar com <strong>cartão de crédito</strong>, você será redirecionado para o checkout seguro do nosso gateway de pagamento no momento do pagamento.
+              </span>
+              <div style={{ backgroundColor: Colors.warningLight, borderRadius: 12, padding: '12px 14px', border: `1px solid ${Colors.border}` }}>
+                <span style={{ fontSize: 13, color: Colors.textSecondary, fontWeight: 600 }}>
+                  Cartão salvo está temporariamente indisponível — nosso gateway de pagamento atual ainda não oferece esse recurso.
                 </span>
-              )}
-
-              <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
-                <input
-                  value={cardNumber}
-                  onChange={e => setCardNumber(maskCardNumber(e.target.value))}
-                  placeholder="Numero do cartao"
-                  disabled={loading}
-                  style={inputStyle}
-                />
-                <input
-                  value={cardHolder}
-                  onChange={e => setCardHolder(e.target.value)}
-                  placeholder="Nome impresso no cartao"
-                  disabled={loading}
-                  style={inputStyle}
-                />
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <input
-                    value={cardExpiry}
-                    onChange={e => setCardExpiry(maskCardExpiry(e.target.value))}
-                    placeholder="MM/AA"
-                    disabled={loading}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  <input
-                    value={cardCvv}
-                    onChange={e => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    placeholder="CVV"
-                    disabled={loading}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                </div>
               </div>
             </div>
           </>
@@ -513,14 +310,16 @@ export default function BankDetails() {
           </>
         )}
 
-        <button onClick={handleSave} disabled={loading} style={{
-          width: '100%', backgroundColor: Colors.doctor, borderRadius: 14, padding: 16, border: 'none',
-          cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1,
-          display: 'flex', justifyContent: 'center', alignItems: 'center',
-          boxShadow: `0 6px 12px ${Colors.doctor}59`,
-        }}>
-          {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>{isPaciente ? 'Salvar Preferencias de Pagamento' : 'Salvar Dados Bancarios'}</span>}
-        </button>
+        {!isPaciente && (
+          <button onClick={handleSave} disabled={loading} style={{
+            width: '100%', backgroundColor: Colors.doctor, borderRadius: 14, padding: 16, border: 'none',
+            cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1,
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            boxShadow: `0 6px 12px ${Colors.doctor}59`,
+          }}>
+            {loading ? <div className="spinner" /> : <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>Salvar Dados Bancarios</span>}
+          </button>
+        )}
 
         {saveMsg && <p style={{ fontSize: 14, color: Colors.success, fontWeight: 700, textAlign: 'center', marginTop: 12 }}>{saveMsg}</p>}
         {saveError && <p style={{ fontSize: 14, color: Colors.error, textAlign: 'center', marginTop: 12 }} role="alert">{saveError}</p>}
