@@ -52,9 +52,8 @@ export function podeEntrarNaConsulta(consulta: { status?: string | null; meetLin
   return statusPermiteEntrada && Boolean(consulta.meetLink);
 }
 
-/** Mapa de ação do médico (PATCH /medicos/me/consultas/:id) para os status alvo. */
-export const ACAO_MEDICO_POR_STATUS: Record<'ACEITA' | 'RECUSADA' | 'CONCLUIDA', string> = {
-  ACEITA: 'ACEITAR',
-  RECUSADA: 'RECUSAR',
-  CONCLUIDA: 'FINALIZAR',
-};
+/**
+ * Status alvo aceitos pelo PATCH /medicos/me/consultas/:id no campo `status`
+ * (contrato confirmado em producao em 2026-07-30; o backend nao aceita mais `acao`).
+ */
+export const STATUS_MEDICO_ACEITOS: Array<'ACEITA' | 'RECUSADA' | 'CONCLUIDA'> = ['ACEITA', 'RECUSADA', 'CONCLUIDA'];
