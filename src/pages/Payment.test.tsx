@@ -6,10 +6,15 @@ import Payment from './Payment';
 const criarPagamentoMock = vi.fn();
 const syncPagamentoMock = vi.fn();
 const navigateMock = vi.fn();
+const getUserMock = vi.fn();
 
 vi.mock('../services/api', () => ({
   criarPagamento: (...args: unknown[]) => criarPagamentoMock(...args),
   syncPagamento: (...args: unknown[]) => syncPagamentoMock(...args),
+}));
+
+vi.mock('../storage/localStorage', () => ({
+  getUser: (...args: unknown[]) => getUserMock(...args),
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -28,6 +33,7 @@ function renderPayment(consultaId = 'consulta-1', valor = 10000) {
   );
 }
 
+
 function semPagamentoExistenteError() {
   return { response: { status: 404, data: { erro: 'Nenhum pagamento encontrado' } } };
 }
@@ -37,6 +43,7 @@ describe('Payment — idempotência do checkout (evitar preference duplicada)', 
     criarPagamentoMock.mockReset();
     syncPagamentoMock.mockReset();
     navigateMock.mockReset();
+    getUserMock.mockReset().mockResolvedValue(null);
     window.sessionStorage.clear();
     vi.useRealTimers();
   });
@@ -104,6 +111,7 @@ describe('Payment — polling de status', () => {
     criarPagamentoMock.mockReset();
     syncPagamentoMock.mockReset();
     navigateMock.mockReset();
+    getUserMock.mockReset().mockResolvedValue(null);
     window.sessionStorage.clear();
   });
 
@@ -183,6 +191,7 @@ describe('Payment — checkout de cartão (gateway Asaas)', () => {
     criarPagamentoMock.mockReset();
     syncPagamentoMock.mockReset();
     navigateMock.mockReset();
+    getUserMock.mockReset().mockResolvedValue(null);
     window.sessionStorage.clear();
     syncPagamentoMock.mockRejectedValue(semPagamentoExistenteError());
     Object.defineProperty(window, 'location', {
@@ -245,5 +254,112 @@ describe('Payment — checkout de cartão (gateway Asaas)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/não retornou link de pagamento/i);
     expect(window.location.href).toBe('');
+  });
+});
+
+describe('Payment — casos de erro do gateway Asaas (CPF, consulta já paga, acesso negado)', () => {
+  beforeEach(() => {
+    criarPagamentoMock.mockReset();
+    syncPagamentoMock.mockReset();
+    navigateMock.mockReset();
+    getUserMock.mockReset().mockResolvedValue(null);
+    window.sessionStorage.clear();
+    syncPagamentoMock.mockRejectedValue(semPagamentoExistenteError());
+  });
+
+  it('exibe mensagem amigável e permite ir ao perfil quando falta CPF (422)', async () => {
+    criarPagamentoMock.mockRejectedValue({
+      response: { status: 422, data: { erro: 'CPF obrigatório para prosseguir com o pagamento' } },
+    });
+
+    renderPayment();
+
+    const btn = await screen.findByRole('button', { name: /gerar código pix/i });
+    fireEvent.click(btn);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/complete seu cadastro com cpf/i);
+    const completarBtn = screen.getByRole('button', { name: /completar cadastro/i });
+    fireEvent.click(completarBtn);
+    expect(navigateMock).toHaveBeenCalledWith('/profile');
+  });
+
+  it('exibe mensagem amigável quando a consulta já foi paga (409)', async () => {
+    criarPagamentoMock.mockRejectedValue({
+      response: { status: 409, data: { erro: 'Pagamento já confirmado para esta consulta' } },
+    });
+
+    renderPayment();
+
+    const btn = await screen.findByRole('button', { name: /gerar código pix/i });
+    fireEvent.click(btn);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/esta consulta já foi paga/i);
+    const voltarBtn = screen.getByRole('button', { name: /voltar ao painel/i });
+    fireEvent.click(voltarBtn);
+    expect(navigateMock).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('bloqueia a tela inteira quando a consulta pertence a outro paciente (403)', async () => {
+    criarPagamentoMock.mockRejectedValue({
+      response: { status: 403, data: { erro: 'Você não tem acesso a esta consulta' } },
+    });
+
+    renderPayment();
+
+    const btn = await screen.findByRole('button', { name: /gerar código pix/i });
+    fireEvent.click(btn);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não tem permissão para acessar/i);
+    expect(screen.queryByRole('button', { name: /gerar código pix/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^cartão$/i })).not.toBeInTheDocument();
+
+    const voltarBtn = screen.getByRole('button', { name: /voltar ao painel/i });
+    fireEvent.click(voltarBtn);
+    expect(navigateMock).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('bloqueia o acesso já ao carregar a tela quando o sync retorna 403 de acesso negado', async () => {
+    syncPagamentoMock.mockReset().mockRejectedValue({
+      response: { status: 403, data: { erro: 'Você não tem acesso a esta consulta' } },
+    });
+
+    renderPayment();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/não tem permissão para acessar/i);
+    expect(criarPagamentoMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Payment — CPF obrigatório verificado proativamente antes de pagar', () => {
+  beforeEach(() => {
+    criarPagamentoMock.mockReset();
+    syncPagamentoMock.mockReset().mockRejectedValue(semPagamentoExistenteError());
+    navigateMock.mockReset();
+    getUserMock.mockReset();
+    window.sessionStorage.clear();
+  });
+
+  it('desabilita o botão de pagar e orienta a completar o cadastro quando o paciente não tem CPF', async () => {
+    getUserMock.mockResolvedValue({ id: 'u1', nome: 'Paciente', email: 'p@x.com', tipo: 'PACIENTE', cpf: undefined });
+
+    renderPayment();
+
+    expect(await screen.findByText(/complete seu cadastro com cpf/i)).toBeInTheDocument();
+    const btn = screen.getByRole('button', { name: /gerar código pix/i });
+    expect(btn).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /completar cadastro/i }));
+    expect(navigateMock).toHaveBeenCalledWith('/profile');
+    expect(criarPagamentoMock).not.toHaveBeenCalled();
+  });
+
+  it('não bloqueia o pagamento quando o paciente já tem CPF cadastrado', async () => {
+    getUserMock.mockResolvedValue({ id: 'u1', nome: 'Paciente', email: 'p@x.com', tipo: 'PACIENTE', cpf: '52998224725' });
+
+    renderPayment();
+
+    const btn = await screen.findByRole('button', { name: /gerar código pix/i });
+    expect(btn).not.toBeDisabled();
+    expect(screen.queryByText(/complete seu cadastro com cpf/i)).not.toBeInTheDocument();
   });
 });

@@ -646,10 +646,12 @@ export async function cancelConsulta(id: string): Promise<void> {
   }
 }
 
+// Contrato confirmado em producao (2026-07-30): o backend espera o status de
+// destino diretamente em `status`, e nao mais uma acao em `acao` (ver
+// docs/plans/divergencias.md e docs/processes/agendamento-consulta.md).
 export async function updateConsultaMedico(id: string, acao: 'ACEITA' | 'RECUSADA' | 'CONCLUIDA', motivoRecusa?: string): Promise<void> {
-  const acaoMap: Record<string, string> = { ACEITA: 'ACEITAR', RECUSADA: 'RECUSAR', CONCLUIDA: 'FINALIZAR' };
   await api.patch(`/medicos/me/consultas/${id}`, {
-    acao: acaoMap[acao] ?? acao,
+    status: acao,
     ...(motivoRecusa ? { motivoRecusa } : {}),
   });
 }

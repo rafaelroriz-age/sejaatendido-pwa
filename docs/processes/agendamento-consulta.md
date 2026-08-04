@@ -8,8 +8,9 @@ related:
   - ../systems/api-backend-e-contratos.md
   - pagamentos-consulta.md
   - ../knowledge/dominio-e-papeis.md
+  - ../plans/divergencias.md
 tags: [agendamento, consulta, disponibilidade]
-last_updated: 2026-07-25
+last_updated: 2026-07-30
 ---
 
 <!-- ai-summary
@@ -56,6 +57,41 @@ Foi observado que `PATCH /medicos/me/consultas/:id` com `acao: "ACEITAR"` respon
 
 - Isso e um bug de **backend** (persistencia do PATCH + geracao do meetLink), nao do frontend: o frontend ja faz atualizacao otimista + refetch (`handleUpdateConsulta` em `src/pages/DoctorDashboard.tsx`) e ja trata `meetLink` ausente sem quebrar a UI (oculta o botao de entrar / usa fallback para o chat).
 - Ver `../plans/duvidas-abertas.md` e `../plans/pendencias-somente-usuario-passo-a-passo.md` para acompanhamento.
+
+## Bug critico confirmado em producao (2026-07-30): aceite de consulta quebrado por contrato divergente — corrigido no frontend em 2026-07-30
+
+Teste end-to-end em `https://sejaatendido.com.br` (paciente novo + medico `Dr. Carlos Teste`, CPF de teste) reproduziu uma falha mais grave que a acima: o clique em "Confirmar" no `DoctorDashboard` retornava **`400 Bad Request`**, e a consulta nem chegava a ficar com status inconsistente — ela simplesmente nunca mudava.
+
+- Requisicao enviada pelo frontend (`updateConsultaMedico` em `src/services/api.ts`): `PATCH /medicos/me/consultas/:id` com corpo `{ "acao": "ACEITAR" }`.
+- Resposta do backend: `400` com `{"erro":"Dados invalidos","detalhes":[{"campo":"status","mensagem":"Invalid option: expected one of \"PENDENTE\"|\"ACEITA\"|\"RECUSADA\"|\"CONCLUIDA\"|\"CANCELADA\""}]}`.
+- Ou seja, o backend migrou o contrato do endpoint de `{ acao: "ACEITAR"|"RECUSAR"|"FINALIZAR" }` para `{ status: "ACEITA"|"RECUSADA"|"CONCLUIDA" }` (enum de destino direto), mas o frontend (`acaoMap` em `updateConsultaMedico`) ainda enviava o campo antigo `acao`.
+- **Impacto (ate a correcao):** nenhum medico conseguia aceitar, recusar ou concluir manualmente uma consulta pela UI. O fluxo completo travava permanentemente em `PENDENTE` a menos que o cron de auto-conclusao do backend eventualmente alterasse o status por outro caminho.
+- **Causa raiz:** dessincronia de contrato front/back (nao e o mesmo bug do item anterior, que era de persistencia; este era de validacao/schema do payload).
+- **Correcao aplicada (frontend, 2026-07-30):** `updateConsultaMedico` agora envia `{ status: acao, ...(motivoRecusa ? { motivoRecusa } : {}) }` em vez de `{ acao: acaoMap[acao] }`, alinhado ao enum confirmado pela resposta 400. Coberto por `src/services/updateConsultaMedico.test.ts` (regressao) e o mock MSW (`src/mocks/handlers.ts`) foi atualizado para validar o novo contrato.
+- **Pendente do lado backend:** confirmar em producao que `PATCH /medicos/me/consultas/:id` com `{ status: "ACEITA" }` (a) responde `200`, (b) persiste o novo status (nao volta a `PENDENTE` num refetch — ver bug de persistencia acima) e (c) gera o `meetLink` no mesmo momento. Confirmar tambem se `motivoRecusa` e o nome de campo esperado ao recusar, e se existe alguma validacao adicional de transicao de estado (ex.: nao permitir `CONCLUIDA` antes do horario da consulta).
+- Ver divergencia registrada em `../plans/divergencias.md` (agora marcada como resolvida no frontend).
+
+## O que o backend precisa fazer para acompanhar (resumo acionavel)
+
+1. **Confirmar e estabilizar o contrato `{ status }`** do `PATCH /medicos/me/consultas/:id` (ja corrigido no frontend) — publicar/validar o schema oficial (enum de `status`, campo `motivoRecusa`) para evitar nova dessincronia de contrato.
+2. **Corrigir a persistencia do PATCH de aceite.** Hoje (bug documentado acima) o status pode nao persistir e a consulta volta a `PENDENTE` num refetch — isso e bloqueante mesmo com o contrato correto.
+3. **Gerar o `meetLink` no momento em que a consulta passa a `ACEITA`.** Sem isso, paciente e medico nunca conseguem "Entrar na Consulta" mesmo com o fluxo de aceite funcionando.
+4. **Incluir dados do paciente (nome) na resposta de `GET /medicos/me/consultas`.** O frontend hoje cai no fallback genérico "Paciente" (ver `getPatientName` em `src/pages/DoctorDashboard.tsx`) porque o payload não traz `paciente.nome`/`pacienteNome` de forma confiável.
+5. **Expor mensagens de erro estruturadas e estáveis** (`erro`, `detalhes[].campo/mensagem`) em todos os endpoints do fluxo de agendamento — o frontend já trata esse formato (`showErrorAlert`), mas variações de shape quebram a extração da mensagem amigável.
+6. **Confirmar o tempo do cron de auto-conclusão** (`PENDENTE`/`ACEITA` → `CONCLUIDA`) e, se possível, permitir configurá-lo ou expor o horário estimado de liberação do pagamento para reduzir a espera "às cegas" do paciente no Dashboard.
+7. **Higienizar contas de teste em produção** (medicos "Dr(a). Medico 178XXXXXXXXX") ou expor um flag de teste filtrável, para não poluir a listagem de médicos em `/book`.
+
+## Melhorias sugeridas para tornar o fluxo mais coeso
+
+Alem do bug critico acima, o teste manual (Playwright/MCP) do fluxo completo — cadastro de paciente, agendamento e aceite pelo medico — revelou pontos que reduzem a coesao/consistencia percebida pelo usuario:
+
+
+1. **Erros de API sao silenciosos para o usuario.** `showErrorAlert` (`src/utils/errorHandler.ts`) apenas faz `console.warn` e dispara um `CustomEvent('app:error')` que **nao tem nenhum listener** no app (busca no codigo nao encontrou nenhum `addEventListener('app:error', ...)`). Essa funcao e usada em 23 pontos (login, agendamento, chat, admin, CRM, agenda do medico, recuperacao de senha etc.). Na pratica, qualquer falha de API — como o 400 acima ao clicar em "Confirmar" — nao mostra nada na tela; o usuario so ve o botao "nao fazer nada". Sugestao: implementar um componente de toast global que escute `app:error` e exiba a mensagem (`title`/`message`) de forma visivel.
+2. **Nome do paciente aparece generico no dashboard do medico.** Em `DoctorDashboard.tsx`, o card de consulta mostra o texto fixo "Paciente" no lugar do nome real (ex.: "Mariana Costa Ferreira"), mesmo com o motivo da consulta sendo exibido corretamente. Isso dificulta o medico identificar quem e o paciente antes de aceitar.
+3. **Lista de selecao de medico em `/book` poluida por contas de teste.** A tela real de producao lista dezenas de "Dr(a). Medico 178XXXXXXXXX" (nomes com timestamp, claramente gerados em testes anteriores), misturados com medicos reais. Isso compromete a credibilidade da tela para um paciente real e dificulta encontrar o medico certo. Sugestao: expurgar/desativar contas de teste em producao ou adicionar filtro por status/flag de teste.
+4. **Rotulo "Pendentes" ambiguo no dashboard do paciente.** O card de estatisticas em `Dashboard.tsx` usa `Pendentes` para contar consultas com **pagamento pendente** (`canPayConsulta`), mas o badge de status exibido no card de cada consulta logo abaixo usa o mesmo texto "Pendente" para indicar que a consulta **ainda aguarda confirmacao do medico**. Sao dois conceitos diferentes com o mesmo rotulo, o que confunde o paciente (ex.: consulta com badge "Pendente" mas contador "Pendentes: 0"). Sugestao: renomear o contador para algo como "Aguardando pagamento" e reservar "Pendente(s)" apenas para o status de confirmacao do medico.
+5. **Sessao compartilhada entre abas sem isolamento.** Como o token fica em `localStorage` (sem particionamento por aba), logar como medico em uma aba do navegador sobrescreve silenciosamente a sessao do paciente aberta em outra aba do mesmo navegador, causando `403` nas chamadas seguintes sem qualquer aviso (reforca o ponto 1). Isso pode acontecer com um usuario real que testa duas contas na mesma janela.
+6. **Falha de chunk JS apos deploy ("stale chunk").** Em um teste, apos criar a conta e fazer login, a navegacao para `/dashboard` falhou com multiplos `404` em arquivos versionados (`Dashboard-*.js`, `Badge-*.js`, `Avatar-*.js` etc.) e um erro `Failed to fetch dynamically imported module`, deixando a tela em branco; um F5 resolveu. Isso e tipico de SPA com code-splitting quando o `index.html` em cache aponta para hashes de um deploy anterior. Sugestao: adicionar um handler global de erro de import dinamico (`vite:preloadError` / `error` em `import()`) que force `window.location.reload()` automaticamente.
 
 ## Valor da consulta no frontend
 

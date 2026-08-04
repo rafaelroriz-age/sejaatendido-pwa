@@ -35,6 +35,22 @@ function formatConsultaValor(valorCentavos?: number): string | null {
   return formatCurrency(valorCentavos / 100);
 }
 
+// Cartão fica retido por janela de segurança antifraude (48h) antes de poder
+// ser antecipado — o backend responde 400 com `previsaoLiberacao` nesse caso.
+// Tratamos separado do erro genérico para exibir a data ao médico, em vez de
+// uma mensagem de erro sem contexto.
+function getRepasseImediatoErrorMessage(error: unknown): string {
+  const anyErr = error as any;
+  const payload = anyErr?.response?.data;
+  const previsaoLiberacao = payload?.previsaoLiberacao;
+  if (previsaoLiberacao) {
+    const data = new Date(previsaoLiberacao);
+    const dataFormatada = Number.isNaN(data.getTime()) ? previsaoLiberacao : data.toLocaleString('pt-BR');
+    return `Este valor está retido por segurança (antifraude) e só pode ser antecipado a partir de ${dataFormatada}.`;
+  }
+  return 'Não foi possível solicitar o repasse imediato agora. Tente novamente em instantes.';
+}
+
 // Diferencia visualmente: aguardando aceite do médico, aceita mas ainda não
 // concluída/paga, concluída aguardando pagamento e efetivamente paga. Antes,
 // tudo que não era "Pendente" aparecia como "Confirmado", inclusive consultas
@@ -225,8 +241,8 @@ export default function Earnings() {
       // Atualiza o saldo apos a antecipacao ser processada.
       const saldoAtualizado = await fetchSaldoMedico().catch(() => null);
       if (saldoAtualizado) setSaldo(saldoAtualizado);
-    } catch {
-      setAntecipacaoError('Não foi possível solicitar o repasse imediato agora. Tente novamente em instantes.');
+    } catch (error) {
+      setAntecipacaoError(getRepasseImediatoErrorMessage(error));
     } finally {
       setAntecipacaoLoading(false);
     }

@@ -439,13 +439,19 @@ export const handlers = [
 
   // Painel médico
   http.get(`${BASE}/medicos/me/consultas`, () => HttpResponse.json({ consultas: MOCK_CONSULTAS_MEDICO, total: MOCK_CONSULTAS_MEDICO.length })),
+  // Contrato confirmado em producao (2026-07-30): o backend recebe `status` direto, nao `acao`.
   http.patch(`${BASE}/medicos/me/consultas/:id`, async ({ request, params }) => {
-    const body = await request.json() as { acao?: string };
-    const statusMap: Record<string, string> = { ACEITAR: 'ACEITA', RECUSAR: 'RECUSADA', FINALIZAR: 'CONCLUIDA' };
-    const novoStatus = statusMap[body.acao ?? ''] ?? body.acao ?? 'PENDENTE';
+    const body = await request.json() as { status?: string };
+    const statusValidos = ['ACEITA', 'RECUSADA', 'CONCLUIDA'];
+    if (!body.status || !statusValidos.includes(body.status)) {
+      return HttpResponse.json(
+        { erro: 'Dados invalidos', detalhes: [{ campo: 'status', mensagem: 'campo status invalido' }] },
+        { status: 400 },
+      );
+    }
     const consulta = MOCK_CONSULTAS_MEDICO.find(c => c.id === params.id);
-    if (consulta) (consulta as any).status = novoStatus;
-    return HttpResponse.json({ consulta: { ...consulta, status: novoStatus } });
+    if (consulta) (consulta as any).status = body.status;
+    return HttpResponse.json({ consulta: { ...consulta, status: body.status } });
   }),
   http.get(`${BASE}/medicos/me/saldo`, () => HttpResponse.json(MOCK_SALDO)),
   http.get(`${BASE}/medicos/me/repasses`, () => HttpResponse.json(MOCK_REPASSES)),

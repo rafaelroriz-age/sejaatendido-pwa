@@ -25,6 +25,12 @@
       "id": "supabase-project-ref",
       "type": "promptString",
       "description": "Supabase Project Ref (opcional - deixe vazio para acesso a todos os projetos)"
+    },
+    {
+      "id": "asaas-api-key",
+      "type": "promptString",
+      "description": "Asaas API Key / access_token (Painel Asaas > Integrações > Chave de API)",
+      "password": true
     }
   ],
   "servers": {
@@ -40,6 +46,13 @@
       "url": "https://mcp.render.com/mcp",
       "headers": {
         "Authorization": "Bearer ${input:render-api-key}"
+      }
+    },
+    "asaas": {
+      "type": "http",
+      "url": "https://docs.asaas.com/mcp",
+      "headers": {
+        "access_token": "${input:asaas-api-key}"
       }
     },
     "supabase": {
