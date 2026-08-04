@@ -1,8 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { criarPagamento, syncPagamento } from '../services/api';
+import {
+  criarPagamento,
+  syncPagamento,
+  pagarComCartaoToken,
+  fetchCartoesSalvos,
+  removerCartaoSalvo,
+  type CartaoSalvo,
+  type PagamentoCartaoResponse,
+  type PagamentoCartaoResultado,
+} from '../services/api';
 import { getUser } from '../storage/localStorage';
 import Colors, { Radius } from '../theme/colors';
+import CreditCardForm, { type CreditCardTokenResult } from '../components/CreditCardForm';
 
 type PaymentMethod = 'pix' | 'cartao';
 
@@ -166,6 +176,17 @@ export default function Payment() {
   // de tentar criar o pagamento e receber o 422 do backend.
   const [patientCpfMissing, setPatientCpfMissing] = useState(false);
 
+  // Cartao (novo estilo Uber: cartao salvo reutilizavel ou cartao novo tokenizado
+  // direto no Asaas — ver services/asaas.ts e services/api.ts:pagarComCartaoToken).
+  const [cartoesSalvos, setCartoesSalvos] = useState<CartaoSalvo[]>([]);
+  const [loadingCartoes, setLoadingCartoes] = useState(false);
+  const [showNovoCartaoForm, setShowNovoCartaoForm] = useState(false);
+  const [installments, setInstallments] = useState(1);
+  const [salvarCartaoChecked, setSalvarCartaoChecked] = useState(false);
+  const [cardSubmitting, setCardSubmitting] = useState(false);
+  const [cardResult, setCardResult] = useState<PagamentoCartaoResultado | null>(null);
+  const [removingCartaoId, setRemovingCartaoId] = useState<string | null>(null);
+
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartedAt = useRef<number | null>(null);
   // Guarda contra duplo-clique/duplo-submit alem do `disabled` do botao: o
@@ -205,10 +226,38 @@ export default function Payment() {
     setPollTimedOut(false);
     setBlockedReason(null);
     setCopied(false);
+    setCardResult(null);
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+  }, [method]);
+
+  // Carrega os cartoes salvos do paciente ao abrir a aba "Cartao" (estilo Uber:
+  // reutilizar um cartao salvo ou cadastrar um novo, nunca obrigatorio).
+  useEffect(() => {
+    if (method !== 'cartao') return;
+    let active = true;
+
+    async function loadCartoesSalvos() {
+      setLoadingCartoes(true);
+      try {
+        const list = await fetchCartoesSalvos();
+        if (!active) return;
+        setCartoesSalvos(list);
+        setShowNovoCartaoForm(list.length === 0);
+      } catch {
+        if (active) {
+          setCartoesSalvos([]);
+          setShowNovoCartaoForm(true);
+        }
+      } finally {
+        if (active) setLoadingCartoes(false);
+      }
+    }
+
+    void loadCartoesSalvos();
+    return () => { active = false; };
   }, [method]);
 
   // Ao entrar na tela (ou trocar de consulta), verifica se ja existe um
@@ -379,7 +428,9 @@ export default function Payment() {
     setBlockedReason(null);
 
     try {
-      const data = (await criarPagamento({ consultaId, metodoPagamento: 'pix', valorCentavos: state?.valor })) as PaymentResponse;
+      // O valor cobrado e sempre o definido pelo medico (valorConsultaCentavos);
+      // o frontend nao envia mais valorCentavos, o backend ignora se enviado.
+      const data = (await criarPagamento({ consultaId, metodoPagamento: 'pix' })) as PaymentResponse;
 
       const hasPixFields = Boolean(data?.pix?.qrCode || data?.pix?.qrCodeBase64 || data?.pix?.ticketUrl);
       if (!hasPixFields) {
@@ -401,32 +452,87 @@ export default function Payment() {
     }
   }
 
-  async function handleCardPayment() {
+  // Interpreta a resposta comum aos dois fluxos de cartao (novo tokenizado ou
+  // salvo): navega para o dashboard quando aprovado, ou expõe o motivo da
+  // recusa para o paciente tentar de novo (outro cartao ou Pix). O motivo da
+  // recusa e mostrado so no banner dedicado (cardResult), evitando duplicar a
+  // mensagem no banner generico de erro.
+  function handleCardPaymentResult(data: PagamentoCartaoResponse) {
+    setCardResult(data?.cartao ?? null);
+
+    const aprovado = data?.cartao?.aprovado;
+    const pagamentoStatus = data?.pagamento?.status;
+
+    if (aprovado === true || pagamentoStatus === 'PAGO') {
+      navigate('/dashboard', { replace: true, state: { paymentSuccess: true, consultaId } });
+    }
+  }
+
+  async function handlePagarComCartaoSalvo(cartaoId: string) {
+    if (!consultaId || submittingRef.current) return;
+    submittingRef.current = true;
+
+    setCardSubmitting(true);
+    setErrorText('');
+    setBlockedReason(null);
+    setCardResult(null);
+
+    try {
+      const data = await pagarComCartaoToken({ consultaId, cartaoId });
+      handleCardPaymentResult(data);
+    } catch (error) {
+      const { blockedReason: reason, message } = classifyPaymentError(error, 'Falha ao pagar com o cartão salvo.');
+      setBlockedReason(reason);
+      setErrorText(message);
+    } finally {
+      setCardSubmitting(false);
+      submittingRef.current = false;
+    }
+  }
+
+  async function handleTokenizedNewCard(result: CreditCardTokenResult) {
     if (!consultaId) {
       setErrorText('ID da consulta não encontrado.');
       return;
     }
-    if (submittingRef.current) return;
-    submittingRef.current = true;
 
-    setLoading(true);
     setErrorText('');
     setBlockedReason(null);
+    setCardResult(null);
+
     try {
-      const data = (await criarPagamento({ consultaId, metodoPagamento: 'card', valorCentavos: state?.valor })) as PaymentResponse;
-      const checkoutUrl = data?.linkPagamento || data?.paymentUrl || data?.asaas?.invoiceUrl || data?.asaas?.checkoutUrl;
-      if (!checkoutUrl) {
-        setErrorText('Checkout do cartão não retornou link de pagamento.');
-        return;
-      }
-      window.location.href = checkoutUrl;
+      const data = await pagarComCartaoToken({
+        consultaId,
+        token: result.token,
+        paymentMethodId: 'credit_card',
+        installments: installments > 1 ? installments : undefined,
+        salvarCartao: salvarCartaoChecked,
+        ultimosDigitos: result.ultimosDigitos,
+        bandeira: result.bandeira,
+        titular: result.titular,
+      });
+      handleCardPaymentResult(data);
     } catch (error) {
-      const { blockedReason: reason, message } = classifyPaymentError(error, 'Falha ao iniciar pagamento com cartão.');
+      const { blockedReason: reason, message } = classifyPaymentError(error, 'Falha ao pagar com o cartão.');
       setBlockedReason(reason);
       setErrorText(message);
+    }
+  }
+
+  async function handleRemoveCartaoSalvo(cartaoId: string) {
+    setRemovingCartaoId(cartaoId);
+    setErrorText('');
+    try {
+      await removerCartaoSalvo(cartaoId);
+      setCartoesSalvos(prev => {
+        const next = prev.filter(c => c.id !== cartaoId);
+        if (next.length === 0) setShowNovoCartaoForm(true);
+        return next;
+      });
+    } catch (error) {
+      setErrorText(getErrorMessage(error, 'Não foi possível remover o cartão.'));
     } finally {
-      setLoading(false);
-      submittingRef.current = false;
+      setRemovingCartaoId(null);
     }
   }
 
@@ -623,23 +729,111 @@ export default function Payment() {
           </>
         ) : (
             <>
-              <div style={{ backgroundColor: Colors.card, borderRadius: 14, border: `1px solid ${Colors.border}`, padding: 14, marginBottom: 12 }}>
-                <span style={{ fontSize: 13, color: Colors.textSecondary }}>
-                  Você será redirecionado para o checkout seguro para inserir os dados do cartão. Cartão salvo ainda não está disponível neste método de pagamento.
-                </span>
-              </div>
+              {loadingCartoes && (
+                <div style={{ textAlign: 'center', padding: '16px 0', fontSize: 13, color: Colors.textMuted, fontWeight: 600 }}>
+                  Carregando cartões salvos…
+                </div>
+              )}
 
-              <button type="button" onClick={handleCardPayment} disabled={loading || !consultaId || Boolean(blockedReason) || patientCpfMissing} style={{
-            width: '100%', backgroundColor: Colors.primary, borderRadius: Radius.md, padding: 18,
-                border: 'none', cursor: (loading || !consultaId) ? 'not-allowed' : 'pointer',
-                color: '#fff', fontSize: 16, fontWeight: 700, opacity: (loading || !consultaId || Boolean(blockedReason) || patientCpfMissing) ? 0.6 : 1,
-            boxShadow: `0 6px 12px ${Colors.primary}59`,
-          }}>
-                {loading ? 'Iniciando checkout…' : 'Pagar com cartao'}
-              </button>
+              {!loadingCartoes && cartoesSalvos.length > 0 && (
+                <div style={{ backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, marginBottom: 10 }}>Cartões salvos</p>
+                  {cartoesSalvos.map(c => (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${Colors.borderLight}`, gap: 8 }}>
+                      <span style={{ fontSize: 14, color: Colors.textPrimary, fontWeight: 600 }}>
+                        {(c.bandeira || 'Cartão').toUpperCase()} •••• {c.ultimosDigitos}
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => handlePagarComCartaoSalvo(c.id)}
+                          disabled={cardSubmitting || !consultaId || Boolean(blockedReason) || patientCpfMissing}
+                          aria-label={`Pagar com cartão terminado em ${c.ultimosDigitos}`}
+                          style={{
+                            backgroundColor: Colors.primary, color: '#fff', border: 'none', borderRadius: 8,
+                            padding: '8px 12px', fontWeight: 700, fontSize: 12,
+                            cursor: cardSubmitting ? 'not-allowed' : 'pointer',
+                            opacity: (cardSubmitting || !consultaId || Boolean(blockedReason) || patientCpfMissing) ? 0.6 : 1,
+                          }}
+                        >
+                          {cardSubmitting ? 'Pagando…' : 'Pagar'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCartaoSalvo(c.id)}
+                          disabled={removingCartaoId === c.id}
+                          aria-label={`Remover cartão terminado em ${c.ultimosDigitos}`}
+                          style={{
+                            backgroundColor: 'transparent', color: Colors.error, border: `1px solid ${Colors.error}`,
+                            borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                            opacity: removingCartaoId === c.id ? 0.6 : 1,
+                          }}
+                        >
+                          {removingCartaoId === c.id ? 'Removendo…' : 'Remover'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowNovoCartaoForm(v => !v)}
+                    style={{ marginTop: 10, backgroundColor: 'transparent', border: 'none', color: Colors.primary, fontWeight: 700, fontSize: 13, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                  >
+                    {showNovoCartaoForm ? 'Cancelar novo cartão' : 'Pagar com outro cartão'}
+                  </button>
+                </div>
+              )}
+
+              {cardResult?.aprovado === false && (
+                <div style={{ backgroundColor: '#FFEBEE', borderRadius: 12, padding: '12px 16px', marginBottom: 16, border: '1px solid #EF9A9A' }}>
+                  <span style={{ fontSize: 14, color: '#C62828', fontWeight: 600, display: 'block', marginBottom: 8 }}>
+                    Pagamento não aprovado{cardResult.statusDetail ? `: ${cardResult.statusDetail}` : '.'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMethod('pix')}
+                    style={{ backgroundColor: '#C62828', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}
+                  >
+                    Tentar pagar com Pix
+                  </button>
+                </div>
+              )}
+
+              {!loadingCartoes && (cartoesSalvos.length === 0 || showNovoCartaoForm)
+                && blockedReason !== 'consulta_ja_paga' && !patientCpfMissing && (
+                <div style={{ backgroundColor: Colors.card, borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, marginBottom: 12 }}>Novo cartão de crédito</p>
+                  <CreditCardForm
+                    submitLabel="Pagar com este cartão"
+                    disabled={!consultaId || Boolean(blockedReason)}
+                    onTokenized={handleTokenizedNewCard}
+                  >
+                    <div style={{ marginBottom: 12 }}>
+                      <label htmlFor="parcelas" style={{ fontSize: 12, fontWeight: 700, color: Colors.textSecondary, marginBottom: 6, display: 'block' }}>
+                        Parcelas
+                      </label>
+                      <select
+                        id="parcelas"
+                        value={installments}
+                        onChange={e => setInstallments(Number(e.target.value))}
+                        style={{ width: '100%', backgroundColor: Colors.inputBg, borderRadius: 12, padding: '12px 14px', fontSize: 14, border: `1px solid ${Colors.border}`, color: Colors.textPrimary }}
+                      >
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
+                          <option key={n} value={n}>{n === 1 ? 'À vista' : `${n}x`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, color: Colors.textSecondary, fontWeight: 600 }}>
+                      <input type="checkbox" checked={salvarCartaoChecked} onChange={e => setSalvarCartaoChecked(e.target.checked)} />
+                      Salvar este cartão para próximos pagamentos
+                    </label>
+                  </CreditCardForm>
+                </div>
+              )}
             </>
         )}
       </div>
     </div>
   );
 }
+

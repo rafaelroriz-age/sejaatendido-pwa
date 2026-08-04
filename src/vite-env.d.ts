@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_FRONTEND_URL?: string;
   readonly VITE_MOCK?: string;
   readonly VITE_VAPID_PUBLIC_KEY?: string;
+  readonly VITE_ASAAS_ENV?: string;
+  readonly VITE_ASAAS_TOKENIZATION_KEY?: string;
 }
 
 interface ImportMeta {

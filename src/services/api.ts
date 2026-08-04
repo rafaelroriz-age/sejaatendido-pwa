@@ -396,9 +396,24 @@ export async function fetchMedicoPerfil(): Promise<Medico> {
   return normalizeMedico(r.data?.medico ?? r.data);
 }
 
+// Contrato do valor da consulta (2026-08-04): o backend passou a expor um endpoint
+// dedicado para o valor cobrado do paciente, em centavos (`valorConsultaCentavos`).
+// Demais campos de perfil do medico continuam em PUT /medicos/me.
 export async function updateMedicoPerfil(data: { especialidade?: string; bio?: string; valorConsulta?: number; fotoPerfil?: string }): Promise<Medico> {
-  const r = await api.put('/medicos/me', data);
-  return normalizeMedico(r.data?.medico ?? r.data);
+  const { valorConsulta, ...outrosCampos } = data;
+  let medico: Medico | undefined;
+
+  if (Object.keys(outrosCampos).length > 0) {
+    const r = await api.put('/medicos/me', outrosCampos);
+    medico = normalizeMedico(r.data?.medico ?? r.data);
+  }
+
+  if (typeof valorConsulta === 'number') {
+    const r = await api.put('/medicos/me/perfil', { valorConsultaCentavos: valorConsulta });
+    medico = normalizeMedico(r.data?.medico ?? r.data);
+  }
+
+  return medico ?? (await fetchMedicoPerfil());
 }
 
 export interface SlotsResponse {
@@ -903,6 +918,88 @@ export async function fetchPagamentoById(id: string): Promise<PagamentoResponse>
 export async function syncPagamento(consultaId: string): Promise<PagamentoResponse> {
   const r = await api.get(`/v1/pagamentos/sync/${consultaId}`);
   return normalizePagamentoResponse(r.data);
+}
+
+// PAGAMENTO COM CARTAO (tokenizacao client-side no Asaas, ver services/asaas.ts)
+// O frontend nunca envia numero/CVV ao backend: apenas o creditCardToken retornado
+// pela tokenizacao, mais os metadados de exibicao (ultimos digitos/bandeira/titular).
+export interface PagarComCartaoTokenRequest {
+  consultaId: string;
+  /** Cartao novo: token retornado pela tokenizacao client-side do Asaas. */
+  token?: string;
+  /** Cartao salvo: id retornado por fetchCartoesSalvos(). */
+  cartaoId?: string;
+  paymentMethodId?: string;
+  /** 2+ = parcelado; omitir ou 1 = a vista. */
+  installments?: number;
+  /** Salva o cartao no perfil apos o pagamento ser aprovado (so aplica a cartao novo). */
+  salvarCartao?: boolean;
+  ultimosDigitos?: string;
+  bandeira?: string;
+  titular?: string;
+}
+
+export interface PagamentoCartaoResultado {
+  status?: string;
+  statusDetail?: string;
+  aprovado?: boolean;
+}
+
+export interface PagamentoCartaoResponse {
+  pagamento?: PagamentoCriado;
+  cartao?: PagamentoCartaoResultado;
+}
+
+export async function pagarComCartaoToken(data: PagarComCartaoTokenRequest): Promise<PagamentoCartaoResponse> {
+  if (Boolean(data.token) === Boolean(data.cartaoId)) {
+    throw new Error('Informe exatamente um entre token (cartao novo) e cartaoId (cartao salvo).');
+  }
+
+  const body: Record<string, unknown> = { consultaId: data.consultaId };
+  if (data.token) body.token = data.token;
+  if (data.cartaoId) body.cartaoId = data.cartaoId;
+  if (data.paymentMethodId) body.paymentMethodId = data.paymentMethodId;
+  if (typeof data.installments === 'number') body.installments = data.installments;
+  if (typeof data.salvarCartao === 'boolean') body.salvarCartao = data.salvarCartao;
+  if (data.ultimosDigitos) body.ultimosDigitos = data.ultimosDigitos;
+  if (data.bandeira) body.bandeira = data.bandeira;
+  if (data.titular) body.titular = data.titular;
+
+  const r = await api.post('/pagamentos/cartao/token', body);
+  return r.data;
+}
+
+// CARTOES SALVOS (perfil do paciente) — token do Asaas persistido pelo backend
+// (criptografado em repouso), reutilizavel para cobrar o mesmo cartao de novo.
+export interface CartaoSalvo {
+  id: string;
+  ultimosDigitos?: string;
+  bandeira?: string;
+  titular?: string;
+  validadeMes?: number;
+  validadeAno?: number;
+}
+
+export async function fetchCartoesSalvos(): Promise<CartaoSalvo[]> {
+  const r = await api.get('/pacientes/me/cartoes');
+  const list = r.data?.cartoes ?? r.data ?? [];
+  return Array.isArray(list) ? list : [];
+}
+
+export interface SalvarCartaoRequest {
+  token: string;
+  ultimosDigitos?: string;
+  bandeira?: string;
+  titular?: string;
+}
+
+export async function salvarCartao(data: SalvarCartaoRequest): Promise<CartaoSalvo> {
+  const r = await api.post('/pacientes/me/cartoes', data);
+  return r.data?.cartao ?? r.data;
+}
+
+export async function removerCartaoSalvo(cartaoId: string): Promise<void> {
+  await api.delete(`/pacientes/me/cartoes/${cartaoId}`);
 }
 
 // DADOS BANCARIOS
