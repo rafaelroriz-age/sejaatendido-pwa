@@ -13,6 +13,8 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-https://sejaatendido-staging-backend.onrender.com}
         VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-}
+        VITE_ASAAS_TOKENIZATION_KEY: ${VITE_ASAAS_TOKENIZATION_KEY:-}
+        VITE_ASAAS_ENV: ${VITE_ASAAS_ENV:-sandbox}
     ports:
       - "3001:80"
     restart: unless-stopped

@@ -15,9 +15,9 @@ last_updated: 2026-08-05
 
 <!-- ai-summary
 System: pagamento de consulta via PIX ou cartao (tokenizacao client-side + cartao salvo) usando endpoints /v1/pagamentos.
-Flow: tela de selecao de forma de pagamento (Pix/Cartao/Dinheiro em breve) -> criar pagamento ou tokenizar cartao -> polling sync (Pix) ou resposta imediata (cartao) -> confirmar status final.
+Flow: consulta precisa estar CONCLUIDA (regra pos-atendimento, 2026-08) -> Dashboard exibe "Pagar consulta" -> tela de selecao de forma de pagamento (Pix/Cartao/Dinheiro em breve) -> criar pagamento ou tokenizar cartao -> polling sync (Pix) ou resposta imediata (cartao) -> confirmar status final.
 Owner: frontend.
-Systems: src/pages/Payment.tsx, src/components/CreditCardForm.tsx, src/services/api.ts, src/services/asaas.ts, src/pages/PaymentSuccess.tsx, src/pages/PaymentPending.tsx, src/pages/PaymentFailure.tsx.
+Systems: src/pages/Payment.tsx, src/pages/Dashboard.tsx, src/pages/BookAppointment.tsx, src/components/CreditCardForm.tsx, src/services/api.ts, src/services/asaas.ts, src/pages/PaymentSuccess.tsx, src/pages/PaymentPending.tsx, src/pages/PaymentFailure.tsx.
 Status: review.
 -->
 
@@ -26,14 +26,34 @@ Status: review.
 ## Origem e evidencias
 
 - Evidencia principal: src/pages/Payment.tsx
+- Evidencia principal: src/pages/Dashboard.tsx
 - Evidencia principal: src/services/api.ts
 - Evidencia complementar: GO-LIVE-CHECKLIST.md
 
 > Migrado e reconciliado de GO-LIVE-CHECKLIST.md (itens de fluxo de receita e polling).
 
+## Regra de negocio: pagamento pos-atendimento (2026-08-05)
+
+- **Mudanca no contrato do backend**: pagamento so pode ser criado quando `consulta.status === 'CONCLUIDA'`.
+  Antes, o pagamento era criado logo apos o agendamento (pre-pagamento); agora o paciente agenda,
+  participa da consulta, e so entao paga.
+- `BookAppointment.tsx` **nao** redireciona mais para `/payment` apos confirmar o agendamento —
+  vai para `/dashboard` (o backend rejeitaria a criacao do pagamento nesse momento).
+- Um job/cron no backend marca a consulta como `CONCLUIDA` (~10 min apos o horario marcado,
+  cobrindo tanto encerramento manual do medico quanto o caso do medico esquecer de finalizar).
+- `Dashboard.tsx` exibe o botao **"Pagar consulta"** somente quando a consulta esta `CONCLUIDA`
+  (`isConsultaConcluida`), levando para `/payment` com o `consultaId`.
+- Se a tela de pagamento for aberta antes da conclusao (ex.: link direto/refresh), a API responde
+  `400`/`403` com mensagem contendo "conclu"/"finaliz"; `Payment.tsx` trata isso como o estado
+  bloqueado `consulta_nao_concluida` e exibe uma mensagem clara em vez de erro generico.
+- **Pendente de validacao real**: essa trava nao e reproduzida pelos mocks MSW por padrao (apenas
+  por um teste unitario dedicado em `Payment.test.tsx`); precisa ser confirmada contra o backend
+  real em staging/producao antes do go-live.
+
 ## Fluxo PIX
 
-1. Tela Payment recebe consultaId (state, query ou sessionStorage).
+1. Tela Payment recebe consultaId (state, query ou sessionStorage) — chega aqui via botao
+   "Pagar consulta" do Dashboard, so disponivel apos a consulta ser CONCLUIDA.
 2. criarPagamento({ consultaId, metodoPagamento: 'pix' }) chama POST /v1/pagamentos/pix.
 3. UI exibe QR (qrCode/qrCodeBase64/ticketUrl) e validade.
 4. Polling chama syncPagamento(consultaId) em intervalo de 5s.

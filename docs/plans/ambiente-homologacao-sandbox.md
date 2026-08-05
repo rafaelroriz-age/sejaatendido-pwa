@@ -100,6 +100,12 @@ O `.gitignore` já ignora `.env` e `.env.*`. Crie um `.env` na raiz com:
 VITE_API_URL=https://sejaatendido-staging-backend.onrender.com
 
 VITE_VAPID_PUBLIC_KEY=                            # opcional (push web)
+
+# Chave RESTRITA de tokenização do Asaas (sandbox) — sem ela o checkout de
+# cartão fica bloqueado com mensagem tratada na UI. Nunca use a chave de
+# produção aqui.
+VITE_ASAAS_TOKENIZATION_KEY=
+VITE_ASAAS_ENV=sandbox
 ```
 
 > Importante: o checkout de pagamento (PIX/cartão) usa o gateway **Asaas**, configurado
