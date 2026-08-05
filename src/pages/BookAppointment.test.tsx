@@ -90,3 +90,58 @@ describe('BookAppointment — conflito de horário (400 "Horário já ocupado")'
     expect(createConsultaMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('BookAppointment — filtro de contas de médico de teste', () => {
+  beforeEach(() => {
+    fetchDisponibilidadeMedicoMock.mockReset();
+    createConsultaMock.mockReset();
+    fetchMinhasConsultasMock.mockReset().mockResolvedValue([]);
+    vi.stubGlobal('alert', vi.fn());
+  });
+
+  it('oculta médicos de teste (por nome ou valor de validação) e mantém os médicos reais', async () => {
+    const medicoReal: Medico = {
+      id: 'medico-real',
+      usuarioId: 'usuario-real',
+      valorConsulta: 20000,
+      usuario: { id: 'usuario-real', nome: 'Dra. Ana Costa', email: 'ana@real.com' },
+    } as Medico;
+    const medicoNomeTeste: Medico = {
+      id: 'medico-carlos-teste',
+      usuarioId: 'usuario-carlos-teste',
+      valorConsulta: 200,
+      usuario: { id: 'usuario-carlos-teste', nome: 'Dr. Carlos Teste', email: 'carlos@teste.com' },
+    } as Medico;
+    const medicoValorValidacao: Medico = {
+      id: 'medico-validacao',
+      usuarioId: 'usuario-validacao',
+      valorConsulta: 10,
+      usuario: { id: 'usuario-validacao', nome: 'Dra. Ana Validação', email: 'validacao@teste.com' },
+    } as Medico;
+    const medicoNomeTimestamp: Medico = {
+      id: 'medico-178',
+      usuarioId: 'usuario-178',
+      valorConsulta: 15000,
+      usuario: { id: 'usuario-178', nome: 'Medico 1789012345', email: 'gerado@teste.com' },
+    } as Medico;
+
+    fetchMedicosMock.mockReset().mockResolvedValue([
+      medicoReal,
+      medicoNomeTeste,
+      medicoValorValidacao,
+      medicoNomeTimestamp,
+    ]);
+
+    render(
+      <MemoryRouter>
+        <BookAppointment />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('medico-option-medico-real')).toBeInTheDocument();
+    expect(screen.queryByTestId('medico-option-medico-carlos-teste')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('medico-option-medico-validacao')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('medico-option-medico-178')).not.toBeInTheDocument();
+  });
+});
+

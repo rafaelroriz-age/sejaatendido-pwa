@@ -31,6 +31,18 @@ function getMedicoNome(m: Medico): string {
   return m.usuario?.nome || anyMedico.nome || anyMedico.usuarioNome || 'Médico';
 }
 
+// Contas de teste criadas em producao (ver docs/processes/agendamento-consulta.md) nao devem
+// aparecer para pacientes reais em /book: nomes conhecidos de contas de validacao, o padrao
+// gerado "Medico <timestamp>" e o valor de consulta de validacao (R$ 0,10).
+const NOMES_MEDICO_TESTE_CONHECIDOS = new Set(['dr. carlos teste', 'dr(a). carlos teste', 'carlos teste']);
+
+function isMedicoDeTeste(m: Medico): boolean {
+  if (m.valorConsulta === 10) return true;
+  const nome = getMedicoNome(m).trim();
+  if (NOMES_MEDICO_TESTE_CONHECIDOS.has(nome.toLowerCase())) return true;
+  return /^medico\s+\d{8,}$/i.test(nome);
+}
+
 function getMedicoCandidateIds(m: Medico): string[] {
   const anyMedico = m as any;
   const candidates = [
@@ -246,9 +258,7 @@ export default function BookAppointment() {
   if (loading) return <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: Colors.bg }}><div className="spinner--primary spinner" /><p style={{ marginTop: 12, color: Colors.textSecondary }}>Carregando médicos...</p></div>;
 
   const currentStep = selectedMedico ? (selectedDate && selectedTime ? 3 : 2) : 1;
-  // Médicos de teste (valorConsulta === 10, ou seja, R$ 0,10) são usados apenas para validação interna
-  // de pagamento/repasse e não devem aparecer para pacientes reais.
-  const medicosVisiveis = medicos.filter(m => m.valorConsulta !== 10);
+  const medicosVisiveis = medicos.filter(m => !isMedicoDeTeste(m));
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg }}>
