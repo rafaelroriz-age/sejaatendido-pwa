@@ -16,6 +16,7 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
 
 - [ ] Fluxo de receita validado ponta a ponta em produção
   - Confirmado em 2026-07-25 (login -> listar médico aprovado -> agendar -> gerar PIX -> concluir pagamento -> status correto), **porém a validação foi feita com o gateway Mercado Pago**. Gateway trocado para **Asaas** em 2026-07-30 — revalidação completa pendente (ver seção 8).
+  - **Reaberto novamente em 2026-08-05**: o backend passou a exigir consulta `CONCLUIDA` antes de permitir criar o pagamento (modelo pós-atendimento, ver seção 9). O fluxo pré-pagamento validado em 2026-07-25 não existe mais — precisa de nova validação ponta a ponta com o fluxo atual.
 
 - [ ] PIX aderente ao contrato atual
   - Confirmado em 2026-07-25 para o contrato Mercado Pago. Contrato do Asaas ainda não confirmado/documentado — pendente.
@@ -62,6 +63,14 @@ Objetivo: liberar produção com segurança para iniciar faturamento.
   - ~~`VITE_MP_PUBLIC_KEY`~~ (removida em 2026-07-30 — não é mais usada após a migração para Asaas, ver seção 8)
   - `VITE_MOCK=false`
 
+- [ ] **Novo (2026-08-05)**: cadastrar os secrets do GitHub Actions para o checkout de cartão
+  funcionar em produção e homologação (wiring já adicionado ao `Dockerfile`/workflows nesta
+  rodada, mas os secrets em si precisam ser criados por quem tem acesso à conta Asaas):
+  - `VITE_ASAAS_TOKENIZATION_KEY` (chave restrita de tokenização, produção) — usada por `deploy.yml`.
+  - `VITE_ASAAS_TOKENIZATION_KEY_SANDBOX` (chave restrita de tokenização, sandbox) — usada por `deploy-homolog.yml`.
+  - Sem esses secrets, o checkout de cartão novo continua bloqueado com mensagem tratada
+    ("chave de tokenização do Asaas não configurada"), mas o PIX não é afetado.
+
 - [x] Executar teste real de pagamento (transação controlada) com conta paciente real. Validado em 2026-07-25.
 - [x] Validar operação do lado médico após compra (consulta aparece, status correto, agenda consistente). Validado em 2026-07-25 com o Dr. Carlos teste.
 - [x] Definir processo financeiro de repasse (manual/automático) e operação de suporte — decidido: automático, com opção de repasse imediato mediante taxa (ver ADR 0002).
@@ -104,3 +113,34 @@ Marque GO apenas se todos os itens da seção "BLOQUEIAM lançamento" estiverem 
 - [ ] **Pendente de validação real**: confirmar contra o backend/staging que os nomes de campo assumidos (`asaas.invoiceUrl`/`checkoutUrl`, contrato de PIX inalterado) batem com a resposta real do Asaas. Se divergirem, ajustar apenas `normalizePagamentoResponse` em `services/api.ts`.
 - [ ] Reexecutar o roteiro da Fase 4 de [roteiro-testes-producao.md](docs/plans/roteiro-testes-producao.md) (PIX + cartão) em staging/produção real antes de reabrir o GO.
 - [x] Passo de validação de código/testes do fluxo Asaas (pagamento + repasse) executado em 2026-07-30 — ver [docs/plans/2026-07-30-passo-validacao-asaas-frontend.md](docs/plans/2026-07-30-passo-validacao-asaas-frontend.md). Corrigido nesta rodada: tratamento de erros 422 (CPF ausente), 409 (consulta já paga), 403 (acesso negado) e retenção antifraude no repasse imediato; UI de "cartão salvo" desativada (Asaas não suporta). Execução ponta a ponta contra o Asaas sandbox real segue pendente.
+
+## 9) Mudança de modelo: pagamento pós-atendimento (2026-08-05)
+
+- [x] Backend passou a exigir `consulta.status === 'CONCLUIDA'` para permitir a criação de
+  pagamento (antes era possível pagar logo após o agendamento). O frontend já reflete essa regra:
+  - `src/pages/BookAppointment.tsx` não redireciona mais para `/payment` após confirmar o
+    agendamento — vai para `/dashboard`.
+  - `src/pages/Dashboard.tsx` só exibe o botão "Pagar consulta" quando a consulta está `CONCLUIDA`.
+  - `src/pages/Payment.tsx` trata separadamente os erros 400/403 "consulta não concluída", 422
+    (CPF ausente), 409 (já paga) e 403 (acesso negado a outro paciente), com mensagens tratadas.
+  - Ver detalhes em [docs/processes/pagamentos-consulta.md](docs/processes/pagamentos-consulta.md).
+- [x] Testado nesta rodada (Playwright + mocks MSW): login, agendamento, seletor de forma de
+  pagamento redesenhado, bloqueio por CPF ausente, geração de PIX mock, e bloqueio correto do
+  checkout de cartão quando a chave de tokenização do Asaas não está configurada. `npm test`,
+  `npm run typecheck` e `npm run build` passam (75/75 testes).
+- [x] Corrigido nesta rodada: `mocks/handlers.ts` agora reproduz a trava "consulta não concluída"
+  nos endpoints de pagamento (antes os mocks aceitavam qualquer status, escondendo essa regra em
+  testes manuais); foi adicionada uma consulta seed já `CONCLUIDA` (`consulta-pronta-pagamento`)
+  para permitir testar o caminho feliz sem esperar o cron real.
+- [x] Corrigido nesta rodada: **`VITE_ASAAS_TOKENIZATION_KEY`/`VITE_ASAAS_ENV` não eram
+  propagadas em nenhum pipeline de build** (`Dockerfile`, `docker-compose.yml`,
+  `docker-compose.staging.yml`, `.github/workflows/deploy.yml`,
+  `.github/workflows/deploy-homolog.yml`) — o checkout de cartão novo estava quebrado em
+  qualquer ambiente publicado (produção, homolog e sandbox Docker), não só localmente. Wiring
+  adicionado em todos os arquivos; falta apenas **cadastrar os secrets reais no GitHub**
+  (`VITE_ASAAS_TOKENIZATION_KEY` para produção, `VITE_ASAAS_TOKENIZATION_KEY_SANDBOX` para
+  homologação) — ver seção 4.
+- [ ] **Pendente de validação real**: confirmar em staging/produção que o cron que marca a
+  consulta como `CONCLUIDA` está ativo e que o fluxo completo (agendar → aguardar conclusão →
+  pagar) funciona ponta a ponta com o backend real. Reexecutar Fase 3/4 de
+  [roteiro-testes-producao.md](docs/plans/roteiro-testes-producao.md) (já atualizado para o novo fluxo).

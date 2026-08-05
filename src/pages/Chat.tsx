@@ -1,24 +1,31 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getUser } from '../storage/localStorage';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { getUser, type User } from '../storage/localStorage';
 import {
   fetchChatsUsuario,
   fetchMensagensChat,
   enviarMensagem,
+  fetchConsultasMedico,
+  fetchMinhasConsultas,
   ChatSummary,
   ChatMessage,
 } from '../services/api';
 import { showErrorAlert } from '../utils/errorHandler';
 import { formatConsultaTime } from '../utils/datetime';
+import { criarLinkWhatsApp } from '../utils/whatsapp';
 import Colors from '../theme/colors';
 import { Icon } from '../components/Icon';
 
 export default function Chat() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userId, setUserId] = useState<string | null>(null);
+  const [userTipo, setUserTipo] = useState<User['tipo'] | null>(null);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [activeChat, setActiveChat] = useState<ChatSummary | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [telefonesPorConsultaId, setTelefonesPorConsultaId] = useState<Record<string, string>>({});
+  const [meetLinksPorConsultaId, setMeetLinksPorConsultaId] = useState<Record<string, string>>({});
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -26,7 +33,11 @@ export default function Chat() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    getUser().then(u => { if (u) setUserId(u.id); });
+    getUser().then(u => {
+      if (!u) return;
+      setUserId(u.id);
+      setUserTipo(u.tipo);
+    });
   }, []);
 
   useEffect(() => {
@@ -37,6 +48,55 @@ export default function Chat() {
       .catch(e => showErrorAlert(e, 'Erro ao carregar conversas'))
       .finally(() => setLoading(false));
   }, [userId]);
+
+  useEffect(() => {
+    if (!userTipo) return;
+
+    const loadTelefones = async () => {
+      try {
+        if (userTipo === 'MEDICO') {
+          const consultas = await fetchConsultasMedico();
+          const telefonesMap: Record<string, string> = {};
+          const meetLinksMap: Record<string, string> = {};
+          consultas.forEach((c) => {
+            const telefone = c.paciente?.telefone ?? c.paciente?.usuario?.telefone;
+            if (c.id && telefone) telefonesMap[c.id] = telefone;
+            if (c.id && c.meetLink) meetLinksMap[c.id] = c.meetLink;
+          });
+          setTelefonesPorConsultaId(telefonesMap);
+          setMeetLinksPorConsultaId(meetLinksMap);
+          return;
+        }
+
+        if (userTipo === 'PACIENTE') {
+          const consultas = await fetchMinhasConsultas();
+          const telefonesMap: Record<string, string> = {};
+          const meetLinksMap: Record<string, string> = {};
+          consultas.forEach((c) => {
+            const telefone = c.medico?.usuario?.telefone;
+            if (c.id && telefone) telefonesMap[c.id] = telefone;
+            if (c.id && c.meetLink) meetLinksMap[c.id] = c.meetLink;
+          });
+          setTelefonesPorConsultaId(telefonesMap);
+          setMeetLinksPorConsultaId(meetLinksMap);
+        }
+      } catch {
+        // O fallback principal e o telefone vindo no payload de chat.
+      }
+    };
+
+    void loadTelefones();
+  }, [userTipo]);
+
+  useEffect(() => {
+    const consultaIdDaUrl = new URLSearchParams(location.search).get('consultaId');
+    if (!consultaIdDaUrl || chats.length === 0) return;
+
+    const chatSelecionado = chats.find(chat => chat.consultaId === consultaIdDaUrl);
+    if (chatSelecionado) {
+      setActiveChat(chatSelecionado);
+    }
+  }, [location.search, chats]);
 
   const loadMessages = useCallback(async (chatId: string) => {
     try {
@@ -69,6 +129,40 @@ export default function Chat() {
     } finally {
       setSending(false);
     }
+  }
+
+  function getTelefoneOutraParte(chat: ChatSummary): string | undefined {
+    return chat.outraParte?.telefone ?? telefonesPorConsultaId[chat.consultaId];
+  }
+
+  function extractMeetingLinks(texto: string): string[] {
+    const urls = (texto.match(/https?:\/\/[^\s)>"]+/gi) ?? [])
+      .map(url => url.replace(/[).,;]+$/, ''));
+    return urls.filter(url => /meet|jitsi|zoom|teams|whereby|google\.com|discord|video/i.test(url));
+  }
+
+  function getPrimaryMeetingLink(chat: ChatSummary | null, msgs: ChatMessage[]): string | undefined {
+    if (!chat) return undefined;
+    for (const msg of msgs) {
+      const links = extractMeetingLinks(msg.texto);
+      if (links.length > 0) return links[0];
+    }
+    return meetLinksPorConsultaId[chat.consultaId];
+  }
+
+  function handleAbrirWhatsApp(chat: ChatSummary) {
+    const telefone = getTelefoneOutraParte(chat);
+    const nome = chat.outraParte?.nome || 'profissional';
+    const link = criarLinkWhatsApp(telefone ?? '', {
+      message: `Ola, ${nome}. Estou te chamando pelo chat da consulta no Seja Atendido.`,
+    });
+
+    if (!link) {
+      showErrorAlert(new Error('Telefone da outra parte indisponivel ou invalido.'), 'WhatsApp indisponivel');
+      return;
+    }
+
+    window.open(link, '_blank', 'noopener,noreferrer');
   }
 
   if (!activeChat) {
@@ -129,12 +223,61 @@ export default function Chat() {
     );
   }
 
+  const primaryMeetLink = getPrimaryMeetingLink(activeChat, messages);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: Colors.bg }}>
       <div style={{ backgroundColor: Colors.primary, padding: '28px 16px 16px', borderRadius: '0 0 20px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <button onClick={() => setActiveChat(null)} style={{ color: '#fff', fontSize: 15, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar</button>
         <span style={{ color: '#fff', fontSize: 18, fontWeight: 800 }}>{activeChat.outraParte?.nome || 'Conversa'}</span>
-        <div style={{ width: 60 }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {primaryMeetLink && (
+            <button
+              onClick={() => window.open(primaryMeetLink, '_blank', 'noopener,noreferrer')}
+              style={{
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 700,
+                background: 'rgba(255,255,255,0.16)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 14,
+                padding: '6px 10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+              aria-label="Abrir reunião"
+              title="Abrir reunião"
+            >
+              <Icon name="calendar" size={14} color="#fff" />
+              Reunião
+            </button>
+          )}
+          <button
+            onClick={() => handleAbrirWhatsApp(activeChat)}
+            disabled={!getTelefoneOutraParte(activeChat)}
+            style={{
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 700,
+              background: 'rgba(255,255,255,0.16)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 14,
+              padding: '6px 10px',
+              cursor: getTelefoneOutraParte(activeChat) ? 'pointer' : 'not-allowed',
+              opacity: getTelefoneOutraParte(activeChat) ? 1 : 0.6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+            aria-label="Abrir conversa no WhatsApp"
+            title={getTelefoneOutraParte(activeChat) ? 'Abrir conversa no WhatsApp' : 'Telefone indisponível'}
+          >
+            <Icon name="message-circle" size={14} color="#fff" />
+            WhatsApp
+          </button>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>

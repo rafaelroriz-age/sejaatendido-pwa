@@ -103,6 +103,16 @@ describe('Dashboard — botão "Entrar na consulta"', () => {
     expect(await screen.findByText(/link da videochamada ainda não está disponível/i)).toBeInTheDocument();
     expect(screen.queryByText('Entrar na consulta')).not.toBeInTheDocument();
   });
+
+  it('oferece acesso direto ao chat quando o meetLink ainda não existe', async () => {
+    fetchMinhasConsultasMock.mockResolvedValue([
+      baseConsulta({ status: 'ACEITA', meetLink: undefined }),
+    ]);
+
+    await renderDashboard();
+
+    expect(await screen.findByRole('button', { name: /abrir chat da consulta/i })).toBeInTheDocument();
+  });
 });
 
 describe('Dashboard — botão "Pagar consulta" (gate de pagamento pós-CONCLUIDA)', () => {

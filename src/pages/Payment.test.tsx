@@ -318,6 +318,46 @@ describe('Payment — pagamento com cartão (tokenização client-side no Asaas)
     expect(removerCartaoSalvoMock).toHaveBeenCalledWith('card-1');
     await waitFor(() => expect(screen.queryByText(/1234/)).not.toBeInTheDocument());
   });
+
+  it('abre o formulário de novo cartão ao clicar em "Adicionar novo cartão" quando já há cartão salvo', async () => {
+    fetchCartoesSalvosMock.mockResolvedValue([
+      { id: 'card-1', ultimosDigitos: '1234', bandeira: 'visa', titular: 'Fulano de Tal' },
+    ]);
+
+    renderPayment();
+    await selecionarCartao();
+
+    await screen.findByRole('button', { name: /pagar com cartão terminado em 1234/i });
+    expect(screen.queryByRole('button', { name: /pagar com este cartão/i })).not.toBeInTheDocument();
+
+    const adicionarBtn = screen.getByRole('button', { name: /adicionar novo cartão/i });
+    await act(async () => { fireEvent.click(adicionarBtn); });
+
+    expect(await screen.findByRole('button', { name: /pagar com este cartão/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cancelar/i })).toBeInTheDocument();
+  });
+});
+
+describe('Payment — seletor de forma de pagamento (redesenho)', () => {
+  beforeEach(() => {
+    criarPagamentoMock.mockReset();
+    syncPagamentoMock.mockReset();
+    navigateMock.mockReset();
+    getUserMock.mockReset().mockResolvedValue(null);
+    window.sessionStorage.clear();
+    syncPagamentoMock.mockRejectedValue(semPagamentoExistenteError());
+  });
+
+  it('exibe Pix, Cartão e Dinheiro (desabilitado, "Em breve") como opções de forma de pagamento', async () => {
+    renderPayment();
+
+    expect(await screen.findByRole('button', { name: 'PIX' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cartão' })).toBeInTheDocument();
+    expect(screen.getByText('Dinheiro')).toBeInTheDocument();
+    expect(screen.getByText('Em breve')).toBeInTheDocument();
+    // "Dinheiro" não é um botão clicável (ainda sem suporte no backend).
+    expect(screen.queryByRole('button', { name: 'Dinheiro' })).not.toBeInTheDocument();
+  });
 });
 
 describe('Payment — casos de erro do gateway Asaas (CPF, consulta já paga, acesso negado)', () => {

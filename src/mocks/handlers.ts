@@ -106,6 +106,19 @@ const MOCK_CONSULTAS_PACIENTE = [
     meetLink: null,
     medico: MOCK_MEDICOS[1],
   },
+  // Seed fixa em CONCLUIDA: cobre o fluxo pos-atendimento (pagamento so libera
+  // apos a consulta concluida) sem depender de esperar o horario real passar.
+  {
+    id: 'consulta-pronta-pagamento',
+    medicoId: LOW_COST_MEDICO_ID,
+    pacienteId: 'paciente-001',
+    dataHora: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    sintomas: 'Consulta concluida (mock para testar pagamento)',
+    status: 'CONCLUIDA',
+    valor: LOW_COST_CONSULTA_VALOR_CENTAVOS,
+    meetLink: 'https://meet.google.com/mock-link-concluida',
+    medico: MOCK_MEDICOS[1],
+  },
 ];
 
 const MOCK_CONSULTAS_MEDICO = [
@@ -179,6 +192,20 @@ function getConsultaValorCentavos(consultaId: unknown): number {
   const allConsultas = [...MOCK_CONSULTAS_PACIENTE, ...MOCK_CONSULTAS_MEDICO];
   const found = allConsultas.find(c => c.id === consultaId);
   return found?.valor ?? DEFAULT_CONSULTA_VALOR_CENTAVOS;
+}
+
+// Espelha a regra real do backend (2026-08): pagamento so pode ser criado
+// quando a consulta esta CONCLUIDA. IDs desconhecidos (criados ad-hoc em
+// outros testes) passam livres para nao quebrar cenarios que nao seedam a
+// consulta explicitamente.
+function bloquearSeConsultaNaoConcluida(consultaId: unknown) {
+  if (typeof consultaId !== 'string') return null;
+  const allConsultas = [...MOCK_CONSULTAS_PACIENTE, ...MOCK_CONSULTAS_MEDICO];
+  const found = allConsultas.find(c => c.id === consultaId);
+  if (found && found.status !== 'CONCLUIDA') {
+    return HttpResponse.json({ erro: 'Consulta ainda não foi concluída' }, { status: 400 });
+  }
+  return null;
 }
 
 let MOCK_DADOS_BANCARIOS_MEDICO = {
@@ -575,6 +602,8 @@ export const handlers = [
 
   http.post(`${BASE}/v1/pagamentos/pix`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const bloqueado = bloquearSeConsultaNaoConcluida(body.consultaId);
+    if (bloqueado) return bloqueado;
     const valor = getConsultaValorCentavos(body.consultaId);
     const pixCode = '00020126580014BR.GOV.BCB.PIX0136mock-pix-key-para-testes';
     const pagId = `pag-${Date.now()}`;
@@ -598,6 +627,8 @@ export const handlers = [
 
   http.post(`${BASE}/v1/pagamentos/cartao`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const bloqueado = bloquearSeConsultaNaoConcluida(body.consultaId);
+    if (bloqueado) return bloqueado;
     const valor = getConsultaValorCentavos(body.consultaId);
     const pagId = `pag-asaas-${Date.now()}`;
     return HttpResponse.json({
@@ -632,6 +663,8 @@ export const handlers = [
       titular?: string;
       salvarCartao?: boolean;
     };
+    const bloqueado = bloquearSeConsultaNaoConcluida(body.consultaId);
+    if (bloqueado) return bloqueado;
     const valor = getConsultaValorCentavos(body.consultaId);
 
     if (body.cartaoId) {

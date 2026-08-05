@@ -551,6 +551,18 @@ export interface Consulta {
   valor?: number;
   meetLink?: string;
   medico?: Medico;
+  paciente?: {
+    id?: string;
+    nome?: string;
+    email?: string;
+    telefone?: string;
+    usuario?: {
+      id?: string;
+      nome?: string;
+      email?: string;
+      telefone?: string;
+    };
+  };
   // Opcional: alguns contratos de backend embutem o status do pagamento vinculado
   // a consulta (evita N+1 chamadas a /v1/pagamentos/sync/:consultaId por item da lista).
   // Quando ausente, o frontend nao assume nada sobre o pagamento.
@@ -566,6 +578,15 @@ export interface CreateConsultaRequest {
 function normalizeConsulta(raw: any): Consulta {
   const medicoRaw = raw?.medico && typeof raw.medico === 'object' ? normalizeMedico(raw.medico) : undefined;
   const pacienteRaw = raw?.paciente && typeof raw.paciente === 'object' ? raw.paciente : undefined;
+  const paciente = pacienteRaw
+    ? {
+        ...pacienteRaw,
+        id: pacienteRaw?.id ?? pacienteRaw?.usuario?.id,
+        nome: pacienteRaw?.nome ?? pacienteRaw?.usuario?.nome,
+        email: pacienteRaw?.email ?? pacienteRaw?.usuario?.email,
+        telefone: pacienteRaw?.telefone ?? pacienteRaw?.usuario?.telefone,
+      }
+    : undefined;
   return {
     id: String(raw?.id ?? raw?.consultaId ?? ''),
     medicoId: String(raw?.medicoId ?? raw?.medico?.id ?? raw?.medico?.usuarioId ?? ''),
@@ -579,7 +600,7 @@ function normalizeConsulta(raw: any): Consulta {
     meetLink: raw?.meetLink,
     medico: medicoRaw,
     pagamentoStatus: raw?.pagamento?.status ?? raw?.pagamentoStatus ?? raw?.statusPagamento,
-    ...(pacienteRaw ? { paciente: pacienteRaw } : {}),
+    ...(paciente ? { paciente } : {}),
   } as Consulta;
 }
 
@@ -1515,10 +1536,28 @@ export async function solicitarRepasseImediato(valorCentavos?: number): Promise<
 export interface ChatSummary {
   chatId: string;
   consultaId: string;
-  outraParte?: { id: string; nome: string };
+  outraParte?: { id: string; nome: string; telefone?: string };
   ultimaMensagem?: string;
   naoLidas?: number;
   atualizadoEm?: string;
+}
+
+function normalizeChatSummary(raw: any): ChatSummary {
+  const other = raw?.outraParte ?? raw?.outra_parte ?? raw?.otherUser ?? raw?.other_user ?? {};
+  return {
+    chatId: String(raw?.chatId ?? raw?.chat_id ?? raw?.id ?? ''),
+    consultaId: String(raw?.consultaId ?? raw?.consulta_id ?? ''),
+    outraParte: {
+      id: String(other?.id ?? other?.usuarioId ?? other?.usuario_id ?? ''),
+      nome: String(other?.nome ?? other?.name ?? 'Conversa'),
+      telefone: typeof other?.telefone === 'string'
+        ? other.telefone
+        : (typeof other?.phone === 'string' ? other.phone : undefined),
+    },
+    ultimaMensagem: raw?.ultimaMensagem ?? raw?.ultima_mensagem ?? raw?.lastMessage,
+    naoLidas: raw?.naoLidas ?? raw?.nao_lidas ?? raw?.unreadCount,
+    atualizadoEm: raw?.atualizadoEm ?? raw?.atualizado_em ?? raw?.updatedAt,
+  };
 }
 
 export interface ChatMessage {
@@ -1530,7 +1569,8 @@ export interface ChatMessage {
 
 export async function fetchChatsUsuario(userId: string): Promise<ChatSummary[]> {
   const r = await api.get(`/api/chats/usuario/${userId}`);
-  return r.data;
+  const list = Array.isArray(r.data?.chats) ? r.data.chats : (Array.isArray(r.data) ? r.data : []);
+  return list.map(normalizeChatSummary);
 }
 
 export async function fetchMensagensChat(chatId: string, limit = 50, cursor?: string): Promise<ChatMessage[]> {

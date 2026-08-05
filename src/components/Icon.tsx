@@ -20,7 +20,12 @@ export type IconName =
   | 'lock'
   | 'file-text'
   | 'paperclip'
-  | 'camera';
+  | 'camera'
+  | 'credit-card'
+  | 'qr-code'
+  | 'banknote'
+  | 'plus-circle'
+  | 'check-circle-filled';
 
 interface IconProps {
   name: IconName;
@@ -150,6 +155,40 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M4 8a2 2 0 0 1 2-2h1.5l1-2h7l1 2H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
       <circle cx="12" cy="13" r="3.5" />
+    </>
+  ),
+  'credit-card': (
+    <>
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+      <path d="M2.5 10h19" />
+      <path d="M6 15h4" />
+    </>
+  ),
+  'qr-code': (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3h-3zM20 14h1v1h-1zM14 20h1v1h-1zM17.5 17.5h1v1h-1zM20 20h1v1h-1z" />
+    </>
+  ),
+  banknote: (
+    <>
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M6 9v.01M18 15v.01" />
+    </>
+  ),
+  'plus-circle': (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v8M8 12h8" />
+    </>
+  ),
+  'check-circle-filled': (
+    <>
+      <circle cx="12" cy="12" r="9" fill="currentColor" stroke="none" />
+      <path d="M8 12.5l2.5 2.5L16 9" stroke="#fff" />
     </>
   ),
 };

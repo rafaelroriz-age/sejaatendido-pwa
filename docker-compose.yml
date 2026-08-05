@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: https://sejaatendido-backend.onrender.com
+        VITE_ASAAS_TOKENIZATION_KEY: ${VITE_ASAAS_TOKENIZATION_KEY:-}
+        VITE_ASAAS_ENV: production
     ports:
       - "3000:80"
     restart: unless-stopped

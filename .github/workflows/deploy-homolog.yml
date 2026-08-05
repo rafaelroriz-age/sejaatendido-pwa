@@ -42,6 +42,8 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL_STAGING || 'https://sejaatendido-staging-backend.onrender.com' }}
           VITE_MOCK: 'false'
           VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
+          VITE_ASAAS_TOKENIZATION_KEY: ${{ secrets.VITE_ASAAS_TOKENIZATION_KEY_SANDBOX }}
+          VITE_ASAAS_ENV: sandbox
 
       - name: Preparar dist (CNAME + 404 fallback)
         run: |

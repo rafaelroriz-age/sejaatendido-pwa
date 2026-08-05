@@ -94,10 +94,15 @@ Referência: [Processo de Autenticação e Autorização](../processes/autentica
 
 Referência: [Processo de Agendamento de Consulta](../processes/agendamento-consulta.md)
 
+> **ATENÇÃO (2026-08-05):** o backend passou a exigir que a consulta esteja **CONCLUIDA** antes de
+> permitir a criação do pagamento (modelo pós-atendimento, ver [Processo de Pagamento](../processes/pagamentos-consulta.md)).
+> Confirmar um agendamento **não** leva mais direto para `/payment` — o botão "Pagar consulta"
+> só aparece no Dashboard depois que a consulta é marcada como concluída pelo backend.
+
 - [ ] Lista de médicos em `/book` carrega médicos **aprovados** com nome, especialidade e valor da consulta (ou "A combinar" quando ausente).
 - [ ] Selecionar médico + data exibe horários disponíveis (via API) ou fallback local de slots (06:00–00:00, 30 em 30 min) quando a API não retorna.
 - [ ] Horários já passados no dia atual **não** ficam selecionáveis.
-- [ ] Selecionar um horário e confirmar cria a consulta e navega para `/payment` com `consultaId` e valor corretos.
+- [ ] Selecionar um horário e confirmar cria a consulta e **redireciona para `/dashboard`** (não mais para `/payment`), exibindo a consulta com status "Pendente".
 - [ ] Forçar conflito de horário (agendar o mesmo slot duas vezes) → erro 409 tratado, slots recarregados, sem deixar reenviar o mesmo horário.
 - [ ] Cancelar um agendamento (se aplicável na tela do paciente) reflete no dashboard.
 
@@ -107,11 +112,16 @@ Referência: [Processo de Agendamento de Consulta](../processes/agendamento-cons
 
 Referência: [Processo de Pagamento da Consulta](../processes/pagamentos-consulta.md)
 
-> **ATENÇÃO (2026-07-30):** o backend trocou o gateway de pagamento de Mercado Pago para
-> **Asaas**. O frontend já foi desacoplado do Mercado Pago e adaptado ao contrato genérico
-> assumido do Asaas (ver [GO-LIVE-CHECKLIST.md](../../GO-LIVE-CHECKLIST.md), seção 8), mas
-> todos os itens desta fase ainda precisam ser reexecutados em staging/produção real para
-> confirmar que os nomes de campo assumidos batem com a resposta real do backend.
+> **ATENÇÃO (2026-08-05):** pagamento agora só é permitido **depois** que a consulta é marcada
+> como CONCLUIDA pelo backend (~10 min após o horário marcado, ou quando o médico finaliza
+> manualmente). Para testar esta fase é preciso: agendar uma consulta com o médico de teste
+> (Dra. Ana Costa, R$ 0,10) em um horário já passado (ou aguardar o horário passar), confirmar
+> que ela aparece como CONCLUIDA no Dashboard com o botão "Pagar consulta", e só então seguir
+> os passos abaixo.
+
+### 4.0 Pré-condição: aguardar/forçar conclusão
+- [ ] Após o horário marcado passar (~10 min), o Dashboard do paciente exibe o botão "Pagar consulta" para a consulta.
+- [ ] Abrir `/payment` **antes** da consulta estar concluída (via URL direta) exibe mensagem clara de bloqueio, sem travar a tela ou expor erro técnico.
 
 ### 4.1 PIX
 - [ ] Gerar PIX em `/payment` chama `POST /v1/pagamentos/pix` e exibe QR code + copia-e-cola (`qrCode`/`qrCodeBase64`/`ticketUrl`) e validade.
@@ -121,10 +131,11 @@ Referência: [Processo de Pagamento da Consulta](../processes/pagamentos-consult
 - [ ] QR expirado (validade vencida) exibe mensagem/ação de gerar novo código, sem travar a tela.
 
 ### 4.2 Cartão (gateway Asaas)
-- [ ] Gerar cobrança de cartão chama `POST /v1/pagamentos/cartao` e redireciona para o checkout hospedado do Asaas (`linkPagamento`/`paymentUrl`, a partir de `asaas.invoiceUrl`/`checkoutUrl`).
-- [ ] Completar pagamento com sucesso → retorno em `/payment/success`, sincroniza status e mostra confirmação.
-- [ ] Simular pagamento pendente → retorno em `/payment/pending` sincroniza e, se o backend já confirmar `PAGO`, redireciona automaticamente para `/payment/success`.
-- [ ] Simular falha/recusa → retorno em `/payment/failure` com mensagem clara e opção de tentar novamente.
+- [ ] Confirmar que `VITE_ASAAS_TOKENIZATION_KEY` está configurada no ambiente testado — sem ela, o
+  checkout de cartão fica bloqueado com mensagem tratada ("chave de tokenização do Asaas não configurada").
+- [ ] Tokenizar um cartão novo (`CreditCardForm`) e confirmar pagamento aprovado/recusado com mensagem clara.
+- [ ] Pagar com um cartão salvo (se houver) e confirmar o mesmo resultado.
+- [ ] Cartão recusado exibe o motivo (`cartao.statusDetail`) e oferece pagar com Pix.
 
 ### 4.3 Pós-pagamento
 - [ ] Consulta paga aparece no dashboard do paciente com status correto.

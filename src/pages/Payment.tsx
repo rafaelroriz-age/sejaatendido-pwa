@@ -13,8 +13,17 @@ import {
 import { getUser } from '../storage/localStorage';
 import Colors, { Radius } from '../theme/colors';
 import CreditCardForm, { type CreditCardTokenResult } from '../components/CreditCardForm';
+import Icon, { type IconName } from '../components/Icon';
 
 type PaymentMethod = 'pix' | 'cartao';
+
+// Metadados de exibicao da tela de selecao de forma de pagamento (icone/descricao).
+// aria-label fixa o nome acessivel do botao (curto, estavel para testes), independente
+// do texto visual mais descritivo mostrado dentro do card.
+const PAYMENT_METHOD_OPTIONS: Array<{ id: PaymentMethod; ariaLabel: string; label: string; description: string; icon: IconName }> = [
+  { id: 'pix', ariaLabel: 'PIX', label: 'Pix', description: 'Aprovação em segundos, sem taxa extra', icon: 'qr-code' },
+  { id: 'cartao', ariaLabel: 'Cartão', label: 'Cartão de crédito', description: 'Cartão salvo ou novo, em até 12x', icon: 'credit-card' },
+];
 
 type PixData = {
   qrCode?: string;
@@ -563,10 +572,6 @@ export default function Payment() {
     );
   }
 
-  const btnBase: React.CSSProperties = {
-    flex: 1, padding: '13px 0', border: 'none', cursor: 'pointer',
-    fontWeight: 700, fontSize: 15, borderRadius: Radius.md, transition: 'all 0.18s',
-  };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: Colors.bg, display: 'flex', flexDirection: 'column' }}>
@@ -592,18 +597,67 @@ export default function Payment() {
           </div>
         )}
 
-        {/* Method selector */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-          {(['pix', 'cartao'] as const).map(m => (
-            <button key={m} type="button" onClick={() => setMethod(m)} disabled={loading || method === m} style={{
-              ...btnBase,
-              backgroundColor: method === m ? Colors.primary : Colors.card,
-              color: method === m ? '#fff' : Colors.textSecondary,
-              boxShadow: method === m ? `0 4px 10px ${Colors.primary}59` : '0 2px 6px rgba(0,0,0,0.06)',
+        {/* Method selector: cards com icone + descricao, estilo checkout profissional */}
+        <p style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, marginBottom: 10 }}>Forma de pagamento</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          {PAYMENT_METHOD_OPTIONS.map(opt => {
+            const selected = method === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setMethod(opt.id)}
+                disabled={loading}
+                aria-label={opt.ariaLabel}
+                aria-pressed={selected}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left', width: '100%',
+                  padding: '14px 16px', borderRadius: Radius.lg, cursor: loading ? 'not-allowed' : 'pointer',
+                  backgroundColor: selected ? Colors.accentSoft : Colors.card,
+                  border: `2px solid ${selected ? Colors.primary : Colors.border}`,
+                  boxShadow: selected ? `0 4px 12px ${Colors.primary}29` : '0 2px 6px rgba(0,0,0,0.05)',
+                  transition: 'all 0.18s', opacity: loading ? 0.6 : 1,
+                }}
+              >
+                <span style={{
+                  width: 42, height: 42, borderRadius: Radius.full, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: selected ? Colors.primary : Colors.inputBg,
+                  color: selected ? '#fff' : Colors.textSecondary,
+                }}>
+                  <Icon name={opt.icon} size={20} />
+                </span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: Colors.textPrimary }}>{opt.label}</span>
+                  <span style={{ display: 'block', fontSize: 12, color: Colors.textMuted, fontWeight: 600, marginTop: 2 }}>{opt.description}</span>
+                </span>
+                <Icon name={selected ? 'check-circle-filled' : 'check-circle'} size={20} color={selected ? Colors.primary : Colors.borderLight} />
+              </button>
+            );
+          })}
+
+          {/* Dinheiro: backend (Asaas) ainda nao tem endpoint equivalente — ver
+              docs/processes/pagamentos-consulta.md. Mantido visivel e desabilitado
+              (em vez de omitido) para deixar claro que a opcao esta planejada. */}
+          <div aria-disabled="true" style={{
+            display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: Radius.lg,
+            backgroundColor: Colors.borderLight, border: `2px dashed ${Colors.border}`,
+          }}>
+            <span style={{
+              width: 42, height: 42, borderRadius: Radius.full, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: Colors.card, color: Colors.textMuted,
             }}>
-              {m === 'pix' ? 'PIX' : 'Cartão'}
-            </button>
-          ))}
+              <Icon name="banknote" size={20} />
+            </span>
+            <span style={{ flex: 1 }}>
+              <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: Colors.textMuted }}>Dinheiro</span>
+              <span style={{ display: 'block', fontSize: 12, color: Colors.textMuted, fontWeight: 600, marginTop: 2 }}>Em breve — pagamento presencial na consulta</span>
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: Colors.warning, backgroundColor: Colors.warningLight, padding: '4px 10px', borderRadius: Radius.full, flexShrink: 0 }}>
+              Em breve
+            </span>
+          </div>
         </div>
 
         {/* Error banner */}
@@ -737,49 +791,66 @@ export default function Payment() {
 
               {!loadingCartoes && cartoesSalvos.length > 0 && (
                 <div style={{ backgroundColor: Colors.card, borderRadius: 16, padding: 16, marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, marginBottom: 10 }}>Cartões salvos</p>
-                  {cartoesSalvos.map(c => (
-                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${Colors.borderLight}`, gap: 8 }}>
-                      <span style={{ fontSize: 14, color: Colors.textPrimary, fontWeight: 600 }}>
-                        {(c.bandeira || 'Cartão').toUpperCase()} •••• {c.ultimosDigitos}
-                      </span>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          type="button"
-                          onClick={() => handlePagarComCartaoSalvo(c.id)}
-                          disabled={cardSubmitting || !consultaId || Boolean(blockedReason) || patientCpfMissing}
-                          aria-label={`Pagar com cartão terminado em ${c.ultimosDigitos}`}
-                          style={{
-                            backgroundColor: Colors.primary, color: '#fff', border: 'none', borderRadius: 8,
-                            padding: '8px 12px', fontWeight: 700, fontSize: 12,
-                            cursor: cardSubmitting ? 'not-allowed' : 'pointer',
-                            opacity: (cardSubmitting || !consultaId || Boolean(blockedReason) || patientCpfMissing) ? 0.6 : 1,
-                          }}
-                        >
-                          {cardSubmitting ? 'Pagando…' : 'Pagar'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCartaoSalvo(c.id)}
-                          disabled={removingCartaoId === c.id}
-                          aria-label={`Remover cartão terminado em ${c.ultimosDigitos}`}
-                          style={{
-                            backgroundColor: 'transparent', color: Colors.error, border: `1px solid ${Colors.error}`,
-                            borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                            opacity: removingCartaoId === c.id ? 0.6 : 1,
-                          }}
-                        >
-                          {removingCartaoId === c.id ? 'Removendo…' : 'Remover'}
-                        </button>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, marginBottom: 12 }}>Escolha um cartão salvo</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {cartoesSalvos.map(c => (
+                      <div key={c.id} style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                        borderRadius: Radius.md, border: `1px solid ${Colors.border}`, backgroundColor: Colors.inputBg,
+                      }}>
+                        <span style={{
+                          width: 36, height: 36, borderRadius: Radius.full, flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: Colors.card, color: Colors.textSecondary,
+                        }}>
+                          <Icon name="credit-card" size={18} />
+                        </span>
+                        <span style={{ flex: 1, fontSize: 14, color: Colors.textPrimary, fontWeight: 700 }}>
+                          {(c.bandeira || 'Cartão').toUpperCase()} •••• {c.ultimosDigitos}
+                        </span>
+                        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => handlePagarComCartaoSalvo(c.id)}
+                            disabled={cardSubmitting || !consultaId || Boolean(blockedReason) || patientCpfMissing}
+                            aria-label={`Pagar com cartão terminado em ${c.ultimosDigitos}`}
+                            style={{
+                              backgroundColor: Colors.primary, color: '#fff', border: 'none', borderRadius: 8,
+                              padding: '8px 12px', fontWeight: 700, fontSize: 12,
+                              cursor: cardSubmitting ? 'not-allowed' : 'pointer',
+                              opacity: (cardSubmitting || !consultaId || Boolean(blockedReason) || patientCpfMissing) ? 0.6 : 1,
+                            }}
+                          >
+                            {cardSubmitting ? 'Pagando…' : 'Pagar'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCartaoSalvo(c.id)}
+                            disabled={removingCartaoId === c.id}
+                            aria-label={`Remover cartão terminado em ${c.ultimosDigitos}`}
+                            style={{
+                              backgroundColor: 'transparent', color: Colors.error, border: `1px solid ${Colors.error}`,
+                              borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                              opacity: removingCartaoId === c.id ? 0.6 : 1,
+                            }}
+                          >
+                            {removingCartaoId === c.id ? 'Removendo…' : 'Remover'}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowNovoCartaoForm(v => !v)}
-                    style={{ marginTop: 10, backgroundColor: 'transparent', border: 'none', color: Colors.primary, fontWeight: 700, fontSize: 13, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                    style={{
+                      marginTop: 10, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      backgroundColor: 'transparent', border: `1.5px dashed ${Colors.border}`, borderRadius: Radius.md,
+                      color: Colors.primary, fontWeight: 700, fontSize: 13, cursor: 'pointer', padding: '10px 0',
+                    }}
                   >
-                    {showNovoCartaoForm ? 'Cancelar novo cartão' : 'Pagar com outro cartão'}
+                    <Icon name="plus-circle" size={16} />
+                    {showNovoCartaoForm ? 'Cancelar' : 'Adicionar novo cartão'}
                   </button>
                 </div>
               )}
@@ -802,7 +873,16 @@ export default function Payment() {
               {!loadingCartoes && (cartoesSalvos.length === 0 || showNovoCartaoForm)
                 && blockedReason !== 'consulta_ja_paga' && !patientCpfMissing && (
                 <div style={{ backgroundColor: Colors.card, borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: Colors.textSecondary, marginBottom: 12 }}>Novo cartão de crédito</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                    <span style={{
+                      width: 32, height: 32, borderRadius: Radius.full, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: Colors.accentSoft, color: Colors.primary,
+                    }}>
+                      <Icon name="credit-card" size={16} />
+                    </span>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: Colors.textPrimary, margin: 0 }}>Novo cartão de crédito</p>
+                  </div>
                   <CreditCardForm
                     submitLabel="Pagar com este cartão"
                     disabled={!consultaId || Boolean(blockedReason)}

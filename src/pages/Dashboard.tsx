@@ -314,9 +314,21 @@ export default function Dashboard() {
                 da videochamada (meetLink). Antes disso ficava silencioso — o botão
                 simplesmente não aparecia, sem explicar o motivo ao paciente. */}
             {!c.meetLink && (isConsultaAceita(c.status) || isConsultaConcluida(c.status)) && (
-              <div style={{ backgroundColor: Colors.infoLight, borderRadius: Radius.md, padding: '10px 12px', marginTop: Space.md, fontSize: Font.xs, color: Colors.info, fontWeight: 600 }}>
-                O link da videochamada ainda não está disponível. Você pode conversar com o médico pelo chat enquanto isso.
-              </div>
+              <>
+                <div style={{ backgroundColor: Colors.infoLight, borderRadius: Radius.md, padding: '10px 12px', marginTop: Space.md, fontSize: Font.xs, color: Colors.info, fontWeight: 600 }}>
+                  O link da videochamada ainda não está disponível. Você pode conversar com o médico pelo chat enquanto isso.
+                </div>
+                <button
+                  onClick={() => navigate(`/chat?consultaId=${c.id}`)}
+                  aria-label="Abrir chat da consulta"
+                  style={{
+                    width: '100%', backgroundColor: Colors.primary, padding: 14, borderRadius: Radius.md,
+                    marginTop: Space.md, border: 'none', color: '#fff', fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  Abrir chat da consulta
+                </button>
+              </>
             )}
             {canCancel(c.status) && (
               <button
