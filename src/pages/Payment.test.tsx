@@ -5,12 +5,23 @@ import Payment from './Payment';
 
 const criarPagamentoMock = vi.fn();
 const syncPagamentoMock = vi.fn();
+const pagarComCartaoTokenMock = vi.fn();
+const fetchCartoesSalvosMock = vi.fn();
+const removerCartaoSalvoMock = vi.fn();
 const navigateMock = vi.fn();
 const getUserMock = vi.fn();
+const tokenizeCreditCardMock = vi.fn();
 
 vi.mock('../services/api', () => ({
   criarPagamento: (...args: unknown[]) => criarPagamentoMock(...args),
   syncPagamento: (...args: unknown[]) => syncPagamentoMock(...args),
+  pagarComCartaoToken: (...args: unknown[]) => pagarComCartaoTokenMock(...args),
+  fetchCartoesSalvos: (...args: unknown[]) => fetchCartoesSalvosMock(...args),
+  removerCartaoSalvo: (...args: unknown[]) => removerCartaoSalvoMock(...args),
+}));
+
+vi.mock('../services/asaas', () => ({
+  tokenizeCreditCard: (...args: unknown[]) => tokenizeCreditCardMock(...args),
 }));
 
 vi.mock('../storage/localStorage', () => ({
@@ -31,6 +42,19 @@ function renderPayment(consultaId = 'consulta-1', valor = 10000) {
       <Payment />
     </MemoryRouter>,
   );
+}
+
+async function preencherFormularioCartaoNovo() {
+  fireEvent.change(await screen.findByLabelText(/número do cartão/i), { target: { value: '4444444444444444' } });
+  fireEvent.change(screen.getByLabelText(/mês de validade/i), { target: { value: '12' } });
+  fireEvent.change(screen.getByLabelText(/ano de validade/i), { target: { value: String(new Date().getFullYear() + 3) } });
+  fireEvent.change(screen.getByLabelText(/^cvv$/i), { target: { value: '123' } });
+  fireEvent.change(screen.getByLabelText(/nome impresso no cartão/i), { target: { value: 'Fulano de Tal' } });
+  fireEvent.change(screen.getByLabelText(/email do titular/i), { target: { value: 'fulano@teste.com' } });
+  fireEvent.change(screen.getByLabelText(/cpf do titular/i), { target: { value: '52998224725' } });
+  fireEvent.change(screen.getByLabelText(/telefone do titular/i), { target: { value: '11988887777' } });
+  fireEvent.change(screen.getByLabelText(/cep do titular/i), { target: { value: '01310930' } });
+  fireEvent.change(screen.getByLabelText(/número do endereço/i), { target: { value: '123' } });
 }
 
 
@@ -184,76 +208,115 @@ describe('Payment — polling de status', () => {
   });
 });
 
-describe('Payment — checkout de cartão (gateway Asaas)', () => {
-  const originalLocation = window.location;
-
+describe('Payment — pagamento com cartão (tokenização client-side no Asaas)', () => {
   beforeEach(() => {
     criarPagamentoMock.mockReset();
     syncPagamentoMock.mockReset();
+    pagarComCartaoTokenMock.mockReset();
+    fetchCartoesSalvosMock.mockReset();
+    removerCartaoSalvoMock.mockReset();
+    tokenizeCreditCardMock.mockReset();
     navigateMock.mockReset();
     getUserMock.mockReset().mockResolvedValue(null);
     window.sessionStorage.clear();
     syncPagamentoMock.mockRejectedValue(semPagamentoExistenteError());
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...originalLocation, href: '' },
-    });
-  });
-
-  afterEach(() => {
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: originalLocation,
-    });
+    fetchCartoesSalvosMock.mockResolvedValue([]);
   });
 
   async function selecionarCartao() {
     const cartaoTab = await screen.findByRole('button', { name: 'Cartão' });
-    fireEvent.click(cartaoTab);
-    return screen.findByRole('button', { name: /pagar com cartao/i });
+    await act(async () => { fireEvent.click(cartaoTab); });
   }
 
-  it('redireciona para o link de pagamento retornado pelo backend (campo normalizado linkPagamento)', async () => {
-    criarPagamentoMock.mockResolvedValue({
-      pagamento: { id: 'pag-asaas-1', status: 'AGUARDANDO' },
-      linkPagamento: 'https://sandbox.asaas.com/i/mock-invoice',
-      asaas: { paymentId: 'pay_123', invoiceUrl: 'https://sandbox.asaas.com/i/mock-invoice' },
+  it('tokeniza um cartão novo e paga quando não há cartão salvo', async () => {
+    tokenizeCreditCardMock.mockResolvedValue({
+      creditCardToken: 'token-abc',
+      creditCardNumber: '4444',
+      creditCardBrand: 'VISA',
+    });
+    pagarComCartaoTokenMock.mockResolvedValue({
+      pagamento: { id: 'pag-1', status: 'PAGO' },
+      cartao: { status: 'approved', statusDetail: 'accredited', aprovado: true },
     });
 
     renderPayment();
+    await selecionarCartao();
+    await preencherFormularioCartaoNovo();
 
-    const pagarBtn = await selecionarCartao();
+    const pagarBtn = await screen.findByRole('button', { name: /pagar com este cartão/i });
     await act(async () => { fireEvent.click(pagarBtn); });
 
-    await waitFor(() => expect(window.location.href).toBe('https://sandbox.asaas.com/i/mock-invoice'));
+    await waitFor(() => expect(pagarComCartaoTokenMock).toHaveBeenCalledWith(expect.objectContaining({
+      consultaId: 'consulta-1',
+      token: 'token-abc',
+      ultimosDigitos: '4444',
+      bandeira: 'VISA',
+    })));
+
+    expect(navigateMock).toHaveBeenCalledWith('/dashboard', expect.objectContaining({
+      state: expect.objectContaining({ paymentSuccess: true, consultaId: 'consulta-1' }),
+    }));
   });
 
-  it('usa asaas.invoiceUrl como alternativa quando linkPagamento não vem preenchido', async () => {
-    criarPagamentoMock.mockResolvedValue({
-      pagamento: { id: 'pag-asaas-2', status: 'AGUARDANDO' },
-      asaas: { paymentId: 'pay_456', invoiceUrl: 'https://sandbox.asaas.com/i/outro-invoice' },
+  it('paga direto com um cartão salvo, sem tokenizar de novo', async () => {
+    fetchCartoesSalvosMock.mockResolvedValue([
+      { id: 'card-1', ultimosDigitos: '1234', bandeira: 'visa', titular: 'Fulano de Tal' },
+    ]);
+    pagarComCartaoTokenMock.mockResolvedValue({
+      pagamento: { id: 'pag-2', status: 'PAGO' },
+      cartao: { status: 'approved', statusDetail: 'accredited', aprovado: true },
     });
 
     renderPayment();
+    await selecionarCartao();
 
-    const pagarBtn = await selecionarCartao();
+    const pagarBtn = await screen.findByRole('button', { name: /pagar com cartão terminado em 1234/i });
     await act(async () => { fireEvent.click(pagarBtn); });
 
-    await waitFor(() => expect(window.location.href).toBe('https://sandbox.asaas.com/i/outro-invoice'));
+    expect(pagarComCartaoTokenMock).toHaveBeenCalledWith({ consultaId: 'consulta-1', cartaoId: 'card-1' });
+    expect(tokenizeCreditCardMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/dashboard', expect.objectContaining({
+      state: expect.objectContaining({ paymentSuccess: true, consultaId: 'consulta-1' }),
+    })));
   });
 
-  it('exibe mensagem de erro quando o backend não retorna nenhum link de checkout', async () => {
-    criarPagamentoMock.mockResolvedValue({
-      pagamento: { id: 'pag-asaas-3', status: 'AGUARDANDO' },
+  it('exibe o motivo da recusa e oferece pagar com Pix quando o cartão não é aprovado', async () => {
+    fetchCartoesSalvosMock.mockResolvedValue([
+      { id: 'card-1', ultimosDigitos: '1234', bandeira: 'visa', titular: 'Fulano de Tal' },
+    ]);
+    pagarComCartaoTokenMock.mockResolvedValue({
+      pagamento: { id: 'pag-3', status: 'FALHOU' },
+      cartao: { status: 'refused', statusDetail: 'cartão sem limite', aprovado: false },
     });
 
     renderPayment();
+    await selecionarCartao();
 
-    const pagarBtn = await selecionarCartao();
+    const pagarBtn = await screen.findByRole('button', { name: /pagar com cartão terminado em 1234/i });
     await act(async () => { fireEvent.click(pagarBtn); });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/não retornou link de pagamento/i);
-    expect(window.location.href).toBe('');
+    expect(await screen.findByText(/pagamento não aprovado.*cartão sem limite/i)).toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalled();
+
+    const pixBtn = screen.getByRole('button', { name: /tentar pagar com pix/i });
+    await act(async () => { fireEvent.click(pixBtn); });
+    expect(await screen.findByRole('button', { name: /gerar código pix/i })).toBeInTheDocument();
+  });
+
+  it('remove um cartão salvo da lista', async () => {
+    fetchCartoesSalvosMock.mockResolvedValue([
+      { id: 'card-1', ultimosDigitos: '1234', bandeira: 'visa', titular: 'Fulano de Tal' },
+    ]);
+    removerCartaoSalvoMock.mockResolvedValue(undefined);
+
+    renderPayment();
+    await selecionarCartao();
+
+    const removerBtn = await screen.findByRole('button', { name: /remover cartão terminado em 1234/i });
+    await act(async () => { fireEvent.click(removerBtn); });
+
+    expect(removerCartaoSalvoMock).toHaveBeenCalledWith('card-1');
+    await waitFor(() => expect(screen.queryByText(/1234/)).not.toBeInTheDocument());
   });
 });
 

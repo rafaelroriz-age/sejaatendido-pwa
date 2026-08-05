@@ -197,6 +197,9 @@ let MOCK_DADOS_BANCARIOS_PACIENTE = {
   conta: '99887-6',
 };
 
+let MOCK_CARTOES_SALVOS: Array<{ id: string; ultimosDigitos: string; bandeira: string; titular: string }> = [];
+
+
 const MOCK_MEDICOS_PENDENTES = [
   {
     id: 'med-pending-001',
@@ -370,6 +373,14 @@ export const handlers = [
   http.put(`${BASE}/medicos/me`, async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     return HttpResponse.json({ medico: { ...MOCK_MEDICOS[0], ...body } });
+  }),
+  // Contrato dedicado (2026-08-04) para o valor da consulta cobrado do paciente.
+  http.put(`${BASE}/medicos/me/perfil`, async ({ request }) => {
+    const body = await request.json() as { valorConsultaCentavos?: number };
+    if (typeof body.valorConsultaCentavos === 'number') {
+      MOCK_MEDICOS[0] = { ...MOCK_MEDICOS[0], valorConsulta: body.valorConsultaCentavos } as typeof MOCK_MEDICOS[0];
+    }
+    return HttpResponse.json({ medico: { ...MOCK_MEDICOS[0] } });
   }),
 
   // CRM
@@ -609,6 +620,66 @@ export const handlers = [
   http.get(`${BASE}/v1/pagamentos/sync/:consultaId`, () =>
     HttpResponse.json({ status: 'PENDENTE', pagamento: { id: 'pag-001', status: 'PENDENTE' } }),
   ),
+
+  // Pagamento com cartao (novo ou salvo), tokenizado direto no Asaas pelo app.
+  http.post(`${BASE}/pagamentos/cartao/token`, async ({ request }) => {
+    const body = await request.json() as {
+      consultaId?: string;
+      token?: string;
+      cartaoId?: string;
+      ultimosDigitos?: string;
+      bandeira?: string;
+      titular?: string;
+      salvarCartao?: boolean;
+    };
+    const valor = getConsultaValorCentavos(body.consultaId);
+
+    if (body.cartaoId) {
+      const existente = MOCK_CARTOES_SALVOS.find(c => c.id === body.cartaoId);
+      if (!existente) {
+        return HttpResponse.json({ erro: 'Cartão salvo não encontrado' }, { status: 404 });
+      }
+    } else if (body.salvarCartao && body.token) {
+      MOCK_CARTOES_SALVOS.push({
+        id: `card-mock-${Date.now()}`,
+        ultimosDigitos: body.ultimosDigitos ?? '0000',
+        bandeira: body.bandeira ?? 'VISA',
+        titular: body.titular ?? 'TITULAR MOCK',
+      });
+    }
+
+    return HttpResponse.json({
+      pagamento: {
+        id: `pag-cartao-${Date.now()}`,
+        consultaId: body.consultaId,
+        valor,
+        status: 'PAGO',
+        metodo: 'CARTAO',
+        criadoEm: new Date().toISOString(),
+      },
+      cartao: { status: 'approved', statusDetail: 'accredited', aprovado: true },
+    });
+  }),
+
+  // Cartões salvos do paciente (perfil, estilo Uber).
+  http.get(`${BASE}/pacientes/me/cartoes`, () => HttpResponse.json({ cartoes: MOCK_CARTOES_SALVOS })),
+
+  http.post(`${BASE}/pacientes/me/cartoes`, async ({ request }) => {
+    const body = await request.json() as { token?: string; ultimosDigitos?: string; bandeira?: string; titular?: string };
+    const novo = {
+      id: `card-mock-${Date.now()}`,
+      ultimosDigitos: body.ultimosDigitos ?? '0000',
+      bandeira: body.bandeira ?? 'VISA',
+      titular: body.titular ?? 'TITULAR MOCK',
+    };
+    MOCK_CARTOES_SALVOS.push(novo);
+    return HttpResponse.json({ cartao: novo }, { status: 201 });
+  }),
+
+  http.delete(`${BASE}/pacientes/me/cartoes/:cartaoId`, ({ params }) => {
+    MOCK_CARTOES_SALVOS = MOCK_CARTOES_SALVOS.filter(c => c.id !== params.cartaoId);
+    return HttpResponse.json({ ok: true });
+  }),
 
   // ── ADMIN ─────────────────────────────────────────────────────────────────
 

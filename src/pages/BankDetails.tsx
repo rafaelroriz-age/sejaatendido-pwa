@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { saveDadosBancarios, fetchDadosBancarios, DadosBancariosPerfil } from '../services/api';
+import {
+  saveDadosBancarios,
+  fetchDadosBancarios,
+  DadosBancariosPerfil,
+  fetchCartoesSalvos,
+  salvarCartao,
+  removerCartaoSalvo,
+  type CartaoSalvo,
+} from '../services/api';
 import { getUser } from '../storage/localStorage';
-import Colors from '../theme/colors';
+import Colors, { Radius } from '../theme/colors';
+import CreditCardForm, { type CreditCardTokenResult } from '../components/CreditCardForm';
 
 type TipoChavePix = 'CPF' | 'CNPJ' | 'EMAIL' | 'TELEFONE' | 'ALEATORIA';
 
@@ -93,6 +102,15 @@ export default function BankDetails() {
   const [saveMsg, setSaveMsg] = useState('');
   const [saveError, setSaveError] = useState('');
 
+  // Paciente — cartões salvos (estilo Uber: token reutilizável persistido pelo
+  // backend, ver services/api.ts fetchCartoesSalvos/salvarCartao/removerCartaoSalvo).
+  const [cartoesSalvos, setCartoesSalvos] = useState<CartaoSalvo[]>([]);
+  const [loadingCartoes, setLoadingCartoes] = useState(false);
+  const [showNovoCartaoForm, setShowNovoCartaoForm] = useState(false);
+  const [removingCartaoId, setRemovingCartaoId] = useState<string | null>(null);
+  const [cartaoMsg, setCartaoMsg] = useState('');
+  const [cartaoError, setCartaoError] = useState('');
+
   useEffect(() => {
     let active = true;
 
@@ -106,6 +124,7 @@ export default function BankDetails() {
 
         if (nextPerfil === 'PACIENTE') {
           setLoadingData(false);
+          await loadCartoesSalvos();
           return;
         }
 
@@ -118,6 +137,56 @@ export default function BankDetails() {
     void bootstrap();
     return () => { active = false; };
   }, []);
+
+  async function loadCartoesSalvos() {
+    setLoadingCartoes(true);
+    try {
+      const list = await fetchCartoesSalvos();
+      setCartoesSalvos(list);
+      setShowNovoCartaoForm(list.length === 0);
+    } catch {
+      setCartoesSalvos([]);
+      setShowNovoCartaoForm(true);
+    } finally {
+      setLoadingCartoes(false);
+    }
+  }
+
+  async function handleSalvarNovoCartao(result: CreditCardTokenResult) {
+    setCartaoMsg('');
+    setCartaoError('');
+    try {
+      const cartao = await salvarCartao({
+        token: result.token,
+        ultimosDigitos: result.ultimosDigitos,
+        bandeira: result.bandeira,
+        titular: result.titular,
+      });
+      setCartoesSalvos(prev => [...prev, cartao]);
+      setShowNovoCartaoForm(false);
+      setCartaoMsg('Cartão salvo com sucesso!');
+      setTimeout(() => setCartaoMsg(''), 3000);
+    } catch (error) {
+      setCartaoError((error as any)?.response?.data?.erro || (error as any)?.response?.data?.mensagem || 'Não foi possível salvar o cartão.');
+    }
+  }
+
+  async function handleRemoverCartao(cartaoId: string) {
+    setCartaoError('');
+    setRemovingCartaoId(cartaoId);
+    try {
+      await removerCartaoSalvo(cartaoId);
+      setCartoesSalvos(prev => {
+        const next = prev.filter(c => c.id !== cartaoId);
+        if (next.length === 0) setShowNovoCartaoForm(true);
+        return next;
+      });
+    } catch {
+      setCartaoError('Não foi possível remover o cartão.');
+    } finally {
+      setRemovingCartaoId(null);
+    }
+  }
 
   async function loadDados(nextPerfil: DadosBancariosPerfil) {
     try {
@@ -229,14 +298,77 @@ export default function BankDetails() {
               <span style={{ fontSize: 17, fontWeight: 800, color: Colors.textPrimary, letterSpacing: -0.3, display: 'block', marginBottom: 10 }}>
                 Como pagar
               </span>
-              <span style={{ fontSize: 14, color: Colors.textSecondary, display: 'block', marginBottom: 14 }}>
-                <strong>Pix</strong> é o método recomendado: gere o QR Code na tela da consulta, sem precisar cadastrar nada aqui antes. Para pagar com <strong>cartão de crédito</strong>, você será redirecionado para o checkout seguro do nosso gateway de pagamento no momento do pagamento.
+              <span style={{ fontSize: 14, color: Colors.textSecondary, display: 'block' }}>
+                <strong>Pix</strong> é o método recomendado: gere o QR Code na tela da consulta, sem precisar cadastrar nada aqui antes. Você também pode pagar com <strong>cartão de crédito</strong>, novo ou salvo, direto na tela da consulta.
               </span>
-              <div style={{ backgroundColor: Colors.warningLight, borderRadius: 12, padding: '12px 14px', border: `1px solid ${Colors.border}` }}>
-                <span style={{ fontSize: 13, color: Colors.textSecondary, fontWeight: 600 }}>
-                  Cartão salvo está temporariamente indisponível — nosso gateway de pagamento atual ainda não oferece esse recurso.
+            </div>
+
+            <div style={{ backgroundColor: Colors.card, borderRadius: 20, padding: 20, marginBottom: 16, boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}>
+              <span style={{ fontSize: 17, fontWeight: 800, color: Colors.textPrimary, letterSpacing: -0.3, display: 'block', marginBottom: 14 }}>
+                Cartões salvos
+              </span>
+
+              {loadingCartoes && (
+                <div style={{ textAlign: 'center', padding: '12px 0', fontSize: 13, color: Colors.textMuted, fontWeight: 600 }}>
+                  Carregando cartões salvos…
+                </div>
+              )}
+
+              {!loadingCartoes && cartoesSalvos.length === 0 && !showNovoCartaoForm && (
+                <span style={{ fontSize: 13, color: Colors.textMuted, display: 'block', marginBottom: 12 }}>
+                  Você ainda não tem nenhum cartão salvo.
                 </span>
-              </div>
+              )}
+
+              {!loadingCartoes && cartoesSalvos.map(c => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${Colors.borderLight}`, gap: 8 }}>
+                  <span style={{ fontSize: 14, color: Colors.textPrimary, fontWeight: 600 }}>
+                    {(c.bandeira || 'Cartão').toUpperCase()} •••• {c.ultimosDigitos}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoverCartao(c.id)}
+                    disabled={removingCartaoId === c.id}
+                    aria-label={`Remover cartão terminado em ${c.ultimosDigitos}`}
+                    style={{
+                      backgroundColor: 'transparent', color: Colors.error, border: `1px solid ${Colors.error}`,
+                      borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                      opacity: removingCartaoId === c.id ? 0.6 : 1,
+                    }}
+                  >
+                    {removingCartaoId === c.id ? 'Removendo…' : 'Remover'}
+                  </button>
+                </div>
+              ))}
+
+              {!loadingCartoes && !showNovoCartaoForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowNovoCartaoForm(true)}
+                  style={{ marginTop: 12, width: '100%', backgroundColor: Colors.accentSoft, color: Colors.primary, border: `1px solid ${Colors.primary}`, borderRadius: Radius.md, padding: 14, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+                >
+                  + Adicionar cartão
+                </button>
+              )}
+
+              {!loadingCartoes && showNovoCartaoForm && (
+                <div style={{ marginTop: 8 }}>
+                  <CreditCardForm submitLabel="Salvar cartão" onTokenized={handleSalvarNovoCartao}>
+                    {cartoesSalvos.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowNovoCartaoForm(false)}
+                        style={{ background: 'none', border: 'none', color: Colors.textSecondary, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: 12, padding: 0, textDecoration: 'underline' }}
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </CreditCardForm>
+                </div>
+              )}
+
+              {cartaoMsg && <p style={{ fontSize: 14, color: Colors.success, fontWeight: 700, marginTop: 12 }}>{cartaoMsg}</p>}
+              {cartaoError && <p role="alert" style={{ fontSize: 14, color: Colors.error, marginTop: 12 }}>{cartaoError}</p>}
             </div>
           </>
         ) : (
